@@ -17,10 +17,10 @@ jobs:
     #### expecting it in the form of
     ####   /go/src/github.com/circleci/go-tool
     ####   /go/src/bitbucket.org/circleci/go-tool
-    working_directory: ~/digest
+    working_directory: ~/imagebuilder
     steps:
       - checkout
-      - run: ./bin/digest dev/lint dev/test build
+      - run: ./bin/imagebuilder dev/lint dev/test build
 workflows:
   version: 2
   pull-request:
