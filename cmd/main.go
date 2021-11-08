@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	run.Service("imagebuilder", imagebuilder.IoCBuilder, imagebuilder.App)
+	run.Tool("imagebuilder", imagebuilder.IoCBuilder, imagebuilder.App)
 }
