@@ -213,8 +213,7 @@ func (b *ImageBuild) run(ctx context.Context, cmd *runCommand) (retErr error) {
 			}
 			return
 		}
-		// FIXME (wojciech): this doesn't work
-		if err := syscall.Chroot("/"); err != nil {
+		if err := syscall.Chroot("."); err != nil {
 			if retErr == nil {
 				retErr = err
 			}
