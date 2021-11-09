@@ -16,8 +16,6 @@ import (
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
-const fromScratch = "scratch"
-
 type cloneFromFn func(srcImageName string) error
 
 // NewBuilder creates new image builder
@@ -71,13 +69,19 @@ func (b *Builder) clone(ctx context.Context, dstImageName string) cloneFromFn {
 		if err != nil {
 			return err
 		}
-		if srcImageName == fromScratch {
+		if strings.HasPrefix(srcImageName, "fedora:") {
+			parts := strings.SplitN(srcImageName, ":", 2)
+			if len(parts) != 2 || parts[1] == "" {
+				return errors.New("no tag provided for fedora release")
+			}
+			fedoraRelease := parts[1]
+
 			if err := b.storage.Create(dstImageName); err != nil {
 				return err
 			}
 
 			err := libexec.Exec(ctx,
-				exec.Command("dnf", "install", "-y", "--installroot="+dstImgPath, "--releasever=34",
+				exec.Command("dnf", "install", "-y", "--installroot="+dstImgPath, "--releasever="+fedoraRelease,
 					"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
 					"dnf"))
 			if err != nil {
