@@ -198,6 +198,9 @@ func (b *ImageBuild) run(ctx context.Context, cmd *runCommand) (retErr error) {
 	if err := syscall.Chroot(b.path); err != nil {
 		return err
 	}
+	if err := os.Chdir("/"); err != nil {
+		return err
+	}
 
 	defer func() {
 		defer func() {
