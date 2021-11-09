@@ -7,9 +7,11 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
+	"github.com/otiai10/copy"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
@@ -79,9 +81,6 @@ func (b *Builder) clone(ctx context.Context, dstImageName string) cloneFromFn {
 					"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
 					"dnf"))
 			if err != nil {
-				return err
-			}
-			if err := ioutil.WriteFile(dstImgPath+"/etc/resolv.conf", []byte("nameserver 8.8.8.8\nnameserver 8.8.4.4\n"), 0o644); err != nil {
 				return err
 			}
 		} else {
@@ -179,7 +178,7 @@ func (b *ImageBuild) label(cmd *labelCommand) error {
 
 // copy is a handler for COPY
 func (b *ImageBuild) copy(cmd *copyCommand) error {
-	return nil
+	return copy.Copy(cmd.from, filepath.Join(b.path, cmd.to))
 }
 
 // run is a handler for RUN
