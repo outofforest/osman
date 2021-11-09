@@ -21,7 +21,7 @@ func IoCBuilder(c *ioc.Container) {
 	c.Singleton(func() runtime.Config {
 		return runtime.Config{
 			RootDir:    "/tmp/images",
-			Dockerfile: "/home/wojciech/sources/imagebuilder/base.image",
+			Dockerfile: "/root/fedora/base.in",
 		}
 	})
 	c.Singleton(storage.NewDirDriver)
