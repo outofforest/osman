@@ -14,13 +14,6 @@ func From(imageName string) Command {
 	}
 }
 
-// FromScratch returns handler for FROM command which creates image from scratch
-func FromScratch() Command {
-	return &fromCommand{
-		imageName: fromScratch,
-	}
-}
-
 // Label returns handler for LABEL command
 func Label(name, value string) Command {
 	return &labelCommand{
@@ -41,13 +34,6 @@ func Copy(from, to string) Command {
 func Run(command string) Command {
 	return &runCommand{
 		command: command,
-	}
-}
-
-// Include returns handler for INCLUDE command
-func Include(file string) Command {
-	return &includeCommand{
-		file: file,
 	}
 }
 
@@ -83,12 +69,4 @@ type runCommand struct {
 
 func (cmd *runCommand) execute(ctx context.Context, build *ImageBuild) error {
 	return build.run(ctx, cmd)
-}
-
-type includeCommand struct {
-	file string
-}
-
-func (cmd *includeCommand) execute(ctx context.Context, build *ImageBuild) error {
-	return build.include(cmd)
 }

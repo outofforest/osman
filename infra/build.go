@@ -225,8 +225,3 @@ func (b *ImageBuild) run(ctx context.Context, cmd *runCommand) (retErr error) {
 
 	return libexec.Exec(ctx, exec.Command("sh", "-c", cmd.command))
 }
-
-// include is a handler for INCLUDE
-func (b *ImageBuild) include(cmd *includeCommand) error {
-	return nil
-}
