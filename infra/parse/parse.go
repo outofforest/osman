@@ -51,9 +51,7 @@ func Parse(dockerfilePath string) ([]infra.Command, error) {
 			return nil, fmt.Errorf("error in line %d of %s command: %w", child.StartLine, child.Value, err)
 		}
 
-		for _, cmd := range cmds {
-			commands = append(commands, cmd)
-		}
+		commands = append(commands, cmds...)
 	}
 	return commands, nil
 }
@@ -119,9 +117,7 @@ func cmdInclude(args []string) ([]infra.Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, cmd := range cmds {
-			res = append(res, cmd)
-		}
+		res = append(res, cmds...)
 	}
 	return res, nil
 }
