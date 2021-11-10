@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -12,11 +13,14 @@ import (
 	"syscall"
 
 	"github.com/otiai10/copy"
+	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
-type cloneFromFn func(srcImageName string) error
+const manifestFile = "manifest.json"
+
+type cloneFromFn func(srcImageName string) (ImageManifest, error)
 
 // NewBuilder creates new image builder
 func NewBuilder(repo *Repository, storage storage.Driver) *Builder {
@@ -80,45 +84,66 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 			return nil, err
 		}
 	}
+
+	if err := ioutil.WriteFile(filepath.Join(path, manifestFile), must.Bytes(json.Marshal(build.Manifest())), 0o444); err != nil {
+		return nil, err
+	}
+
 	return build, nil
 }
 
 func (b *Builder) clone(ctx context.Context, dstImageName string) cloneFromFn {
-	return func(srcImageName string) error {
-		dstImgPath, err := b.storage.Path(dstImageName)
-		if err != nil {
-			return err
-		}
-
+	return func(srcImageName string) (ImageManifest, error) {
 		srcImgPath, err := b.storage.Path(srcImageName)
 		if err != nil {
-			return err
+			return ImageManifest{}, err
 		}
 		if err := umount(srcImgPath); err != nil {
-			return err
+			return ImageManifest{}, err
 		}
 		err = b.storage.Clone(srcImageName, dstImageName)
 		if err != nil && errors.Is(err, storage.ErrSourceImageDoesNotExist) {
 			if img := b.repo.Retrieve(srcImageName); img != nil {
 				if _, err := b.Build(ctx, img); err != nil {
-					return err
+					return ImageManifest{}, err
 				}
 				err = b.storage.Clone(srcImageName, dstImageName)
 			} else {
-				return fmt.Errorf("image %s does not exist in repository", srcImageName)
+				return ImageManifest{}, fmt.Errorf("image %s does not exist in repository", srcImageName)
 			}
 		}
 		if err != nil {
-			return err
+			return ImageManifest{}, err
+		}
+
+		dstImgPath, err := b.storage.Path(dstImageName)
+		if err != nil {
+			return ImageManifest{}, err
+		}
+
+		if err := os.Remove(filepath.Join(dstImgPath, manifestFile)); err != nil {
+			return ImageManifest{}, err
+		}
+
+		manifestRaw, err := ioutil.ReadFile(filepath.Join(srcImgPath, manifestFile))
+		if err != nil {
+			return ImageManifest{}, err
+		}
+		var manifest ImageManifest
+		if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+			return ImageManifest{}, err
 		}
 
 		if err := syscall.Mount("/dev", dstImgPath+"/dev", "", syscall.MS_BIND, ""); err != nil {
-			return err
+			return ImageManifest{}, err
 		}
 		if err := syscall.Mount("/proc", dstImgPath+"/proc", "", syscall.MS_BIND, ""); err != nil {
-			return err
+			return ImageManifest{}, err
 		}
-		return syscall.Mount("/sys", dstImgPath+"/sys", "", syscall.MS_BIND, "")
+		if err := syscall.Mount("/sys", dstImgPath+"/sys", "", syscall.MS_BIND, ""); err != nil {
+			return ImageManifest{}, err
+		}
+		return manifest, nil
 	}
 }
 
@@ -144,12 +169,16 @@ func umount(imgPath string) error {
 	return nil
 }
 
+// ImageManifest contains info about built image
+type ImageManifest struct {
+	Params []string
+}
+
 func newImageBuild(base bool, path string, cloneFn cloneFromFn) *ImageBuild {
 	return &ImageBuild{
 		cloneFn: cloneFn,
 		base:    base,
 		path:    path,
-		labels:  map[string]string{},
 	}
 }
 
@@ -157,9 +186,9 @@ func newImageBuild(base bool, path string, cloneFn cloneFromFn) *ImageBuild {
 type ImageBuild struct {
 	cloneFn cloneFromFn
 
-	base   bool
-	path   string
-	labels map[string]string
+	base     bool
+	path     string
+	manifest ImageManifest
 }
 
 // Path returns path to directory where image is created
@@ -167,9 +196,9 @@ func (b *ImageBuild) Path() string {
 	return b.path
 }
 
-// Label returns a value of label
-func (b *ImageBuild) Label(name string) string {
-	return b.labels[name]
+// Manifest returns image manifest
+func (b *ImageBuild) Manifest() ImageManifest {
+	return b.manifest
 }
 
 // from is a handler for FROM
@@ -177,12 +206,17 @@ func (b *ImageBuild) from(cmd *fromCommand) error {
 	if b.base {
 		return errors.New("command FROM is forbidden for base image")
 	}
-	return b.cloneFn(cmd.imageName)
+	manifest, err := b.cloneFn(cmd.imageName)
+	if err != nil {
+		return err
+	}
+	b.manifest.Params = manifest.Params
+	return nil
 }
 
-// label is a handler for Label
-func (b *ImageBuild) label(cmd *labelCommand) error {
-	b.labels[cmd.name] = cmd.value
+// params sets kernel params for image
+func (b *ImageBuild) params(cmd *paramsCommand) error {
+	b.manifest.Params = append(b.manifest.Params, cmd.params...)
 	return nil
 }
 

@@ -179,7 +179,7 @@ func init() {
 	dispatch = map[string]func(string, *directives) (*Node, map[string]bool, error){
 		"copy":    parseMaybeJSONToList,
 		"from":    parseStringsWhitespaceDelimited,
-		"label":   parseLabel,
+		"params":  parseStringsWhitespaceDelimited,
 		"run":     parseMaybeJSON,
 		"include": parseStringsWhitespaceDelimited,
 	}

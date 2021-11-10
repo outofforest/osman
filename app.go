@@ -34,6 +34,7 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	must.OK(os.Chdir(filepath.Dir(config.Dockerfile)))
 
 	repo.Store(infra.Describe("fedora:34",
+		infra.Params("param1"),
 		infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`)))
 
@@ -47,8 +48,7 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 		return err
 	}
 
-	logger.Get(ctx).Info("Image built", zap.String("path", build.Path()),
-		zap.String("label", build.Label("pl.woojciki.wojciech.kernel-param.blacklist-nouveau")))
+	logger.Get(ctx).Info("Image built", zap.String("path", build.Path()), zap.Strings("params", build.Manifest().Params))
 
 	return nil
 }

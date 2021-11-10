@@ -35,8 +35,8 @@ func Parse(dockerfilePath string) ([]infra.Command, error) {
 		switch strings.ToLower(child.Value) {
 		case "from":
 			cmds, err = cmdFrom(args)
-		case "label":
-			cmds, err = cmdLabel(args)
+		case "params":
+			cmds, err = cmdParams(args)
 		case "copy":
 			cmds, err = cmdCopy(args)
 		case "run":
@@ -66,17 +66,11 @@ func cmdFrom(args []string) ([]infra.Command, error) {
 	return []infra.Command{infra.From(args[0])}, nil
 }
 
-func cmdLabel(args []string) ([]infra.Command, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("incorrect number of arguments, expected: 2, got: %d", len(args))
+func cmdParams(args []string) ([]infra.Command, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("no arguments passed")
 	}
-	if args[0] == "" {
-		return nil, errors.New("first argument is empty")
-	}
-	if args[1] == "" {
-		return nil, errors.New("second argument is empty")
-	}
-	return []infra.Command{infra.Label(args[0], args[1])}, nil
+	return []infra.Command{infra.Params(args...)}, nil
 }
 
 func cmdCopy(args []string) ([]infra.Command, error) {
