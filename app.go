@@ -21,7 +21,7 @@ func IoCBuilder(c *ioc.Container) {
 	c.Singleton(func() runtime.Config {
 		return runtime.Config{
 			RootDir:    "/tmp/images",
-			Dockerfile: "/root/fedora/base.in",
+			Dockerfile: "/root/fedora/base.image",
 		}
 	})
 	c.Singleton(storage.NewDirDriver)
@@ -32,6 +32,10 @@ func IoCBuilder(c *ioc.Container) {
 // App runs builder app
 func App(ctx context.Context, config runtime.Config, repo *infra.Repository, builder *infra.Builder) error {
 	must.OK(os.Chdir(filepath.Dir(config.Dockerfile)))
+
+	repo.Store(infra.Describe("fedora:34",
+		infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
+		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`)))
 
 	commands, err := parse.Parse(config.Dockerfile)
 	if err != nil {
