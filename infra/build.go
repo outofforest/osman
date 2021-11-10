@@ -53,7 +53,27 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 	}()
 
-	build := newImageBuild(path, b.clone(ctx, img.Name()))
+	var base bool
+	if strings.HasPrefix(img.Name(), "fedora:") {
+		parts := strings.SplitN(img.Name(), ":", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			return nil, errors.New("no tag provided for base image")
+		}
+		fedoraRelease := parts[1]
+
+		if err := b.storage.Create(img.Name()); err != nil {
+			return nil, err
+		}
+
+		if err := libexec.Exec(ctx,
+			exec.Command("dnf", "install", "-y", "--installroot="+path, "--releasever="+fedoraRelease,
+				"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
+				"dnf", "langpacks-en")); err != nil {
+			return nil, err
+		}
+	}
+
+	build := newImageBuild(base, path, b.clone(ctx, img.Name()))
 
 	for _, cmd := range img.commands {
 		if err := cmd.execute(ctx, build); err != nil {
@@ -69,46 +89,27 @@ func (b *Builder) clone(ctx context.Context, dstImageName string) cloneFromFn {
 		if err != nil {
 			return err
 		}
-		if strings.HasPrefix(srcImageName, "fedora:") {
-			parts := strings.SplitN(srcImageName, ":", 2)
-			if len(parts) != 2 || parts[1] == "" {
-				return errors.New("no tag provided for fedora release")
-			}
-			fedoraRelease := parts[1]
 
-			if err := b.storage.Create(dstImageName); err != nil {
-				return err
-			}
-
-			err := libexec.Exec(ctx,
-				exec.Command("dnf", "install", "-y", "--installroot="+dstImgPath, "--releasever="+fedoraRelease,
-					"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
-					"dnf"))
-			if err != nil {
-				return err
-			}
-		} else {
-			srcImgPath, err := b.storage.Path(srcImageName)
-			if err != nil {
-				return err
-			}
-			if err := umount(srcImgPath); err != nil {
-				return err
-			}
-			err = b.storage.Clone(srcImageName, dstImageName)
-			if err != nil && errors.Is(err, storage.ErrSourceImageDoesNotExist) {
-				if img := b.repo.Retrieve(srcImageName); img != nil {
-					if _, err := b.Build(ctx, img); err != nil {
-						return err
-					}
-					err = b.storage.Clone(srcImageName, dstImageName)
-				} else {
-					return fmt.Errorf("image %s does not exist in repository", srcImageName)
+		srcImgPath, err := b.storage.Path(srcImageName)
+		if err != nil {
+			return err
+		}
+		if err := umount(srcImgPath); err != nil {
+			return err
+		}
+		err = b.storage.Clone(srcImageName, dstImageName)
+		if err != nil && errors.Is(err, storage.ErrSourceImageDoesNotExist) {
+			if img := b.repo.Retrieve(srcImageName); img != nil {
+				if _, err := b.Build(ctx, img); err != nil {
+					return err
 				}
+				err = b.storage.Clone(srcImageName, dstImageName)
+			} else {
+				return fmt.Errorf("image %s does not exist in repository", srcImageName)
 			}
-			if err != nil {
-				return err
-			}
+		}
+		if err != nil {
+			return err
 		}
 
 		if err := syscall.Mount("/dev", dstImgPath+"/dev", "", syscall.MS_BIND, ""); err != nil {
@@ -143,9 +144,10 @@ func umount(imgPath string) error {
 	return nil
 }
 
-func newImageBuild(path string, cloneFn cloneFromFn) *ImageBuild {
+func newImageBuild(base bool, path string, cloneFn cloneFromFn) *ImageBuild {
 	return &ImageBuild{
 		cloneFn: cloneFn,
+		base:    base,
 		path:    path,
 		labels:  map[string]string{},
 	}
@@ -155,6 +157,7 @@ func newImageBuild(path string, cloneFn cloneFromFn) *ImageBuild {
 type ImageBuild struct {
 	cloneFn cloneFromFn
 
+	base   bool
 	path   string
 	labels map[string]string
 }
@@ -171,6 +174,9 @@ func (b *ImageBuild) Label(name string) string {
 
 // from is a handler for FROM
 func (b *ImageBuild) from(cmd *fromCommand) error {
+	if b.base {
+		return errors.New("command FROM is forbidden for base image")
+	}
 	return b.cloneFn(cmd.imageName)
 }
 
