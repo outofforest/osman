@@ -14,11 +14,10 @@ func From(imageName string) Command {
 	}
 }
 
-// Label returns handler for LABEL command
-func Label(name, value string) Command {
-	return &labelCommand{
-		name:  name,
-		value: value,
+// Params returns handler for PARAMS command
+func Params(params ...string) Command {
+	return &paramsCommand{
+		params: params,
 	}
 }
 
@@ -45,13 +44,12 @@ func (cmd *fromCommand) execute(ctx context.Context, build *ImageBuild) error {
 	return build.from(cmd)
 }
 
-type labelCommand struct {
-	name  string
-	value string
+type paramsCommand struct {
+	params []string
 }
 
-func (cmd *labelCommand) execute(ctx context.Context, build *ImageBuild) error {
-	return build.label(cmd)
+func (cmd *paramsCommand) execute(ctx context.Context, build *ImageBuild) error {
+	return build.params(cmd)
 }
 
 type copyCommand struct {
