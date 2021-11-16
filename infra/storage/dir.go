@@ -61,7 +61,7 @@ func (d *dirDriver) Clone(srcImageName string, dstImageName string) error {
 	if err != nil || !info.IsDir() {
 		return fmt.Errorf("source image %s does not exist: %w", srcImageName, ErrSourceImageDoesNotExist)
 	}
-	return copy.Copy(srcImgPath, dstImgPath)
+	return copy.Copy(srcImgPath, dstImgPath, copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
 // Drop drops image

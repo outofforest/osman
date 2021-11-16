@@ -5,7 +5,7 @@ go 1.16
 replace github.com/ridge/parallel => github.com/wojciech-malota-wojcik/parallel v0.1.2
 
 require (
-	github.com/otiai10/copy v1.6.0
+	github.com/otiai10/copy v1.7.0
 	github.com/pkg/errors v0.8.1
 	github.com/ridge/must v0.6.0
 	github.com/spf13/pflag v1.0.5

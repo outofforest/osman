@@ -222,7 +222,7 @@ func (b *ImageBuild) params(cmd *paramsCommand) error {
 
 // copy is a handler for COPY
 func (b *ImageBuild) copy(cmd *copyCommand) error {
-	return copy.Copy(cmd.from, filepath.Join(b.path, cmd.to))
+	return copy.Copy(cmd.from, filepath.Join(b.path, cmd.to), copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
 // run is a handler for RUN
