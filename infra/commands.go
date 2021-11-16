@@ -2,7 +2,7 @@ package infra
 
 import "context"
 
-// Command is implemented by commands available in Dockerfile
+// Command is implemented by commands available in Specfile
 type Command interface {
 	execute(ctx context.Context, build *ImageBuild) error
 }

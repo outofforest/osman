@@ -10,7 +10,7 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 )
 
-// Parse parses Dockerfile
+// Parse parses Specfile
 func Parse(dockerfilePath string) ([]infra.Command, error) {
 	file, err := os.Open(dockerfilePath)
 	if err != nil {
