@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/otiai10/copy"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
@@ -20,21 +21,23 @@ type dirDriver struct {
 	rootPath string
 }
 
-// Path returns path to image
-func (d *dirDriver) Path(imageName string) (string, error) {
-	return d.toPath(imageName)
-}
-
-// Create creates destination path
-func (d *dirDriver) Create(dstImageName string) error {
-	dstImgPath, err := d.toPath(dstImageName)
+// Mount mounts image in filesystem
+func (d *dirDriver) Mount(imageName, dstPath string) (UnmountFn, error) {
+	srcPath, err := d.toPath(imageName)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := d.Drop(dstImageName); err != nil {
-		return err
+	if err := os.MkdirAll(srcPath, 0o700); err != nil && !os.IsExist(err) {
+		return nil, err
 	}
-	return os.Mkdir(dstImgPath, 0o700)
+
+	if err := syscall.Mount(srcPath, dstPath, "", syscall.MS_BIND, ""); err != nil {
+		return nil, err
+	}
+
+	return func() error {
+		return syscall.Unmount(dstPath, 0)
+	}, nil
 }
 
 // Clone clones source image to destination or returns false if source image does not exist

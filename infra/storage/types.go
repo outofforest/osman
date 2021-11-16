@@ -1,17 +1,19 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+)
 
 // ErrSourceImageDoesNotExist is returned if source image does not exist
 var ErrSourceImageDoesNotExist = errors.New("source image does not exist")
 
+// UnmountFn unmounts mounted image
+type UnmountFn = func() error
+
 // Driver represents storage driver
 type Driver interface {
-	// Path returns path to image
-	Path(imageName string) (string, error)
-
-	// Create creates destination path
-	Create(dstImageName string) error
+	// Mount mounts the image in filesystem
+	Mount(imageName, dstPath string) (UnmountFn, error)
 
 	// Clone clones source image to destination
 	Clone(srcImageName string, dstImageName string) error

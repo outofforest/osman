@@ -38,24 +38,33 @@ type Builder struct {
 
 // Build builds images
 func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBuild, retErr error) {
-	path, err := b.storage.Path(img.Name())
+	if err := b.storage.Drop(img.Name()); err != nil {
+		return nil, err
+	}
+	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
 	if err != nil {
 		return nil, err
 	}
-
-	if err := umount(path); err != nil {
-		return nil, err
-	}
 	defer func() {
-		err := umount(path)
-		if err == nil && retErr != nil {
-			_ = b.storage.Drop(img.Name())
-			return
-		}
-		if retErr == nil {
+		if err := os.Remove(path); retErr == nil {
 			retErr = err
 		}
 	}()
+
+	var imgUnmount storage.UnmountFn
+	defer func() {
+		if err := umount(path); err != nil && retErr == nil {
+			retErr = err
+		}
+		if imgUnmount != nil {
+			if err := imgUnmount(); err != nil && retErr == nil {
+				retErr = err
+			}
+		}
+	}()
+	if err := umount(path); err != nil {
+		return nil, err
+	}
 
 	var base bool
 	if strings.HasPrefix(img.Name(), "fedora:") {
@@ -65,7 +74,9 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 		fedoraRelease := parts[1]
 
-		if err := b.storage.Create(img.Name()); err != nil {
+		var err error
+		imgUnmount, err = b.storage.Mount(img.Name(), path)
+		if err != nil {
 			return nil, err
 		}
 
@@ -77,7 +88,51 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 	}
 
-	build := newImageBuild(base, path, b.clone(ctx, img.Name()))
+	build := newImageBuild(base, path, func(srcImageName string) (ImageManifest, error) {
+		err = b.storage.Clone(srcImageName, img.Name())
+		if err != nil && errors.Is(err, storage.ErrSourceImageDoesNotExist) {
+			if baseImage := b.repo.Retrieve(srcImageName); baseImage != nil {
+				if _, err := b.Build(ctx, baseImage); err != nil {
+					return ImageManifest{}, err
+				}
+				err = b.storage.Clone(srcImageName, img.Name())
+			} else {
+				return ImageManifest{}, fmt.Errorf("image %s does not exist in repository", srcImageName)
+			}
+		}
+		if err != nil {
+			return ImageManifest{}, err
+		}
+
+		imgUnmount, err = b.storage.Mount(img.Name(), path)
+		if err != nil {
+			return ImageManifest{}, err
+		}
+
+		manifestRaw, err := ioutil.ReadFile(filepath.Join(path, manifestFile))
+		if err != nil {
+			return ImageManifest{}, err
+		}
+		if err := os.Remove(filepath.Join(path, manifestFile)); err != nil {
+			return ImageManifest{}, err
+		}
+
+		var manifest ImageManifest
+		if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+			return ImageManifest{}, err
+		}
+
+		if err := syscall.Mount("/dev", filepath.Join(path, "dev"), "", syscall.MS_BIND, ""); err != nil {
+			return ImageManifest{}, err
+		}
+		if err := syscall.Mount("/proc", filepath.Join(path, "proc"), "", syscall.MS_BIND, ""); err != nil {
+			return ImageManifest{}, err
+		}
+		if err := syscall.Mount("/sys", filepath.Join(path, "sys"), "", syscall.MS_BIND, ""); err != nil {
+			return ImageManifest{}, err
+		}
+		return manifest, nil
+	})
 
 	for _, cmd := range img.commands {
 		if err := cmd.execute(ctx, build); err != nil {
@@ -90,61 +145,6 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 	}
 
 	return build, nil
-}
-
-func (b *Builder) clone(ctx context.Context, dstImageName string) cloneFromFn {
-	return func(srcImageName string) (ImageManifest, error) {
-		srcImgPath, err := b.storage.Path(srcImageName)
-		if err != nil {
-			return ImageManifest{}, err
-		}
-		if err := umount(srcImgPath); err != nil {
-			return ImageManifest{}, err
-		}
-		err = b.storage.Clone(srcImageName, dstImageName)
-		if err != nil && errors.Is(err, storage.ErrSourceImageDoesNotExist) {
-			if img := b.repo.Retrieve(srcImageName); img != nil {
-				if _, err := b.Build(ctx, img); err != nil {
-					return ImageManifest{}, err
-				}
-				err = b.storage.Clone(srcImageName, dstImageName)
-			} else {
-				return ImageManifest{}, fmt.Errorf("image %s does not exist in repository", srcImageName)
-			}
-		}
-		if err != nil {
-			return ImageManifest{}, err
-		}
-
-		dstImgPath, err := b.storage.Path(dstImageName)
-		if err != nil {
-			return ImageManifest{}, err
-		}
-
-		if err := os.Remove(filepath.Join(dstImgPath, manifestFile)); err != nil {
-			return ImageManifest{}, err
-		}
-
-		manifestRaw, err := ioutil.ReadFile(filepath.Join(srcImgPath, manifestFile))
-		if err != nil {
-			return ImageManifest{}, err
-		}
-		var manifest ImageManifest
-		if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
-			return ImageManifest{}, err
-		}
-
-		if err := syscall.Mount("/dev", dstImgPath+"/dev", "", syscall.MS_BIND, ""); err != nil {
-			return ImageManifest{}, err
-		}
-		if err := syscall.Mount("/proc", dstImgPath+"/proc", "", syscall.MS_BIND, ""); err != nil {
-			return ImageManifest{}, err
-		}
-		if err := syscall.Mount("/sys", dstImgPath+"/sys", "", syscall.MS_BIND, ""); err != nil {
-			return ImageManifest{}, err
-		}
-		return manifest, nil
-	}
 }
 
 func umount(imgPath string) error {
