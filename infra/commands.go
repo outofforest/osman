@@ -1,6 +1,10 @@
 package infra
 
-import "context"
+import (
+	"context"
+
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+)
 
 // Command is implemented by commands available in Specfile
 type Command interface {
@@ -8,9 +12,10 @@ type Command interface {
 }
 
 // From returns handler for FROM command
-func From(imageName string) Command {
+func From(imageName string, tag types.Tag) Command {
 	return &fromCommand{
 		imageName: imageName,
+		tag:       tag,
 	}
 }
 
@@ -38,6 +43,7 @@ func Run(command string) Command {
 
 type fromCommand struct {
 	imageName string
+	tag       types.Tag
 }
 
 func (cmd *fromCommand) execute(ctx context.Context, build *ImageBuild) error {

@@ -6,6 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+
 	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
 )
 
@@ -62,7 +65,19 @@ func cmdFrom(args []string) ([]Command, error) {
 	if args[0] == "" {
 		return nil, errors.New("first argument is empty")
 	}
-	return []Command{From(args[0])}, nil
+
+	parts := strings.SplitN(args[0], ":", 2)
+	name := parts[0]
+	tag := runtime.DefaultTag
+	if len(parts) == 2 && parts[1] != "" {
+		tag = types.Tag(parts[1])
+	}
+
+	if !runtime.IsTagValid(tag) {
+		return nil, fmt.Errorf("tag %s is invalid", tag)
+	}
+
+	return []Command{From(name, tag)}, nil
 }
 
 func cmdParams(args []string) ([]Command, error) {

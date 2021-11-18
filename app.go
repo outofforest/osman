@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
@@ -30,11 +32,11 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 
 	must.OK(os.Chdir(filepath.Dir(config.Specfile)))
 
-	repo.Store(infra.Describe("fedora:34",
+	repo.Store(infra.Describe("fedora", []types.Tag{"34"},
 		infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`)))
 
-	build, err := infra.BuildFromFile(ctx, builder, config.Specfile)
+	build, err := infra.BuildFromFile(ctx, builder, config.Specfile, config.Tags...)
 	if err != nil {
 		return err
 	}

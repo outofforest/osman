@@ -12,6 +12,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/google/uuid"
+
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
+
 	"github.com/otiai10/copy"
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
@@ -21,18 +25,15 @@ import (
 
 const manifestFile = "manifest.json"
 
-// FIXME (wojciech): remove once real build ID is introduced
-const buildID types.BuildID = "id"
-
-type cloneFromFn func(srcImageName string) (ImageManifest, error)
+type cloneFromFn func(srcImageName string, srcTag types.Tag) (ImageManifest, error)
 
 // BuildFromFile builds image from spec file
-func BuildFromFile(ctx context.Context, builder *Builder, specFile string) (imgBuild *ImageBuild, retErr error) {
+func BuildFromFile(ctx context.Context, builder *Builder, specFile string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
 	commands, err := Parse(specFile)
 	if err != nil {
 		return nil, err
 	}
-	return builder.Build(ctx, Describe(strings.TrimSuffix(filepath.Base(specFile), ".spec"), commands...))
+	return builder.Build(ctx, Describe(strings.TrimSuffix(filepath.Base(specFile), ".spec"), tags, commands...))
 }
 
 // NewBuilder creates new image builder
@@ -51,15 +52,12 @@ type Builder struct {
 
 // Build builds images
 func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBuild, retErr error) {
-	if err := b.storage.Drop(img.Name(), buildID); err != nil {
-		return nil, err
-	}
 	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := os.Remove(path); retErr == nil {
+		if err := os.Remove(path); retErr == nil && !os.IsNotExist(err) {
 			retErr = err
 		}
 	}()
@@ -79,51 +77,55 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		return nil, err
 	}
 
+	buildID := types.BuildID(uuid.Must(uuid.NewUUID()).String())
 	var base bool
-	if strings.HasPrefix(img.Name(), "fedora:") {
-		parts := strings.SplitN(img.Name(), ":", 2)
-		if len(parts) != 2 || parts[1] == "" {
-			return nil, errors.New("no tag provided for base image")
+	if img.Name() == "fedora" {
+		tags := img.Tags()
+		if len(img.Tags()) != 1 {
+			return nil, errors.New("for fedora image exactly one tag is required")
 		}
-		fedoraRelease := parts[1]
-
+		if err := b.storage.Create(img.Name(), buildID); err != nil {
+			return nil, err
+		}
 		var err error
-		imgUnmount, err = b.storage.Mount(img.Name(), buildID, path)
+		imgUnmount, err = b.storage.Mount(buildID, path)
 		if err != nil {
 			return nil, err
 		}
 
 		if err := libexec.Exec(ctx,
-			exec.Command("dnf", "install", "-y", "--installroot="+path, "--releasever="+fedoraRelease,
+			exec.Command("dnf", "install", "-y", "--installroot="+path, "--releasever="+string(tags[0]),
 				"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
 				"dnf", "langpacks-en")); err != nil {
 			return nil, err
 		}
 	}
 
-	build := newImageBuild(base, path, func(srcImageName string) (ImageManifest, error) {
+	build := newImageBuild(base, path, func(srcImageName string, srcTag types.Tag) (ImageManifest, error) {
 		// Try to clone existing image
 		var cloned bool
-		err = b.storage.Clone(srcImageName, img.Name(), buildID)
+		err = b.storage.Clone(srcImageName, srcTag, img.Name(), buildID)
 
 		switch {
 		case err == nil:
 			cloned = true
 		case errors.Is(err, storage.ErrSourceImageDoesNotExist):
-			// If image does not exist try to build it from spec file in the current directory
-			_, err = BuildFromFile(ctx, b, srcImageName+".spec")
+			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
+			if srcTag == runtime.DefaultTag {
+				_, err = BuildFromFile(ctx, b, srcImageName+".spec", runtime.DefaultTag)
+			}
 		default:
 			return ImageManifest{}, err
 		}
 
 		switch {
 		case err == nil:
-		case os.IsNotExist(err):
+		case os.IsNotExist(err) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If spec file does not exist, try building from repository
-			if baseImage := b.repo.Retrieve(srcImageName); baseImage != nil {
+			if baseImage := b.repo.Retrieve(srcImageName, srcTag); baseImage != nil {
 				_, err = b.Build(ctx, baseImage)
 			} else {
-				return ImageManifest{}, fmt.Errorf("can't find image %s", srcImageName)
+				err = fmt.Errorf("can't find image %s", srcImageName)
 			}
 		default:
 			return ImageManifest{}, err
@@ -134,12 +136,12 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 
 		if !cloned {
-			if err := b.storage.Clone(srcImageName, img.Name(), buildID); err != nil {
+			if err := b.storage.Clone(srcImageName, srcTag, img.Name(), buildID); err != nil {
 				return ImageManifest{}, err
 			}
 		}
 
-		imgUnmount, err = b.storage.Mount(img.Name(), buildID, path)
+		imgUnmount, err = b.storage.Mount(buildID, path)
 		if err != nil {
 			return ImageManifest{}, err
 		}
@@ -173,6 +175,10 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		if err := cmd.execute(ctx, build); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := b.storage.Tag(buildID, img.tags); err != nil {
+		return nil, err
 	}
 
 	if err := ioutil.WriteFile(filepath.Join(path, manifestFile), must.Bytes(json.Marshal(build.Manifest())), 0o444); err != nil {
@@ -236,7 +242,7 @@ func (b *ImageBuild) from(cmd *fromCommand) error {
 	if b.base {
 		return errors.New("command FROM is forbidden for base image")
 	}
-	manifest, err := b.cloneFn(cmd.imageName)
+	manifest, err := b.cloneFn(cmd.imageName, cmd.tag)
 	if err != nil {
 		return err
 	}
