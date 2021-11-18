@@ -22,6 +22,15 @@ const manifestFile = "manifest.json"
 
 type cloneFromFn func(srcImageName string) (ImageManifest, error)
 
+// BuildFromFile builds image from spec file
+func BuildFromFile(ctx context.Context, builder *Builder, specFile string) (imgBuild *ImageBuild, retErr error) {
+	commands, err := Parse(specFile)
+	if err != nil {
+		return nil, err
+	}
+	return builder.Build(ctx, Describe(strings.TrimSuffix(filepath.Base(specFile), ".spec"), commands...))
+}
+
 // NewBuilder creates new image builder
 func NewBuilder(repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
@@ -89,19 +98,42 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 	}
 
 	build := newImageBuild(base, path, func(srcImageName string) (ImageManifest, error) {
+		// Try to clone existing image
+		var cloned bool
 		err = b.storage.Clone(srcImageName, img.Name())
-		if err != nil && errors.Is(err, storage.ErrSourceImageDoesNotExist) {
+
+		switch {
+		case err == nil:
+			cloned = true
+		case errors.Is(err, storage.ErrSourceImageDoesNotExist):
+			// If image does not exist try to build it from spec file in the current directory
+			_, err = BuildFromFile(ctx, b, srcImageName+".spec")
+		default:
+			return ImageManifest{}, err
+		}
+
+		switch {
+		case err == nil:
+		case os.IsNotExist(err):
+			// If spec file does not exist, try building from repository
 			if baseImage := b.repo.Retrieve(srcImageName); baseImage != nil {
-				if _, err := b.Build(ctx, baseImage); err != nil {
-					return ImageManifest{}, err
-				}
+				_, err = b.Build(ctx, baseImage)
 				err = b.storage.Clone(srcImageName, img.Name())
 			} else {
-				return ImageManifest{}, fmt.Errorf("image %s does not exist in repository", srcImageName)
+				return ImageManifest{}, fmt.Errorf("can't find image %s", srcImageName)
 			}
+		default:
+			return ImageManifest{}, err
 		}
+
 		if err != nil {
 			return ImageManifest{}, err
+		}
+
+		if !cloned {
+			if err := b.storage.Clone(srcImageName, img.Name()); err != nil {
+				return ImageManifest{}, err
+			}
 		}
 
 		imgUnmount, err = b.storage.Mount(img.Name(), path)
@@ -189,11 +221,6 @@ type ImageBuild struct {
 	base     bool
 	path     string
 	manifest ImageManifest
-}
-
-// Path returns path to directory where image is created
-func (b *ImageBuild) Path() string {
-	return b.path
 }
 
 // Manifest returns image manifest

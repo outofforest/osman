@@ -1,4 +1,4 @@
-package parse
+package infra
 
 import (
 	"errors"
@@ -7,11 +7,10 @@ import (
 	"strings"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/dockerfile/parser"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 )
 
 // Parse parses Specfile
-func Parse(dockerfilePath string) ([]infra.Command, error) {
+func Parse(dockerfilePath string) ([]Command, error) {
 	file, err := os.Open(dockerfilePath)
 	if err != nil {
 		return nil, err
@@ -23,14 +22,14 @@ func Parse(dockerfilePath string) ([]infra.Command, error) {
 		return nil, err
 	}
 
-	commands := make([]infra.Command, 0, len(parsed.AST.Children))
+	commands := make([]Command, 0, len(parsed.AST.Children))
 	for _, child := range parsed.AST.Children {
 		args := []string{}
 		for arg := child.Next; arg != nil; arg = arg.Next {
 			args = append(args, arg.Value)
 		}
 
-		var cmds []infra.Command
+		var cmds []Command
 		var err error
 		switch strings.ToLower(child.Value) {
 		case "from":
@@ -56,24 +55,24 @@ func Parse(dockerfilePath string) ([]infra.Command, error) {
 	return commands, nil
 }
 
-func cmdFrom(args []string) ([]infra.Command, error) {
+func cmdFrom(args []string) ([]Command, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
 	}
 	if args[0] == "" {
 		return nil, errors.New("first argument is empty")
 	}
-	return []infra.Command{infra.From(args[0])}, nil
+	return []Command{From(args[0])}, nil
 }
 
-func cmdParams(args []string) ([]infra.Command, error) {
+func cmdParams(args []string) ([]Command, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("no arguments passed")
 	}
-	return []infra.Command{infra.Params(args...)}, nil
+	return []Command{Params(args...)}, nil
 }
 
-func cmdCopy(args []string) ([]infra.Command, error) {
+func cmdCopy(args []string) ([]Command, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("incorrect number of arguments, expected: 2, got: %d", len(args))
 	}
@@ -83,25 +82,25 @@ func cmdCopy(args []string) ([]infra.Command, error) {
 	if args[1] == "" {
 		return nil, errors.New("second argument is empty")
 	}
-	return []infra.Command{infra.Copy(args[0], args[1])}, nil
+	return []Command{Copy(args[0], args[1])}, nil
 }
 
-func cmdRun(args []string) ([]infra.Command, error) {
+func cmdRun(args []string) ([]Command, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
 	}
 	if args[0] == "" {
 		return nil, errors.New("first argument is empty")
 	}
-	return []infra.Command{infra.Run(args[0])}, nil
+	return []Command{Run(args[0])}, nil
 }
 
-func cmdInclude(args []string) ([]infra.Command, error) {
+func cmdInclude(args []string) ([]Command, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("no arguments passed")
 	}
 
-	res := []infra.Command{}
+	res := []Command{}
 	for _, arg := range args {
 		if arg == "" {
 			return nil, errors.New("empty argument passed")
