@@ -15,10 +15,14 @@ import (
 	"github.com/otiai10/copy"
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
 const manifestFile = "manifest.json"
+
+// FIXME (wojciech): remove once real build ID is introduced
+const buildID types.BuildID = "id"
 
 type cloneFromFn func(srcImageName string) (ImageManifest, error)
 
@@ -47,7 +51,7 @@ type Builder struct {
 
 // Build builds images
 func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBuild, retErr error) {
-	if err := b.storage.Drop(img.Name()); err != nil {
+	if err := b.storage.Drop(img.Name(), buildID); err != nil {
 		return nil, err
 	}
 	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
@@ -84,7 +88,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		fedoraRelease := parts[1]
 
 		var err error
-		imgUnmount, err = b.storage.Mount(img.Name(), path)
+		imgUnmount, err = b.storage.Mount(img.Name(), buildID, path)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +104,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 	build := newImageBuild(base, path, func(srcImageName string) (ImageManifest, error) {
 		// Try to clone existing image
 		var cloned bool
-		err = b.storage.Clone(srcImageName, img.Name())
+		err = b.storage.Clone(srcImageName, img.Name(), buildID)
 
 		switch {
 		case err == nil:
@@ -118,7 +122,6 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 			// If spec file does not exist, try building from repository
 			if baseImage := b.repo.Retrieve(srcImageName); baseImage != nil {
 				_, err = b.Build(ctx, baseImage)
-				err = b.storage.Clone(srcImageName, img.Name())
 			} else {
 				return ImageManifest{}, fmt.Errorf("can't find image %s", srcImageName)
 			}
@@ -131,12 +134,12 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 
 		if !cloned {
-			if err := b.storage.Clone(srcImageName, img.Name()); err != nil {
+			if err := b.storage.Clone(srcImageName, img.Name(), buildID); err != nil {
 				return ImageManifest{}, err
 			}
 		}
 
-		imgUnmount, err = b.storage.Mount(img.Name(), path)
+		imgUnmount, err = b.storage.Mount(img.Name(), buildID, path)
 		if err != nil {
 			return ImageManifest{}, err
 		}
