@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/dockerfile/parser"
+	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
 )
 
 // Parse parses Specfile
