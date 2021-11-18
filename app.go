@@ -4,11 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parse"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/ioc"
@@ -33,21 +31,15 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	must.OK(os.Chdir(filepath.Dir(config.Specfile)))
 
 	repo.Store(infra.Describe("fedora:34",
-		infra.Params("param1"),
 		infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`)))
 
-	commands, err := parse.Parse(config.Specfile)
-	if err != nil {
-		return err
-	}
-	img := infra.Describe(strings.TrimSuffix(filepath.Base(config.Specfile), ".spec"), commands...)
-	build, err := builder.Build(ctx, img)
+	build, err := infra.BuildFromFile(ctx, builder, config.Specfile)
 	if err != nil {
 		return err
 	}
 
-	logger.Get(ctx).Info("Image built", zap.String("path", build.Path()), zap.Strings("params", build.Manifest().Params))
+	logger.Get(ctx).Info("Image built", zap.Strings("params", build.Manifest().Params))
 
 	return nil
 }
