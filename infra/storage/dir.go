@@ -8,7 +8,13 @@ import (
 
 	"github.com/otiai10/copy"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
+
+const subDirBuilds = "builds"
+
+// FIXME (wojciech): remove once tags are introduced
+const buildID types.BuildID = "id"
 
 // NewDirDriver returns new storage driver based on directories
 func NewDirDriver(config runtime.Config) Driver {
@@ -22,8 +28,8 @@ type dirDriver struct {
 }
 
 // Mount mounts image in filesystem
-func (d *dirDriver) Mount(imageName, dstPath string) (UnmountFn, error) {
-	srcPath, err := d.toPath(imageName)
+func (d *dirDriver) Mount(imageName string, buildID types.BuildID, dstPath string) (UnmountFn, error) {
+	srcPath, err := d.toBuildPath(imageName, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,16 +47,17 @@ func (d *dirDriver) Mount(imageName, dstPath string) (UnmountFn, error) {
 }
 
 // Clone clones source image to destination or returns false if source image does not exist
-func (d *dirDriver) Clone(srcImageName string, dstImageName string) error {
-	dstImgPath, err := d.toPath(dstImageName)
+func (d *dirDriver) Clone(srcImageName string, dstImageName string, dstBuildID types.BuildID) error {
+	dstImgPath, err := d.toBuildPath(dstImageName, dstBuildID)
 	if err != nil {
 		return err
 	}
-	if err := d.Drop(dstImageName); err != nil {
+
+	if err := d.Drop(dstImageName, dstBuildID); err != nil {
 		return err
 	}
 
-	srcImgPath, err := d.toPath(srcImageName)
+	srcImgPath, err := d.toBuildPath(srcImageName, buildID)
 	if err != nil {
 		return err
 	}
@@ -65,8 +72,8 @@ func (d *dirDriver) Clone(srcImageName string, dstImageName string) error {
 }
 
 // Drop drops image
-func (d *dirDriver) Drop(imageName string) error {
-	imgPath, err := d.toPath(imageName)
+func (d *dirDriver) Drop(imageName string, buildID types.BuildID) error {
+	imgPath, err := d.toBuildPath(imageName, buildID)
 	if err != nil {
 		return err
 	}
@@ -76,10 +83,10 @@ func (d *dirDriver) Drop(imageName string) error {
 	return nil
 }
 
-func (d *dirDriver) toPath(imageName string) (string, error) {
+func (d *dirDriver) toBuildPath(imageName string, buildID types.BuildID) (string, error) {
 	rootPath, err := filepath.Abs(d.rootPath)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(rootPath, imageName), nil
+	return filepath.Join(rootPath, imageName, subDirBuilds, string(buildID)), nil
 }

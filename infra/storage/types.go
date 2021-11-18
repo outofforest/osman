@@ -2,6 +2,8 @@ package storage
 
 import (
 	"errors"
+
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
 // ErrSourceImageDoesNotExist is returned if source image does not exist
@@ -13,11 +15,11 @@ type UnmountFn = func() error
 // Driver represents storage driver
 type Driver interface {
 	// Mount mounts the image in filesystem
-	Mount(imageName, dstPath string) (UnmountFn, error)
+	Mount(imageName string, buildID types.BuildID, dstPath string) (UnmountFn, error)
 
 	// Clone clones source image to destination
-	Clone(srcImageName string, dstImageName string) error
+	Clone(srcImageName string, dstImageName string, dstBuildID types.BuildID) error
 
 	// Drop drops image
-	Drop(imageName string) error
+	Drop(imageName string, buildID types.BuildID) error
 }
