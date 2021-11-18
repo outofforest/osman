@@ -3,7 +3,7 @@ package parser
 import (
 	"errors"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/dockerfile/stack"
+	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/stack"
 )
 
 // ErrorLocation gives a location in source code that caused the error
