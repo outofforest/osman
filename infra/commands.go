@@ -6,7 +6,7 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
-// Command is implemented by commands available in Specfile
+// Command is implemented by commands available in SpecFile
 type Command interface {
 	execute(ctx context.Context, build *ImageBuild) error
 }
