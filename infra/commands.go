@@ -26,14 +26,6 @@ func Params(params ...string) Command {
 	}
 }
 
-// Copy returns handler for COPY command
-func Copy(from, to string) Command {
-	return &copyCommand{
-		from: from,
-		to:   to,
-	}
-}
-
 // Run returns handler for RUN command
 func Run(command string) Command {
 	return &runCommand{
@@ -56,15 +48,6 @@ type paramsCommand struct {
 
 func (cmd *paramsCommand) execute(ctx context.Context, build *ImageBuild) error {
 	return build.params(cmd)
-}
-
-type copyCommand struct {
-	from string
-	to   string
-}
-
-func (cmd *copyCommand) execute(ctx context.Context, build *ImageBuild) error {
-	return build.copy(cmd)
 }
 
 type runCommand struct {

@@ -177,7 +177,6 @@ func init() {
 	// functions. Errors are propagated up by Parse() and the resulting AST can
 	// be incorporated directly into the existing AST as a next.
 	dispatch = map[string]func(string, *directives) (*Node, map[string]bool, error){
-		"copy":    parseMaybeJSONToList,
 		"from":    parseStringsWhitespaceDelimited,
 		"params":  parseStringsWhitespaceDelimited,
 		"run":     parseMaybeJSON,

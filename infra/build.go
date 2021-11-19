@@ -17,7 +17,6 @@ import (
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
 
-	"github.com/otiai10/copy"
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
@@ -85,9 +84,17 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		return nil, err
 	}
 
+	specDir := filepath.Join(path, ".specdir")
+
 	var imgUnmount storage.UnmountFn
 	defer func() {
 		if err := umount(path); err != nil {
+			if retErr != nil {
+				retErr = err
+			}
+			return
+		}
+		if err := os.Remove(specDir); err != nil && !os.IsNotExist(err) {
 			if retErr != nil {
 				retErr = err
 			}
@@ -195,6 +202,12 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 			return ImageManifest{}, err
 		}
 
+		if err := os.Mkdir(specDir, 0o700); err != nil {
+			return ImageManifest{}, err
+		}
+		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND, ""); err != nil {
+			return ImageManifest{}, err
+		}
 		if err := syscall.Mount("/dev", filepath.Join(path, "dev"), "", syscall.MS_BIND, ""); err != nil {
 			return ImageManifest{}, err
 		}
@@ -236,7 +249,8 @@ func umount(imgPath string) error {
 			break
 		}
 		mountpoint := props[1]
-		if !strings.HasPrefix(mountpoint, imgPath+"/") {
+		prefix := imgPath + "/"
+		if !strings.HasPrefix(mountpoint, prefix) && mount != prefix {
 			continue
 		}
 		if err := syscall.Unmount(mountpoint, 0); err != nil {
@@ -290,11 +304,6 @@ func (b *ImageBuild) from(cmd *fromCommand) error {
 func (b *ImageBuild) params(cmd *paramsCommand) error {
 	b.manifest.Params = append(b.manifest.Params, cmd.params...)
 	return nil
-}
-
-// copy is a handler for COPY
-func (b *ImageBuild) copy(cmd *copyCommand) error {
-	return copy.Copy(cmd.from, filepath.Join(b.path, cmd.to), copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
 // run is a handler for RUN
