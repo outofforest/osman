@@ -214,7 +214,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		if err := syscall.Mount("/proc", filepath.Join(path, "proc"), "", syscall.MS_BIND, ""); err != nil {
 			return ImageManifest{}, err
 		}
-		if err := syscall.Mount("/sys", filepath.Join(path, "sys"), "", syscall.MS_BIND, ""); err != nil {
+		if err := syscall.Mount("/sys", filepath.Join(path, "sys"), "", syscall.MS_BIND|syscall.MS_RDONLY, ""); err != nil {
 			return ImageManifest{}, err
 		}
 		return manifest, nil
