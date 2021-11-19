@@ -32,7 +32,8 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	must.OK(os.Chdir(filepath.Dir(config.SpecFile)))
 
 	fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
-		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`)}
+		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
+		infra.Run(`rm -rf /var/cache/* /tmp/*`)}
 
 	repo.Store(infra.Describe("fedora", []types.Tag{"34"}, fedoraCmds...))
 	repo.Store(infra.Describe("fedora", []types.Tag{"35"}, fedoraCmds...))
