@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -33,12 +35,16 @@ func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, err
 	if err != nil {
 		return nil, err
 	}
-	buildPath, err := filepath.EvalSymlinks(buildLink)
+	buildDir, err := filepath.EvalSymlinks(buildLink)
+	if err != nil {
+		return nil, err
+	}
+	buildAbsDir, err := filepath.Abs(buildDir)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := syscall.Mount(buildPath, dstPath, "", syscall.MS_BIND, ""); err != nil {
+	if err := syscall.Mount(buildAbsDir, dstPath, "", syscall.MS_BIND, ""); err != nil {
 		return nil, err
 	}
 
@@ -47,49 +53,60 @@ func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, err
 	}, nil
 }
 
-// Create creates blank image
-func (d *dirDriver) Create(imageName string, buildID types.BuildID) error {
-	buildPath, err := d.toAbsoluteBuildDir(imageName, buildID)
+// CreateEmpty creates blank image for build
+func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
+	buildAbsLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(buildPath, 0o700); err != nil {
 		return err
 	}
 
-	dir := filepath.Join("..", d.toRelativeBuildDir(imageName, buildID))
-	link, err := d.toAbsoluteBuildLink(buildID)
+	if err := os.MkdirAll(filepath.Dir(buildAbsLink), 0o700); err != nil && !os.IsExist(err) {
+		return err
+	}
+
+	link := filepath.Join("..", d.toRelativeBuildDir(imageName, buildID))
+
+	// Create symlink before creating directory because Drop is based on this symlink
+	if err := os.Symlink(link, buildAbsLink); err != nil {
+		return err
+	}
+
+	buildAbsDir, err := d.toAbsoluteBuildDir(imageName, buildID)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil && !os.IsExist(err) {
-		return err
-	}
-	return os.Symlink(dir, link)
+	return os.MkdirAll(buildAbsDir, 0o700)
 }
 
 // Clone clones source image to destination or returns false if source image does not exist
 func (d *dirDriver) Clone(srcImageName string, srcTag types.Tag, dstImageName string, dstBuildID types.BuildID) error {
-	dstImgPath, err := d.toAbsoluteBuildDir(dstImageName, dstBuildID)
+	dstBuildAbsDir, err := d.toAbsoluteBuildDir(dstImageName, dstBuildID)
 	if err != nil {
 		return err
 	}
 
-	srcImgLink, err := d.toAbsoluteTagLink(srcImageName, srcTag)
+	srcTagLink, err := d.toAbsoluteTagLink(srcImageName, srcTag)
 	if err != nil {
 		return err
 	}
-	srcImgPath, err := filepath.EvalSymlinks(srcImgLink)
+	srcBuildDir, err := filepath.EvalSymlinks(srcTagLink)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("image %s:%s does not exist: %w", srcImageName, srcTag, ErrSourceImageDoesNotExist)
 		}
 		return err
 	}
-	if err := d.Create(dstImageName, dstBuildID); err != nil {
+	srcBuildAbsDir, err := filepath.Abs(srcBuildDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("image %s:%s does not exist: %w", srcImageName, srcTag, ErrSourceImageDoesNotExist)
+		}
 		return err
 	}
-	return copy.Copy(srcImgPath, dstImgPath, copy.Options{PreserveTimes: true, PreserveOwner: true})
+	if err := d.CreateEmpty(dstImageName, dstBuildID); err != nil {
+		return err
+	}
+	return copy.Copy(srcBuildAbsDir, dstBuildAbsDir, copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
 // Tag tags buildID with tags
@@ -102,7 +119,11 @@ func (d *dirDriver) Tag(buildID types.BuildID, tags []types.Tag) error {
 	if err != nil {
 		return err
 	}
-	parentDir := filepath.Dir(buildDir)
+	buildAbsDir, err := filepath.Abs(buildDir)
+	if err != nil {
+		return err
+	}
+	parentDir := filepath.Dir(buildAbsDir)
 	for _, tag := range tags {
 		tagLink := filepath.Join(parentDir, string(tag))
 	retry:
@@ -124,27 +145,99 @@ func (d *dirDriver) Tag(buildID types.BuildID, tags []types.Tag) error {
 }
 
 // Drop drops image
-func (d *dirDriver) Drop(buildID types.BuildID) error {
-	buildLinkPath, err := d.toAbsoluteBuildLink(buildID)
+func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
+	// Sequence is important:
+	// 1. remove tags
+	// 2. remove build dir
+	// 3. remove build link
+
+	buildLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
 		return err
 	}
-	imgPath, err := filepath.EvalSymlinks(buildLinkPath)
+	defer func() {
+		if retErr != nil {
+			return
+		}
+		if err := os.Remove(buildLink); err != nil && !os.IsNotExist(err) {
+			retErr = err
+		}
+	}()
+
+	buildDir, err := filepath.EvalSymlinks(buildLink)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 
-	if err := os.Remove(buildLinkPath); err != nil {
+	buildAbsDir, err := filepath.Abs(buildDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 
-	if err := os.RemoveAll(imgPath); err != nil && !os.IsNotExist(err) {
+	tagsAbsDir := filepath.Dir(buildAbsDir)
+	dir, err := os.Open(tagsAbsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer dir.Close()
+
+	var entries []os.DirEntry
+	for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
+		for _, e := range entries {
+			info, err := e.Info()
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				return err
+			}
+
+			if info.Mode()&os.ModeSymlink != 0 {
+				tagAbsLink := filepath.Join(tagsAbsDir, info.Name())
+				buildDirFromLink, err := filepath.EvalSymlinks(tagAbsLink)
+				if err != nil {
+					if os.IsNotExist(err) {
+						// dead link, remove it
+						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
+							return err
+						}
+						continue
+					}
+					return err
+				}
+				buildAbsDirFromLink, err := filepath.Abs(buildDirFromLink)
+				if err != nil {
+					if os.IsNotExist(err) {
+						// dead link, remove it
+						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
+							return err
+						}
+						continue
+					}
+					return err
+				}
+				if buildAbsDir == buildAbsDirFromLink {
+					if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
+						return err
+					}
+				}
+			}
+		}
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 
-	// FIXME (wojciech): remove tags
-
-	return nil
+	return os.RemoveAll(buildDir)
 }
 
 func (d *dirDriver) toRelativeBuildDir(imageName string, buildID types.BuildID) string {

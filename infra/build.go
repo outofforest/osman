@@ -52,39 +52,49 @@ type Builder struct {
 
 // Build builds images
 func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBuild, retErr error) {
+	buildID := types.BuildID(uuid.Must(uuid.NewUUID()).String())
+
 	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := os.Remove(path); retErr == nil && !os.IsNotExist(err) {
-			retErr = err
-		}
-	}()
 
 	var imgUnmount storage.UnmountFn
 	defer func() {
-		if err := umount(path); err != nil && retErr == nil {
-			retErr = err
+		if err := umount(path); err != nil {
+			if retErr != nil {
+				retErr = err
+			}
+			return
 		}
 		if imgUnmount != nil {
-			if err := imgUnmount(); err != nil && retErr == nil {
+			if err := imgUnmount(); err != nil {
+				if retErr != nil {
+					retErr = err
+				}
+				return
+			}
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			if retErr == nil {
+				retErr = err
+			}
+			return
+		}
+		if retErr != nil {
+			if err := b.storage.Drop(buildID); err != nil {
 				retErr = err
 			}
 		}
 	}()
-	if err := umount(path); err != nil {
-		return nil, err
-	}
 
-	buildID := types.BuildID(uuid.Must(uuid.NewUUID()).String())
 	var base bool
 	if img.Name() == "fedora" {
 		tags := img.Tags()
 		if len(img.Tags()) != 1 {
 			return nil, errors.New("for fedora image exactly one tag is required")
 		}
-		if err := b.storage.Create(img.Name(), buildID); err != nil {
+		if err := b.storage.CreateEmpty(img.Name(), buildID); err != nil {
 			return nil, err
 		}
 		var err error
@@ -125,7 +135,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 			if baseImage := b.repo.Retrieve(srcImageName, srcTag); baseImage != nil {
 				_, err = b.Build(ctx, baseImage)
 			} else {
-				err = fmt.Errorf("can't find image %s", srcImageName)
+				err = fmt.Errorf("can't find image %s:%s", srcImageName, srcTag)
 			}
 		default:
 			return ImageManifest{}, err
