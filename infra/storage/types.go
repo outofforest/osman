@@ -17,8 +17,8 @@ type Driver interface {
 	// Mount mounts the image in filesystem
 	Mount(buildID types.BuildID, dstPath string) (UnmountFn, error)
 
-	// Create creates blank image
-	Create(imageName string, buildID types.BuildID) error
+	// CreateEmpty creates blank image for build
+	CreateEmpty(imageName string, buildID types.BuildID) error
 
 	// Clone clones source image to destination
 	Clone(srcImageName string, srcTag types.Tag, dstImageName string, dstBuildID types.BuildID) error
