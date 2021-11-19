@@ -39,8 +39,6 @@ func Parse(dockerfilePath string) ([]Command, error) {
 			cmds, err = cmdFrom(args)
 		case "params":
 			cmds, err = cmdParams(args)
-		case "copy":
-			cmds, err = cmdCopy(args)
 		case "run":
 			cmds, err = cmdRun(args)
 		case "include":
@@ -80,19 +78,6 @@ func cmdParams(args []string) ([]Command, error) {
 		return nil, fmt.Errorf("no arguments passed")
 	}
 	return []Command{Params(args...)}, nil
-}
-
-func cmdCopy(args []string) ([]Command, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("incorrect number of arguments, expected: 2, got: %d", len(args))
-	}
-	if args[0] == "" {
-		return nil, errors.New("first argument is empty")
-	}
-	if args[1] == "" {
-		return nil, errors.New("second argument is empty")
-	}
-	return []Command{Copy(args[0], args[1])}, nil
 }
 
 func cmdRun(args []string) ([]Command, error) {
