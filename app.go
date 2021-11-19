@@ -5,12 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc"
 	"github.com/wojciech-malota-wojcik/logger"
 	"go.uber.org/zap"
@@ -29,7 +28,6 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	if !config.VerboseLogging {
 		logger.VerboseOff()
 	}
-	must.OK(os.Chdir(filepath.Dir(config.SpecFile)))
 
 	fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
@@ -38,12 +36,15 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	repo.Store(infra.Describe("fedora", []types.Tag{"34"}, fedoraCmds...))
 	repo.Store(infra.Describe("fedora", []types.Tag{"35"}, fedoraCmds...))
 
-	build, err := infra.BuildFromFile(ctx, builder, config.SpecFile, config.Name, config.Tags...)
-	if err != nil {
-		return err
-	}
+	for i, specFile := range config.SpecFiles {
+		must.OK(os.Chdir(filepath.Dir(specFile)))
 
-	logger.Get(ctx).Info("Image built", zap.Strings("params", build.Manifest().Params))
+		build, err := infra.BuildFromFile(ctx, builder, specFile, config.Names[i], config.Tags...)
+		if err != nil {
+			return err
+		}
+		logger.Get(ctx).Info("Image built", zap.Strings("params", build.Manifest().Params))
+	}
 
 	return nil
 }
