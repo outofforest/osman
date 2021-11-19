@@ -49,8 +49,9 @@ func BuildFromFile(ctx context.Context, builder *Builder, specFile, name string,
 }
 
 // NewBuilder creates new image builder
-func NewBuilder(repo *Repository, storage storage.Driver) *Builder {
+func NewBuilder(config runtime.Config, repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
+		rebuild: config.Rebuild,
 		repo:    repo,
 		storage: storage,
 	}
@@ -58,6 +59,7 @@ func NewBuilder(repo *Repository, storage storage.Driver) *Builder {
 
 // Builder builds images
 type Builder struct {
+	rebuild bool
 	repo    *Repository
 	storage storage.Driver
 }
@@ -145,14 +147,18 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 	}
 
 	build := newImageBuild(base, path, func(srcImageName string, srcTag types.Tag) (ImageManifest, error) {
+		errRebuild := errors.New("rebuild")
 		// Try to clone existing image
 		var cloned bool
-		err = b.storage.Clone(srcImageName, srcTag, img.Name(), buildID)
+		err := errRebuild
+		if !b.rebuild {
+			err = b.storage.Clone(srcImageName, srcTag, img.Name(), buildID)
+		}
 
 		switch {
 		case err == nil:
 			cloned = true
-		case errors.Is(err, storage.ErrSourceImageDoesNotExist):
+		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
 			if srcTag == runtime.DefaultTag {
 				_, err = BuildFromFile(ctx, b, srcImageName+".spec", srcImageName, runtime.DefaultTag)
@@ -163,7 +169,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 
 		switch {
 		case err == nil:
-		case os.IsNotExist(err) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
+		case errors.Is(err, errRebuild) || os.IsNotExist(err) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If spec file does not exist, try building from repository
 			if baseImage := b.repo.Retrieve(srcImageName, srcTag); baseImage != nil {
 				_, err = b.Build(ctx, baseImage)
