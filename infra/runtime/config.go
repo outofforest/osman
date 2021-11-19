@@ -20,19 +20,23 @@ func NewConfigFromCLI() Config {
 
 	var tags []string
 	pflag.StringVar(&config.RootDir, "root-dir", filepath.Join(must.String(os.UserHomeDir()), ".images"), "Directory where built images are stored")
-	pflag.StringVar(&config.Name, "name", "", "Name of built image, if empty name is derived from spec file name")
+	pflag.StringSliceVar(&config.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
 	pflag.StringSliceVar(&tags, "tag", []string{string(DefaultTag)}, "Tags assigned to created build")
 	pflag.BoolVar(&config.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
 	pflag.BoolVarP(&config.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
 	pflag.Parse()
 
-	if pflag.NArg() != 1 {
-		panic("exactly one non-flag argument required pointing to image spec file")
+	if pflag.NArg() == 0 {
+		panic("at least one specfile has to be provided")
 	}
 
-	config.SpecFile = pflag.Arg(0)
-	if config.Name == "" {
-		config.Name = strings.TrimSuffix(filepath.Base(config.SpecFile), ".spec")
+	config.SpecFiles = make([]string, 0, pflag.NArg())
+	for i := 0; i < pflag.NArg(); i++ {
+		specFile := pflag.Arg(i)
+		config.SpecFiles = append(config.SpecFiles, specFile)
+		if len(config.Names) < i+1 {
+			config.Names = append(config.Names, strings.TrimSuffix(filepath.Base(specFile), ".spec"))
+		}
 	}
 	return config
 }
@@ -42,11 +46,11 @@ type Config struct {
 	// RootDir is the root directory for images
 	RootDir string
 
-	// SpecFile path to build
-	SpecFile string
+	// SpecFiles is the list of specfiles to build
+	SpecFiles []string
 
-	// Name is the name for built image
-	Name string
+	// Names is the list of names for corresponding specfiles
+	Names []string
 
 	// Tags are used to tag the build
 	Tags []types.Tag
