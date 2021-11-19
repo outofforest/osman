@@ -29,7 +29,7 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	if !config.VerboseLogging {
 		logger.VerboseOff()
 	}
-	must.OK(os.Chdir(filepath.Dir(config.Specfile)))
+	must.OK(os.Chdir(filepath.Dir(config.SpecFile)))
 
 	fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`)}
@@ -37,7 +37,7 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	repo.Store(infra.Describe("fedora", []types.Tag{"34"}, fedoraCmds...))
 	repo.Store(infra.Describe("fedora", []types.Tag{"35"}, fedoraCmds...))
 
-	build, err := infra.BuildFromFile(ctx, builder, config.Specfile, config.Tags...)
+	build, err := infra.BuildFromFile(ctx, builder, config.SpecFile, config.Name, config.Tags...)
 	if err != nil {
 		return err
 	}

@@ -22,7 +22,7 @@ import (
 // (value next (child child-next child-next-next) next-next)
 //
 // This data structure is frankly pretty lousy for handling complex languages,
-// but lucky for us the Specfile isn't very complicated. This structure
+// but lucky for us the SpecFile isn't very complicated. This structure
 // works a little more effectively than a "proper" parse tree for our needs.
 //
 type Node struct {
@@ -107,7 +107,7 @@ type directives struct {
 }
 
 // setEscapeToken sets the default token for escaping characters and as line-
-// continuation token in a Specfile. Only ` (backtick) and \ (backslash) are
+// continuation token in a SpecFile. Only ` (backtick) and \ (backslash) are
 // allowed as token.
 func (d *directives) setEscapeToken(s string) error {
 	if s != "`" && s != `\` {
@@ -192,7 +192,7 @@ func newNodeFromLine(line string, d *directives, comments []string) (*Node, erro
 	cmd, flags, args := splitCommand(line)
 
 	fn := dispatch[strings.ToLower(cmd)]
-	// Ignore invalid Specfile instructions
+	// Ignore invalid SpecFile instructions
 	if fn == nil {
 		fn = parseIgnore
 	}
@@ -211,7 +211,7 @@ func newNodeFromLine(line string, d *directives, comments []string) (*Node, erro
 	}, nil
 }
 
-// Result is the result of parsing a Specfile
+// Result is the result of parsing a SpecFile
 type Result struct {
 	AST         *Node
 	EscapeToken rune

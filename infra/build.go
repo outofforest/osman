@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -27,13 +28,25 @@ const manifestFile = "manifest.json"
 
 type cloneFromFn func(srcImageName string, srcTag types.Tag) (ImageManifest, error)
 
+var regExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
+
+// IsTagValid returns true if tag is valid
+func IsTagValid(tag types.Tag) bool {
+	return regExp.MatchString(string(tag))
+}
+
+// IsNameValid returns true if name is valid
+func IsNameValid(name string) bool {
+	return regExp.MatchString(name)
+}
+
 // BuildFromFile builds image from spec file
-func BuildFromFile(ctx context.Context, builder *Builder, specFile string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
+func BuildFromFile(ctx context.Context, builder *Builder, specFile, name string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
 	commands, err := Parse(specFile)
 	if err != nil {
 		return nil, err
 	}
-	return builder.Build(ctx, Describe(strings.TrimSuffix(filepath.Base(specFile), ".spec"), tags, commands...))
+	return builder.Build(ctx, Describe(name, tags, commands...))
 }
 
 // NewBuilder creates new image builder
@@ -52,6 +65,19 @@ type Builder struct {
 
 // Build builds images
 func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBuild, retErr error) {
+	if !IsNameValid(img.Name()) {
+		return nil, fmt.Errorf("name %s is invalid", img.Name())
+	}
+	tags := img.Tags()
+	if len(tags) == 0 {
+		tags = []types.Tag{runtime.DefaultTag}
+	}
+	for _, tag := range tags {
+		if !IsTagValid(tag) {
+			return nil, fmt.Errorf("tag %s is invalid", tag)
+		}
+	}
+
 	buildID := types.BuildID(uuid.Must(uuid.NewUUID()).String())
 
 	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
@@ -122,7 +148,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		case errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
 			if srcTag == runtime.DefaultTag {
-				_, err = BuildFromFile(ctx, b, srcImageName+".spec", runtime.DefaultTag)
+				_, err = BuildFromFile(ctx, b, srcImageName+".spec", srcImageName, runtime.DefaultTag)
 			}
 		default:
 			return ImageManifest{}, err
@@ -187,7 +213,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 	}
 
-	if err := b.storage.Tag(buildID, img.tags); err != nil {
+	if err := b.storage.Tag(buildID, tags); err != nil {
 		return nil, err
 	}
 

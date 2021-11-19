@@ -12,7 +12,7 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
 )
 
-// Parse parses Specfile
+// Parse parses SpecFile
 func Parse(dockerfilePath string) ([]Command, error) {
 	file, err := os.Open(dockerfilePath)
 	if err != nil {
@@ -72,11 +72,6 @@ func cmdFrom(args []string) ([]Command, error) {
 	if len(parts) == 2 && parts[1] != "" {
 		tag = types.Tag(parts[1])
 	}
-
-	if !runtime.IsTagValid(tag) {
-		return nil, fmt.Errorf("tag %s is invalid", tag)
-	}
-
 	return []Command{From(name, tag)}, nil
 }
 
