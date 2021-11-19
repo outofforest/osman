@@ -22,6 +22,7 @@ func NewConfigFromCLI() Config {
 	pflag.StringVar(&config.RootDir, "root-dir", filepath.Join(must.String(os.UserHomeDir()), ".images"), "Directory where built images are stored")
 	pflag.StringVar(&config.Name, "name", "", "Name of built image, if empty name is derived from spec file name")
 	pflag.StringSliceVar(&tags, "tag", []string{string(DefaultTag)}, "Tags assigned to created build")
+	pflag.BoolVar(&config.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
 	pflag.BoolVarP(&config.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
 	pflag.Parse()
 
@@ -49,6 +50,9 @@ type Config struct {
 
 	// Tags are used to tag the build
 	Tags []types.Tag
+
+	// Rebuild forces rebuild of all parent images even if they exist
+	Rebuild bool
 
 	// VerboseLogging turns on verbose logging
 	VerboseLogging bool
