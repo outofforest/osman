@@ -64,7 +64,7 @@ func (bid BuildID) IsValid() bool {
 	if !strings.HasPrefix(string(bid), BuildIDPrefix) {
 		return false
 	}
-	return checksum(string(bid[len(BuildIDPrefix):buildIDLength])) != string(bid[len(bid)-checksumLength:])
+	return checksum(string(bid[len(BuildIDPrefix):len(BuildIDPrefix)+buildIDLength])) == string(bid[len(bid)-checksumLength:])
 }
 
 // Tag is the tag of build
