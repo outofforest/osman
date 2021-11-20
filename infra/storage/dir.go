@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/otiai10/copy"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
@@ -72,6 +73,90 @@ func (d *dirDriver) Builds() ([]types.BuildID, error) {
 				res = append(res, types.BuildID(info.Name()))
 			}
 		}
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return res, nil
+}
+
+// Info returns information about build
+func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
+	buildAbsLink, err := d.toAbsoluteBuildLink(buildID)
+	if err != nil {
+		return BuildInfo{}, err
+	}
+	buildAbsDir, err := filepath.EvalSymlinks(buildAbsLink)
+	if err != nil {
+		return BuildInfo{}, err
+	}
+	tagsAbsDir := filepath.Dir(buildAbsDir)
+
+	stat, err := os.Stat(buildAbsDir)
+	if err != nil {
+		return BuildInfo{}, err
+	}
+	statT, ok := stat.Sys().(*syscall.Stat_t)
+	if !ok {
+		panic("stat can't be retrieved")
+	}
+
+	res := BuildInfo{
+		BuildID:   buildID,
+		CreatedAt: time.Unix(statT.Ctim.Sec, statT.Ctim.Nsec),
+		Name:      filepath.Base(tagsAbsDir),
+		Tags:      []types.Tag{},
+	}
+
+	dir, err := os.Open(tagsAbsDir)
+	if err != nil {
+		return BuildInfo{}, err
+	}
+	defer dir.Close()
+
+	var entries []os.DirEntry
+	for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
+		for _, e := range entries {
+			info, err := e.Info()
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				return BuildInfo{}, err
+			}
+
+			if info.Mode()&os.ModeSymlink != 0 {
+				tagAbsLink := filepath.Join(tagsAbsDir, info.Name())
+				buildDirFromLink, err := filepath.EvalSymlinks(tagAbsLink)
+				if err != nil {
+					if os.IsNotExist(err) {
+						// dead link, remove it
+						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
+							return BuildInfo{}, err
+						}
+						continue
+					}
+					return BuildInfo{}, err
+				}
+				buildAbsDirFromLink, err := filepath.Abs(buildDirFromLink)
+				if err != nil {
+					if os.IsNotExist(err) {
+						// dead link, remove it
+						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
+							return BuildInfo{}, err
+						}
+						continue
+					}
+					return BuildInfo{}, err
+				}
+				if buildAbsDir == buildAbsDirFromLink {
+					res.Tags = append(res.Tags, types.Tag(info.Name()))
+				}
+			}
+		}
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return BuildInfo{}, err
 	}
 	return res, nil
 }

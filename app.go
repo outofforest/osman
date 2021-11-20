@@ -2,9 +2,11 @@ package imagebuilder
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/ridge/must"
 	"github.com/spf13/cobra"
@@ -38,12 +40,26 @@ func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 	listCmd := &cobra.Command{
 		Short: "List information about available builds",
 		Use:   "list",
-		RunE: cmdF.Cmd(nil, func(storage storage.Driver) error {
-			builds, err := storage.Builds()
+		RunE: cmdF.Cmd(nil, func(s storage.Driver) error {
+			builds, err := s.Builds()
 			if err != nil {
 				return err
 			}
-			fmt.Println(builds)
+			res := make([]storage.BuildInfo, 0, len(builds))
+			for _, buildID := range builds {
+				info, err := s.Info(buildID)
+				if err != nil {
+					return err
+				}
+				sort.Sort(types.TagSlice(info.Tags))
+				res = append(res, info)
+			}
+
+			sort.Slice(res, func(i int, j int) bool {
+				return res[i].CreatedAt.Before(res[j].CreatedAt)
+			})
+
+			fmt.Println(string(must.Bytes(json.MarshalIndent(res, "", "  "))))
 			return nil
 		}),
 	}
