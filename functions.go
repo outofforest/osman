@@ -37,6 +37,23 @@ func Build(ctx context.Context, config configBuild.Build, repo *infra.Repository
 	return nil
 }
 
+func listBuild(info storage.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool) bool {
+	if buildIDs != nil && buildIDs[info.BuildID] {
+		return true
+	}
+	if buildKeys != nil {
+		if buildKeys[types.NewBuildKey(info.Name, "")] {
+			return true
+		}
+		for _, tag := range info.Tags {
+			if buildKeys[types.NewBuildKey(info.Name, tag)] || buildKeys[types.NewBuildKey("", tag)] {
+				return true
+			}
+		}
+	}
+	return buildIDs == nil && buildKeys == nil
+}
+
 // List lists builds
 func List(config configList.List, s storage.Driver) ([]storage.BuildInfo, error) {
 	var buildIDs map[types.BuildID]bool
@@ -46,6 +63,13 @@ func List(config configList.List, s storage.Driver) ([]storage.BuildInfo, error)
 			buildIDs[buildID] = true
 		}
 	}
+	var buildKeys map[types.BuildKey]bool
+	if len(config.BuildKeys) > 0 {
+		buildKeys = map[types.BuildKey]bool{}
+		for _, buildKey := range config.BuildKeys {
+			buildKeys[buildKey] = true
+		}
+	}
 
 	builds, err := s.Builds()
 	if err != nil {
@@ -53,12 +77,13 @@ func List(config configList.List, s storage.Driver) ([]storage.BuildInfo, error)
 	}
 	res := make([]storage.BuildInfo, 0, len(builds))
 	for _, buildID := range builds {
-		if buildIDs != nil && !buildIDs[buildID] {
-			continue
-		}
 		info, err := s.Info(buildID)
 		if err != nil {
 			return nil, err
+		}
+
+		if !listBuild(info, buildIDs, buildKeys) {
+			continue
 		}
 		sort.Sort(types.TagSlice(info.Tags))
 		res = append(res, info)

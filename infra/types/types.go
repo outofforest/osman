@@ -3,17 +3,17 @@ package types
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
+	"regexp"
 	"strings"
 )
 
 const alphabet = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const buildIDPrefix = "bid"
 const buildIDLength = 16
 const checksumLength = 4
-
-// BuildIDPrefix is the prefix reserved for build IDs
-const BuildIDPrefix = "bid"
 
 var crcTable *crc32.Table
 
@@ -41,7 +41,7 @@ func NewBuildID() BuildID {
 		panic(err)
 	}
 	encode(buf)
-	return BuildID(BuildIDPrefix + string(buf) + checksum(string(buf)))
+	return BuildID(buildIDPrefix + string(buf) + checksum(string(buf)))
 }
 
 // ParseBuildID parses string into build ID and returns error if string is not a valid one
@@ -58,17 +58,22 @@ type BuildID string
 
 // IsValid verifies if format of build ID is valid
 func (bid BuildID) IsValid() bool {
-	if len(bid) != len(BuildIDPrefix)+buildIDLength+checksumLength {
+	if len(bid) != len(buildIDPrefix)+buildIDLength+checksumLength {
 		return false
 	}
-	if !strings.HasPrefix(string(bid), BuildIDPrefix) {
+	if !strings.HasPrefix(string(bid), buildIDPrefix) {
 		return false
 	}
-	return checksum(string(bid[len(BuildIDPrefix):len(BuildIDPrefix)+buildIDLength])) == string(bid[len(bid)-checksumLength:])
+	return checksum(string(bid[len(buildIDPrefix):len(buildIDPrefix)+buildIDLength])) == string(bid[len(bid)-checksumLength:])
 }
 
 // Tag is the tag of build
 type Tag string
+
+// IsValid returns true if tag is valid
+func (t Tag) IsValid() bool {
+	return regExp.MatchString(string(t))
+}
 
 // TagSlice is a sortable representation of slice of tags
 type TagSlice []Tag
@@ -76,3 +81,54 @@ type TagSlice []Tag
 func (x TagSlice) Len() int           { return len(x) }
 func (x TagSlice) Less(i, j int) bool { return x[i] < x[j] }
 func (x TagSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
+
+var regExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
+
+// IsNameValid returns true if name is valid
+func IsNameValid(name string) bool {
+	if strings.HasPrefix(name, buildIDPrefix) {
+		return false
+	}
+	return regExp.MatchString(name)
+}
+
+// NewBuildKey returns new build key
+func NewBuildKey(name string, tag Tag) BuildKey {
+	return BuildKey{Name: name, Tag: tag}
+}
+
+// ParseBuildKey parses string into build key and returns error if string is not a valid one
+func ParseBuildKey(strBuildKey string) (BuildKey, error) {
+	if strBuildKey == "" {
+		return BuildKey{}, errors.New("empty build key received")
+	}
+	parts := strings.SplitN(strBuildKey, ":", 2)
+	name := parts[0]
+	if name != "" && !IsNameValid(name) {
+		return BuildKey{}, fmt.Errorf("name '%s' is invalid", name)
+	}
+
+	var tag Tag
+	if len(parts) == 2 {
+		tag = Tag(parts[1])
+		if tag == "" {
+			return BuildKey{}, errors.New("empty tag received")
+		}
+	}
+	if tag != "" && !tag.IsValid() {
+		return BuildKey{}, fmt.Errorf("tag '%s' is invalid", tag)
+	}
+
+	return BuildKey{Name: name, Tag: tag}, nil
+}
+
+// BuildKey represents Name-Tag pair
+type BuildKey struct {
+	Name string
+	Tag  Tag
+}
+
+// String returns string representation of build key
+func (bk BuildKey) String() string {
+	return fmt.Sprintf("%s:%s", bk.Name, bk.Tag)
+}

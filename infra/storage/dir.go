@@ -211,27 +211,27 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
 }
 
 // Clone clones source build to destination build
-func (d *dirDriver) Clone(srcImageName string, srcTag types.Tag, dstImageName string, dstBuildID types.BuildID) error {
+func (d *dirDriver) Clone(srcBuildKey types.BuildKey, dstImageName string, dstBuildID types.BuildID) error {
 	dstBuildAbsDir, err := d.toAbsoluteBuildDir(dstImageName, dstBuildID)
 	if err != nil {
 		return err
 	}
 
-	srcTagLink, err := d.toAbsoluteTagLink(srcImageName, srcTag)
+	srcTagLink, err := d.toAbsoluteTagLink(srcBuildKey.Name, srcBuildKey.Tag)
 	if err != nil {
 		return err
 	}
 	srcBuildDir, err := filepath.EvalSymlinks(srcTagLink)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("image %s:%s does not exist: %w", srcImageName, srcTag, ErrSourceImageDoesNotExist)
+			return fmt.Errorf("image %s does not exist: %w", srcBuildKey, ErrSourceImageDoesNotExist)
 		}
 		return err
 	}
 	srcBuildAbsDir, err := filepath.Abs(srcBuildDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("image %s:%s does not exist: %w", srcImageName, srcTag, ErrSourceImageDoesNotExist)
+			return fmt.Errorf("image %s does not exist: %w", srcBuildKey, ErrSourceImageDoesNotExist)
 		}
 		return err
 	}

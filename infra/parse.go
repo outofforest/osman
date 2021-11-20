@@ -62,13 +62,12 @@ func cmdFrom(args []string) ([]Command, error) {
 		return nil, errors.New("first argument is empty")
 	}
 
-	parts := strings.SplitN(args[0], ":", 2)
-	name := parts[0]
-	var tag types.Tag
-	if len(parts) == 2 && parts[1] != "" {
-		tag = types.Tag(parts[1])
+	buildKey, err := types.ParseBuildKey(args[0])
+	if err != nil {
+		return nil, err
 	}
-	return []Command{From(name, tag)}, nil
+
+	return []Command{From(buildKey)}, nil
 }
 
 func cmdParams(args []string) ([]Command, error) {

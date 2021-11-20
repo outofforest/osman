@@ -13,13 +13,12 @@ type Command interface {
 }
 
 // From returns handler for FROM command
-func From(imageName string, tag types.Tag) Command {
-	if tag == "" {
-		tag = config.DefaultTag
+func From(buildKey types.BuildKey) Command {
+	if buildKey.Tag == "" {
+		buildKey.Tag = config.DefaultTag
 	}
 	return &fromCommand{
-		imageName: imageName,
-		tag:       tag,
+		buildKey: buildKey,
 	}
 }
 
@@ -38,8 +37,7 @@ func Run(command string) Command {
 }
 
 type fromCommand struct {
-	imageName string
-	tag       types.Tag
+	buildKey types.BuildKey
 }
 
 func (cmd *fromCommand) execute(ctx context.Context, build *ImageBuild) error {
