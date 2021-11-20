@@ -2,14 +2,10 @@ package infra
 
 import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 )
 
 // Describe creates descriptor for image
 func Describe(name string, tags []types.Tag, commands ...Command) *Descriptor {
-	if len(tags) == 0 {
-		tags = []types.Tag{runtime.DefaultTag}
-	}
 	return &Descriptor{
 		name:     name,
 		tags:     tags,
