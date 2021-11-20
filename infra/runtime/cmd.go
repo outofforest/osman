@@ -19,10 +19,13 @@ type CmdFactory struct {
 }
 
 // Cmd returns function compatible with RunE
-func (f *CmdFactory) Cmd(cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
+func (f *CmdFactory) Cmd(argsDst *[]string, cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if argsDst != nil {
+			*argsDst = args
+		}
 		var err error
-		f.c.Resolve(func(config Config) {
+		f.c.Resolve(func(c *ioc.Container, config Config) {
 			if !config.VerboseLogging {
 				logger.VerboseOff()
 			}

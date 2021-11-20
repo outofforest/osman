@@ -31,7 +31,9 @@ func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 	rootCmd := &cobra.Command{
 		Short:        "Builds images from spec files",
 		SilenceUsage: true,
-		RunE: cmdF.Cmd(func(ctx context.Context, config runtime.Config, repo *infra.Repository, builder *infra.Builder) error {
+		Args:         cobra.MinimumNArgs(1),
+		Use:          "[flags] ...specfile",
+		RunE: cmdF.Cmd(&cf.SpecFiles, func(ctx context.Context, config runtime.Config, repo *infra.Repository, builder *infra.Builder) error {
 			fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 				infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
 				infra.Run(`rm -rf /var/cache/* /tmp/*`)}
@@ -51,7 +53,6 @@ func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 			return nil
 		}),
 	}
-
 	rootCmd.Flags().StringSliceVar(&cf.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
 	rootCmd.Flags().StringSliceVar(&cf.Tags, "tag", []string{string(runtime.DefaultTag)}, "Tags assigned to created build")
 	rootCmd.Flags().BoolVar(&cf.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
