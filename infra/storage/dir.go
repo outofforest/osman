@@ -109,8 +109,8 @@ func (d *dirDriver) Clone(srcImageName string, srcTag types.Tag, dstImageName st
 	return copy.Copy(srcBuildAbsDir, dstBuildAbsDir, copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
-// Tag tags buildID with tags
-func (d *dirDriver) Tag(buildID types.BuildID, tags []types.Tag) error {
+// Tag tags buildID with tag
+func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
 	buildLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
 		return err
@@ -124,21 +124,19 @@ func (d *dirDriver) Tag(buildID types.BuildID, tags []types.Tag) error {
 		return err
 	}
 	parentDir := filepath.Dir(buildAbsDir)
-	for _, tag := range tags {
-		tagLink := filepath.Join(parentDir, string(tag))
-	retry:
-		for {
-			err := os.Symlink(string(buildID), tagLink)
-			switch {
-			case err == nil:
-				break retry
-			case os.IsExist(err):
-				if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-			default:
+	tagLink := filepath.Join(parentDir, string(tag))
+retry:
+	for {
+		err := os.Symlink(string(buildID), tagLink)
+		switch {
+		case err == nil:
+			break retry
+		case os.IsExist(err):
+			if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
 				return err
 			}
+		default:
+			return err
 		}
 	}
 	return nil

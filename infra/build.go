@@ -42,15 +42,18 @@ func IsNameValid(name string) bool {
 // NewBuilder creates new image builder
 func NewBuilder(config runtime.Config, repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
-		rebuild: config.Rebuild,
-		repo:    repo,
-		storage: storage,
+		rebuild:     config.Rebuild,
+		readyBuilds: map[repoKey]bool{},
+		repo:        repo,
+		storage:     storage,
 	}
 }
 
 // Builder builds images
 type Builder struct {
-	rebuild bool
+	rebuild     bool
+	readyBuilds map[repoKey]bool
+
 	repo    *Repository
 	storage storage.Driver
 }
@@ -65,7 +68,7 @@ func (b *Builder) BuildFromFile(ctx context.Context, specFile, name string, tags
 }
 
 // Build builds images
-func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBuild, retErr error) {
+func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBuild, retErr error) {
 	if !IsNameValid(img.Name()) {
 		return nil, fmt.Errorf("name %s is invalid", img.Name())
 	}
@@ -89,6 +92,11 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 	specDir := filepath.Join(path, ".specdir")
 
 	var imgUnmount storage.UnmountFn
+	defer func() {
+		if retErr != nil {
+			retBuild = nil
+		}
+	}()
 	defer func() {
 		if err := umount(path); err != nil {
 			if retErr != nil {
@@ -120,6 +128,10 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 			if err := b.storage.Drop(buildID); err != nil {
 				retErr = err
 			}
+			return
+		}
+		for _, tag := range retBuild.manifest.Tags {
+			b.readyBuilds[repoKey{name: img.Name(), tag: tag}] = true
 		}
 	}()
 
@@ -151,7 +163,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		// Try to clone existing image
 		var cloned bool
 		err := errRebuild
-		if !b.rebuild {
+		if !b.rebuild || b.readyBuilds[repoKey{name: srcImageName, tag: srcTag}] {
 			err = b.storage.Clone(srcImageName, srcTag, img.Name(), buildID)
 		}
 
@@ -232,14 +244,17 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		}
 	}
 
-	if err := b.storage.Tag(buildID, tags); err != nil {
-		return nil, err
-	}
-
 	if err := ioutil.WriteFile(filepath.Join(path, manifestFile), must.Bytes(json.Marshal(build.Manifest())), 0o444); err != nil {
 		return nil, err
 	}
 
+	for _, tag := range tags {
+		if err := b.storage.Tag(buildID, tag); err != nil {
+			return nil, err
+		}
+	}
+	build.manifest.Tags = tags
+	build.manifest.BuildID = buildID
 	return build, nil
 }
 
@@ -268,7 +283,9 @@ func umount(imgPath string) error {
 
 // ImageManifest contains info about built image
 type ImageManifest struct {
-	Params []string
+	BuildID types.BuildID
+	Params  []string
+	Tags    []types.Tag
 }
 
 func newImageBuild(base bool, path string, cloneFn cloneFromFn) *ImageBuild {
