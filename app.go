@@ -39,7 +39,7 @@ func App(ctx context.Context, config runtime.Config, repo *infra.Repository, bui
 	for i, specFile := range config.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
 
-		build, err := infra.BuildFromFile(ctx, builder, specFile, config.Names[i], config.Tags...)
+		build, err := builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...)
 		if err != nil {
 			return err
 		}
