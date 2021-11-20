@@ -42,6 +42,9 @@ func IsTagValid(tag types.Tag) bool {
 
 // IsNameValid returns true if name is valid
 func IsNameValid(name string) bool {
+	if strings.HasPrefix(name, types.BuildIDPrefix) {
+		return false
+	}
 	return regExp.MatchString(name)
 }
 
