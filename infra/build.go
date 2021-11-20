@@ -14,9 +14,10 @@ import (
 	"syscall"
 
 	"github.com/ridge/must"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
+	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
@@ -46,7 +47,7 @@ func IsNameValid(name string) bool {
 }
 
 // NewBuilder creates new image builder
-func NewBuilder(config runtime.ConfigBuild, repo *Repository, storage storage.Driver) *Builder {
+func NewBuilder(config config.Build, repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
 		rebuild:     config.Rebuild,
 		readyBuilds: map[buildKey]bool{},

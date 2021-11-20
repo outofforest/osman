@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/otiai10/copy"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
+	"github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
@@ -20,7 +20,7 @@ const (
 )
 
 // NewDirDriver returns new storage driver based on directories
-func NewDirDriver(config runtime.ConfigRoot) Driver {
+func NewDirDriver(config config.Root) Driver {
 	return &dirDriver{
 		rootPath: config.RootDir,
 	}

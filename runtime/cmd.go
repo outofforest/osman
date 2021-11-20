@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
 	"github.com/wojciech-malota-wojcik/ioc"
 	"github.com/wojciech-malota-wojcik/logger"
 )
@@ -28,7 +29,7 @@ func (f *CmdFactory) Cmd(cmdFunc interface{}) func(cmd *cobra.Command, args []st
 			return args
 		})
 		var err error
-		f.c.Resolve(func(c *ioc.Container, configRoot ConfigRoot) {
+		f.c.Resolve(func(c *ioc.Container, configRoot config.Root) {
 			if !configRoot.VerboseLogging {
 				logger.VerboseOff()
 			}

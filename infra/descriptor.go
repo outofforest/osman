@@ -1,8 +1,8 @@
 package infra
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 )
 
 // Describe creates descriptor for image
