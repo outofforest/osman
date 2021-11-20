@@ -58,5 +58,6 @@ func (f *tableFormatter) Format(slice interface{}) string {
 		res += "\n"
 	}
 
-	return res
+	// remove last new line
+	return res[:len(res)-1]
 }
