@@ -254,13 +254,13 @@ func (b *Builder) build(ctx context.Context, stack map[buildKey]bool, img *Descr
 			return ImageManifest{}, err
 		}
 
-		if err := syscall.Mount("/dev", filepath.Join(path, "dev"), "", syscall.MS_BIND, ""); err != nil {
+		if err := syscall.Mount("none", filepath.Join(path, "dev"), "devtmpfs", 0, ""); err != nil {
 			return ImageManifest{}, err
 		}
-		if err := syscall.Mount("/proc", filepath.Join(path, "proc"), "", syscall.MS_BIND, ""); err != nil {
+		if err := syscall.Mount("none", filepath.Join(path, "proc"), "proc", 0, ""); err != nil {
 			return ImageManifest{}, err
 		}
-		if err := syscall.Mount("/sys", filepath.Join(path, "sys"), "", syscall.MS_BIND, ""); err != nil {
+		if err := syscall.Mount("none", filepath.Join(path, "sys"), "sysfs", 0, ""); err != nil {
 			return ImageManifest{}, err
 		}
 		return manifest, nil
