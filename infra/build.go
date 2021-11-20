@@ -27,6 +27,15 @@ const manifestFile = "manifest.json"
 
 type cloneFromFn func(srcImageName string, srcTag types.Tag) (ImageManifest, error)
 
+type buildKey struct {
+	name string
+	tag  types.Tag
+}
+
+func (bk buildKey) String() string {
+	return fmt.Sprintf("%s:%s", bk.name, bk.tag)
+}
+
 var regExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
 
 // IsTagValid returns true if tag is valid
@@ -43,7 +52,7 @@ func IsNameValid(name string) bool {
 func NewBuilder(config runtime.Config, repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
 		rebuild:     config.Rebuild,
-		readyBuilds: map[repoKey]bool{},
+		readyBuilds: map[buildKey]bool{},
 		repo:        repo,
 		storage:     storage,
 	}
@@ -52,7 +61,7 @@ func NewBuilder(config runtime.Config, repo *Repository, storage storage.Driver)
 // Builder builds images
 type Builder struct {
 	rebuild     bool
-	readyBuilds map[repoKey]bool
+	readyBuilds map[buildKey]bool
 
 	repo    *Repository
 	storage storage.Driver
@@ -60,15 +69,23 @@ type Builder struct {
 
 // BuildFromFile builds image from spec file
 func (b *Builder) BuildFromFile(ctx context.Context, specFile, name string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
-	commands, err := Parse(specFile)
-	if err != nil {
-		return nil, err
-	}
-	return b.Build(ctx, Describe(name, tags, commands...))
+	return b.buildFromFile(ctx, map[buildKey]bool{}, specFile, name, tags...)
 }
 
 // Build builds images
 func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBuild, retErr error) {
+	return b.build(ctx, map[buildKey]bool{}, img)
+}
+
+func (b *Builder) buildFromFile(ctx context.Context, stack map[buildKey]bool, specFile, name string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
+	commands, err := Parse(specFile)
+	if err != nil {
+		return nil, err
+	}
+	return b.build(ctx, stack, Describe(name, tags, commands...))
+}
+
+func (b *Builder) build(ctx context.Context, stack map[buildKey]bool, img *Descriptor) (retBuild *ImageBuild, retErr error) {
 	if !IsNameValid(img.Name()) {
 		return nil, fmt.Errorf("name %s is invalid", img.Name())
 	}
@@ -76,10 +93,17 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBu
 	if len(tags) == 0 {
 		tags = []types.Tag{runtime.DefaultTag}
 	}
+	keys := make([]buildKey, 0, len(tags))
 	for _, tag := range tags {
 		if !IsTagValid(tag) {
 			return nil, fmt.Errorf("tag %s is invalid", tag)
 		}
+		key := buildKey{name: img.Name(), tag: tag}
+		if stack[key] {
+			return nil, fmt.Errorf("loop in dependencies detected on image %s", key)
+		}
+		stack[key] = true
+		keys = append(keys, key)
 	}
 
 	buildID := types.BuildID(uuid.Must(uuid.NewUUID()).String())
@@ -130,9 +154,6 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBu
 			}
 			return
 		}
-		for _, tag := range retBuild.manifest.Tags {
-			b.readyBuilds[repoKey{name: img.Name(), tag: tag}] = true
-		}
 	}()
 
 	var base bool
@@ -163,7 +184,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBu
 		// Try to clone existing image
 		var cloned bool
 		err := errRebuild
-		if !b.rebuild || b.readyBuilds[repoKey{name: srcImageName, tag: srcTag}] {
+		if !b.rebuild || b.readyBuilds[buildKey{name: srcImageName, tag: srcTag}] {
 			err = b.storage.Clone(srcImageName, srcTag, img.Name(), buildID)
 		}
 
@@ -173,7 +194,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBu
 		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
 			if srcTag == runtime.DefaultTag {
-				_, err = b.BuildFromFile(ctx, srcImageName+".spec", srcImageName, runtime.DefaultTag)
+				_, err = b.buildFromFile(ctx, stack, srcImageName+".spec", srcImageName, runtime.DefaultTag)
 			}
 		default:
 			return ImageManifest{}, err
@@ -184,7 +205,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBu
 		case errors.Is(err, errRebuild) || os.IsNotExist(err) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If spec file does not exist, try building from repository
 			if baseImage := b.repo.Retrieve(srcImageName, srcTag); baseImage != nil {
-				_, err = b.Build(ctx, baseImage)
+				_, err = b.build(ctx, stack, baseImage)
 			} else {
 				err = fmt.Errorf("can't find image %s:%s", srcImageName, srcTag)
 			}
@@ -248,13 +269,15 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (retBuild *ImageBu
 		return nil, err
 	}
 
-	for _, tag := range tags {
-		if err := b.storage.Tag(buildID, tag); err != nil {
+	for _, key := range keys {
+		if err := b.storage.Tag(buildID, key.tag); err != nil {
 			return nil, err
 		}
 	}
-	build.manifest.Tags = tags
 	build.manifest.BuildID = buildID
+	for _, key := range keys {
+		b.readyBuilds[key] = true
+	}
 	return build, nil
 }
 
@@ -285,7 +308,6 @@ func umount(imgPath string) error {
 type ImageManifest struct {
 	BuildID types.BuildID
 	Params  []string
-	Tags    []types.Tag
 }
 
 func newImageBuild(base bool, path string, cloneFn cloneFromFn) *ImageBuild {
