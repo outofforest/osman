@@ -39,15 +39,6 @@ func IsNameValid(name string) bool {
 	return regExp.MatchString(name)
 }
 
-// BuildFromFile builds image from spec file
-func BuildFromFile(ctx context.Context, builder *Builder, specFile, name string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
-	commands, err := Parse(specFile)
-	if err != nil {
-		return nil, err
-	}
-	return builder.Build(ctx, Describe(name, tags, commands...))
-}
-
 // NewBuilder creates new image builder
 func NewBuilder(config runtime.Config, repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
@@ -62,6 +53,15 @@ type Builder struct {
 	rebuild bool
 	repo    *Repository
 	storage storage.Driver
+}
+
+// BuildFromFile builds image from spec file
+func (b *Builder) BuildFromFile(ctx context.Context, specFile, name string, tags ...types.Tag) (imgBuild *ImageBuild, retErr error) {
+	commands, err := Parse(specFile)
+	if err != nil {
+		return nil, err
+	}
+	return b.Build(ctx, Describe(name, tags, commands...))
 }
 
 // Build builds images
@@ -161,7 +161,7 @@ func (b *Builder) Build(ctx context.Context, img *Descriptor) (imgBuild *ImageBu
 		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
 			if srcTag == runtime.DefaultTag {
-				_, err = BuildFromFile(ctx, b, srcImageName+".spec", srcImageName, runtime.DefaultTag)
+				_, err = b.BuildFromFile(ctx, srcImageName+".spec", srcImageName, runtime.DefaultTag)
 			}
 		default:
 			return ImageManifest{}, err
