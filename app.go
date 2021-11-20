@@ -17,7 +17,8 @@ import (
 
 // IoCBuilder configures ioc container
 func IoCBuilder(c *ioc.Container) {
-	c.Singleton(runtime.NewConfigFromCLI)
+	c.Singleton(runtime.NewConfigFactory)
+	c.Singleton(runtime.NewConfigFromFactory)
 	c.Singleton(storage.NewDirDriver)
 	c.Singleton(infra.NewRepository)
 	c.Transient(infra.NewBuilder)
