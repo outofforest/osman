@@ -36,7 +36,7 @@ func newConfig(cf *configFactory, args commands.Args) config.Build {
 	config := config.Build{
 		SpecFiles: args,
 		Names:     cf.Names,
-		Tags:      make([]types.Tag, 0, len(cf.Tags)),
+		Tags:      make(types.Tags, 0, len(cf.Tags)),
 		Rebuild:   cf.Rebuild,
 	}
 

@@ -66,7 +66,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	}
 	tags := img.Tags()
 	if len(tags) == 0 {
-		tags = []types.Tag{config.DefaultTag}
+		tags = types.Tags{config.DefaultTag}
 	}
 	keys := make([]types.BuildKey, 0, len(tags))
 	for _, tag := range tags {

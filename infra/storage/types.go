@@ -42,5 +42,5 @@ type BuildInfo struct {
 	BuildID   types.BuildID
 	CreatedAt time.Time
 	Name      string
-	Tags      []types.Tag
+	Tags      types.Tags
 }

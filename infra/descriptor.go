@@ -5,7 +5,7 @@ import (
 )
 
 // Describe creates descriptor for image
-func Describe(name string, tags []types.Tag, commands ...Command) *Descriptor {
+func Describe(name string, tags types.Tags, commands ...Command) *Descriptor {
 	return &Descriptor{
 		name:     name,
 		tags:     tags,
@@ -16,7 +16,7 @@ func Describe(name string, tags []types.Tag, commands ...Command) *Descriptor {
 // Descriptor describes future image
 type Descriptor struct {
 	name     string
-	tags     []types.Tag
+	tags     types.Tags
 	commands []Command
 }
 
@@ -26,6 +26,6 @@ func (d *Descriptor) Name() string {
 }
 
 // Tags returns tags of the image
-func (d *Descriptor) Tags() []types.Tag {
+func (d *Descriptor) Tags() types.Tags {
 	return d.tags
 }
