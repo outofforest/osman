@@ -23,8 +23,8 @@ type Driver interface {
 	// Clone clones source image to destination
 	Clone(srcImageName string, srcTag types.Tag, dstImageName string, dstBuildID types.BuildID) error
 
-	// Tag tags buildID with tags
-	Tag(buildID types.BuildID, tags []types.Tag) error
+	// Tag tags buildID with tag
+	Tag(buildID types.BuildID, tag types.Tag) error
 
 	// Drop drops image
 	Drop(buildID types.BuildID) error
