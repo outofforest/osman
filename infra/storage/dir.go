@@ -20,7 +20,7 @@ const (
 )
 
 // NewDirDriver returns new storage driver based on directories
-func NewDirDriver(config runtime.Config) Driver {
+func NewDirDriver(config runtime.ConfigRoot) Driver {
 	return &dirDriver{
 		rootPath: config.RootDir,
 	}

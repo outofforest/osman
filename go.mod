@@ -12,7 +12,6 @@ replace (
 )
 
 require (
-	github.com/google/uuid v1.3.0
 	github.com/otiai10/copy v1.7.0
 	github.com/pkg/errors v0.8.1
 	github.com/ridge/must v0.6.0

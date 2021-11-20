@@ -6,6 +6,9 @@ import (
 	"github.com/wojciech-malota-wojcik/logger"
 )
 
+// Args is the list of positional CLI arguments passed to application
+type Args []string
+
 // NewCmdFactory returns new CmdFactory
 func NewCmdFactory(c *ioc.Container) *CmdFactory {
 	return &CmdFactory{
@@ -19,14 +22,14 @@ type CmdFactory struct {
 }
 
 // Cmd returns function compatible with RunE
-func (f *CmdFactory) Cmd(argsDst *[]string, cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
+func (f *CmdFactory) Cmd(cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if argsDst != nil {
-			*argsDst = args
-		}
+		f.c.Singleton(func() Args {
+			return args
+		})
 		var err error
-		f.c.Resolve(func(c *ioc.Container, config Config) {
-			if !config.VerboseLogging {
+		f.c.Resolve(func(c *ioc.Container, configRoot ConfigRoot) {
+			if !configRoot.VerboseLogging {
 				logger.VerboseOff()
 			}
 			f.c.Call(cmdFunc, &err)

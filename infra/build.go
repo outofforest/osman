@@ -13,11 +13,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/google/uuid"
-
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
-
 	"github.com/ridge/must"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/libexec"
@@ -49,7 +46,7 @@ func IsNameValid(name string) bool {
 }
 
 // NewBuilder creates new image builder
-func NewBuilder(config runtime.Config, repo *Repository, storage storage.Driver) *Builder {
+func NewBuilder(config runtime.ConfigBuild, repo *Repository, storage storage.Driver) *Builder {
 	return &Builder{
 		rebuild:     config.Rebuild,
 		readyBuilds: map[buildKey]bool{},
@@ -106,7 +103,7 @@ func (b *Builder) build(ctx context.Context, stack map[buildKey]bool, img *Descr
 		keys = append(keys, key)
 	}
 
-	buildID := types.BuildID(uuid.Must(uuid.NewUUID()).String())
+	buildID := types.NewBuildID()
 
 	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
 	if err != nil {
