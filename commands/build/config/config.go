@@ -1,7 +1,6 @@
 package config
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
@@ -10,8 +9,6 @@ const DefaultTag types.Tag = "latest"
 
 // Build stores configuration for build command
 type Build struct {
-	config.Root
-
 	// SpecFiles is the list of specfiles to build
 	SpecFiles []string
 
