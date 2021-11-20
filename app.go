@@ -2,6 +2,7 @@ package imagebuilder
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -34,6 +35,19 @@ func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 	rootCmd.PersistentFlags().StringVar(&cf.RootDir, "root-dir", filepath.Join(must.String(os.UserHomeDir()), ".images"), "Directory where built images are stored")
 	rootCmd.PersistentFlags().BoolVarP(&cf.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
 
+	listCmd := &cobra.Command{
+		Short: "List information about available builds",
+		Use:   "list",
+		RunE: cmdF.Cmd(nil, func(storage storage.Driver) error {
+			builds, err := storage.Builds()
+			if err != nil {
+				return err
+			}
+			fmt.Println(builds)
+			return nil
+		}),
+	}
+
 	buildCmd := &cobra.Command{
 		Short: "Builds images from spec files",
 		Args:  cobra.MinimumNArgs(1),
@@ -62,6 +76,6 @@ func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 	buildCmd.Flags().StringSliceVar(&cf.Tags, "tag", []string{string(runtime.DefaultTag)}, "Tags assigned to created build")
 	buildCmd.Flags().BoolVar(&cf.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
 
-	rootCmd.AddCommand(buildCmd)
+	rootCmd.AddCommand(listCmd, buildCmd)
 	return rootCmd.Execute()
 }

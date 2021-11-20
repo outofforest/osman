@@ -29,7 +29,54 @@ type dirDriver struct {
 	rootPath string
 }
 
-// Mount mounts image in filesystem
+// Builds returns available builds
+func (d *dirDriver) Builds() ([]types.BuildID, error) {
+	rootPath, err := filepath.Abs(d.rootPath)
+	if err != nil {
+		return nil, err
+	}
+	buildsAbsDir := filepath.Join(rootPath, subDirBuilds)
+	dir, err := os.Open(buildsAbsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []types.BuildID{}, nil
+		}
+		return nil, err
+	}
+	defer dir.Close()
+
+	res := []types.BuildID{}
+	var entries []os.DirEntry
+	for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
+		for _, e := range entries {
+			info, err := e.Info()
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				return nil, err
+			}
+
+			if info.Mode()&os.ModeSymlink != 0 {
+				buildAbsLink := filepath.Join(buildsAbsDir, info.Name())
+				if _, err := filepath.EvalSymlinks(buildAbsLink); err != nil {
+					if os.IsNotExist(err) {
+						// dead link, remove it
+						if err := os.Remove(buildAbsLink); err != nil && !os.IsNotExist(err) {
+							return nil, err
+						}
+						continue
+					}
+					return nil, err
+				}
+				res = append(res, types.BuildID(info.Name()))
+			}
+		}
+	}
+	return res, nil
+}
+
+// Mount mounts build in filesystem
 func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, error) {
 	buildLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
@@ -53,7 +100,7 @@ func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, err
 	}, nil
 }
 
-// CreateEmpty creates blank image for build
+// CreateEmpty creates blank build
 func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
 	buildAbsLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
@@ -78,7 +125,7 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
 	return os.MkdirAll(buildAbsDir, 0o700)
 }
 
-// Clone clones source image to destination or returns false if source image does not exist
+// Clone clones source build to destination build
 func (d *dirDriver) Clone(srcImageName string, srcTag types.Tag, dstImageName string, dstBuildID types.BuildID) error {
 	dstBuildAbsDir, err := d.toAbsoluteBuildDir(dstImageName, dstBuildID)
 	if err != nil {
@@ -109,7 +156,7 @@ func (d *dirDriver) Clone(srcImageName string, srcTag types.Tag, dstImageName st
 	return copy.Copy(srcBuildAbsDir, dstBuildAbsDir, copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
-// Tag tags buildID with tag
+// Tag tags build with tag
 func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
 	buildLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
