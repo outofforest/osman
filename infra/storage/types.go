@@ -14,18 +14,21 @@ type UnmountFn = func() error
 
 // Driver represents storage driver
 type Driver interface {
-	// Mount mounts the image in filesystem
+	// Builds returns available builds
+	Builds() ([]types.BuildID, error)
+
+	// Mount mounts the build in filesystem
 	Mount(buildID types.BuildID, dstPath string) (UnmountFn, error)
 
-	// CreateEmpty creates blank image for build
+	// CreateEmpty creates blank build
 	CreateEmpty(imageName string, buildID types.BuildID) error
 
-	// Clone clones source image to destination
+	// Clone clones build to destination build
 	Clone(srcImageName string, srcTag types.Tag, dstImageName string, dstBuildID types.BuildID) error
 
-	// Tag tags buildID with tag
+	// Tag tags build with tag
 	Tag(buildID types.BuildID, tag types.Tag) error
 
-	// Drop drops image
+	// Drop drops build
 	Drop(buildID types.BuildID) error
 }
