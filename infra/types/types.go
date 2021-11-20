@@ -75,12 +75,19 @@ func (t Tag) IsValid() bool {
 	return regExp.MatchString(string(t))
 }
 
-// TagSlice is a sortable representation of slice of tags
-type TagSlice []Tag
+// Tags is a sortable representation of slice of tags
+type Tags []Tag
 
-func (x TagSlice) Len() int           { return len(x) }
-func (x TagSlice) Less(i, j int) bool { return x[i] < x[j] }
-func (x TagSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
+func (x Tags) String() string {
+	strs := make([]string, 0, len(x))
+	for _, tag := range x {
+		strs = append(strs, string(tag))
+	}
+	return strings.Join(strs, ", ")
+}
+func (x Tags) Len() int           { return len(x) }
+func (x Tags) Less(i, j int) bool { return x[i] < x[j] }
+func (x Tags) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 
 var regExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
 

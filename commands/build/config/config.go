@@ -16,7 +16,7 @@ type Build struct {
 	Names []string
 
 	// Tags are used to tag the build
-	Tags []types.Tag
+	Tags types.Tags
 
 	// Rebuild forces rebuild of all parent images even if they exist
 	Rebuild bool

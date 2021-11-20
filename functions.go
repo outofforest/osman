@@ -22,8 +22,8 @@ func Build(ctx context.Context, config configBuild.Build, repo *infra.Repository
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
 		infra.Run(`rm -rf /var/cache/* /tmp/*`)}
 
-	repo.Store(infra.Describe("fedora", []types.Tag{"34"}, fedoraCmds...))
-	repo.Store(infra.Describe("fedora", []types.Tag{"35"}, fedoraCmds...))
+	repo.Store(infra.Describe("fedora", types.Tags{"34"}, fedoraCmds...))
+	repo.Store(infra.Describe("fedora", types.Tags{"35"}, fedoraCmds...))
 
 	for i, specFile := range config.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
@@ -85,7 +85,7 @@ func List(config configList.List, s storage.Driver) ([]storage.BuildInfo, error)
 		if !listBuild(info, buildIDs, buildKeys) {
 			continue
 		}
-		sort.Sort(types.TagSlice(info.Tags))
+		sort.Sort(info.Tags)
 		res = append(res, info)
 	}
 

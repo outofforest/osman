@@ -66,6 +66,6 @@ func command(c *ioc.Container, cf *configFactory, cmdF *commands.CmdFactory) *co
 			return nil
 		}),
 	}
-	cmd.Flags().StringVar(&cf.Formatter, "formatter", "json", "Name of formatter used to format the output: "+strings.Join(c.Names((*format.Formatter)(nil)), " | "))
+	cmd.Flags().StringVar(&cf.Formatter, "format", "table", "Name of formatter used to format the output: "+strings.Join(c.Names((*format.Formatter)(nil)), " | "))
 	return cmd
 }

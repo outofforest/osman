@@ -2,14 +2,13 @@ package format
 
 import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/list/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/ioc"
 )
 
-// Formatter formats build list into string
+// Formatter formats slice into string
 type Formatter interface {
 	// Format formats build list into string
-	Format(builds []storage.BuildInfo) string
+	Format(slice interface{}) string
 }
 
 // Resolve resolves concrete formatter based on config

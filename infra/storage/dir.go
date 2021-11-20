@@ -105,7 +105,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
 		BuildID:   buildID,
 		CreatedAt: time.Unix(statT.Ctim.Sec, statT.Ctim.Nsec),
 		Name:      filepath.Base(tagsAbsDir),
-		Tags:      []types.Tag{},
+		Tags:      types.Tags{},
 	}
 
 	dir, err := os.Open(tagsAbsDir)

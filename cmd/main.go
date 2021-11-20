@@ -20,6 +20,7 @@ func iocBuilder(c *ioc.Container) {
 	c.Transient(infra.NewBuilder)
 
 	c.Singleton(format.Resolve)
+	c.SingletonNamed("table", format.NewTableFormatter)
 	c.SingletonNamed("json", format.NewJSONFormatter)
 
 	root.Install(c)
