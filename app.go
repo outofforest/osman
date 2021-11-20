@@ -29,10 +29,15 @@ func IoCBuilder(c *ioc.Container) {
 // App runs builder app
 func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 	rootCmd := &cobra.Command{
-		Short:        "Builds images from spec files",
 		SilenceUsage: true,
-		Args:         cobra.MinimumNArgs(1),
-		Use:          "[flags] ...specfile",
+	}
+	rootCmd.PersistentFlags().StringVar(&cf.RootDir, "root-dir", filepath.Join(must.String(os.UserHomeDir()), ".images"), "Directory where built images are stored")
+	rootCmd.PersistentFlags().BoolVarP(&cf.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
+
+	buildCmd := &cobra.Command{
+		Short: "Builds images from spec files",
+		Args:  cobra.MinimumNArgs(1),
+		Use:   "build [flags] ...specfile",
 		RunE: cmdF.Cmd(&cf.SpecFiles, func(ctx context.Context, config runtime.Config, repo *infra.Repository, builder *infra.Builder) error {
 			fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 				infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
@@ -53,10 +58,10 @@ func App(cf *runtime.ConfigFactory, cmdF *runtime.CmdFactory) error {
 			return nil
 		}),
 	}
-	rootCmd.Flags().StringSliceVar(&cf.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
-	rootCmd.Flags().StringSliceVar(&cf.Tags, "tag", []string{string(runtime.DefaultTag)}, "Tags assigned to created build")
-	rootCmd.Flags().BoolVar(&cf.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
-	rootCmd.PersistentFlags().StringVar(&cf.RootDir, "root-dir", filepath.Join(must.String(os.UserHomeDir()), ".images"), "Directory where built images are stored")
-	rootCmd.PersistentFlags().BoolVarP(&cf.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
+	buildCmd.Flags().StringSliceVar(&cf.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
+	buildCmd.Flags().StringSliceVar(&cf.Tags, "tag", []string{string(runtime.DefaultTag)}, "Tags assigned to created build")
+	buildCmd.Flags().BoolVar(&cf.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
+
+	rootCmd.AddCommand(buildCmd)
 	return rootCmd.Execute()
 }
