@@ -8,11 +8,11 @@ import (
 
 	"github.com/ridge/must"
 	"github.com/spf13/cobra"
+	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
 	configRoot "github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 	"github.com/wojciech-malota-wojcik/ioc"
 	"github.com/wojciech-malota-wojcik/logger"
 	"go.uber.org/zap"
@@ -38,7 +38,7 @@ type configFactory struct {
 	Rebuild bool
 }
 
-func newConfig(cf *configFactory, configRoot configRoot.Root, args runtime.Args) config.Build {
+func newConfig(cf *configFactory, configRoot configRoot.Root, args commands.Args) config.Build {
 	config := config.Build{
 		Root:      configRoot,
 		SpecFiles: args,
@@ -58,7 +58,7 @@ func newConfig(cf *configFactory, configRoot configRoot.Root, args runtime.Args)
 	return config
 }
 
-func command(cf *configFactory, cmdF *runtime.CmdFactory) *cobra.Command {
+func command(cf *configFactory, cmdF *commands.CmdFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Short: "Builds images from spec files",
 		Args:  cobra.MinimumNArgs(1),
@@ -84,7 +84,7 @@ func command(cf *configFactory, cmdF *runtime.CmdFactory) *cobra.Command {
 		}),
 	}
 	cmd.Flags().StringSliceVar(&cf.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
-	cmd.Flags().StringSliceVar(&cf.Tags, "tag", []string{string(runtime.DefaultTag)}, "Tags assigned to created build")
+	cmd.Flags().StringSliceVar(&cf.Tags, "tag", []string{string(config.DefaultTag)}, "Tags assigned to created build")
 	cmd.Flags().BoolVar(&cf.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
 	return cmd
 }

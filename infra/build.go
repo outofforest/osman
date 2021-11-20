@@ -17,7 +17,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
@@ -89,7 +88,7 @@ func (b *Builder) build(ctx context.Context, stack map[buildKey]bool, img *Descr
 	}
 	tags := img.Tags()
 	if len(tags) == 0 {
-		tags = []types.Tag{runtime.DefaultTag}
+		tags = []types.Tag{config.DefaultTag}
 	}
 	keys := make([]buildKey, 0, len(tags))
 	for _, tag := range tags {
@@ -191,8 +190,8 @@ func (b *Builder) build(ctx context.Context, stack map[buildKey]bool, img *Descr
 			cloned = true
 		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
-			if srcTag == runtime.DefaultTag {
-				_, err = b.buildFromFile(ctx, stack, srcImageName+".spec", srcImageName, runtime.DefaultTag)
+			if srcTag == config.DefaultTag {
+				_, err = b.buildFromFile(ctx, stack, srcImageName+".spec", srcImageName, config.DefaultTag)
 			}
 		default:
 			return ImageManifest{}, err

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
 )
 
@@ -65,7 +64,7 @@ func cmdFrom(args []string) ([]Command, error) {
 
 	parts := strings.SplitN(args[0], ":", 2)
 	name := parts[0]
-	tag := runtime.DefaultTag
+	var tag types.Tag
 	if len(parts) == 2 && parts[1] != "" {
 		tag = types.Tag(parts[1])
 	}

@@ -7,9 +7,9 @@ import (
 
 	"github.com/ridge/must"
 	"github.com/spf13/cobra"
+	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 	"github.com/wojciech-malota-wojcik/ioc"
 )
 
@@ -18,7 +18,7 @@ func Install(c *ioc.Container) {
 	c.TransientNamed("list", command)
 }
 
-func command(cmdF *runtime.CmdFactory) *cobra.Command {
+func command(cmdF *commands.CmdFactory) *cobra.Command {
 	return &cobra.Command{
 		Short: "List information about available builds",
 		Use:   "list",

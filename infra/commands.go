@@ -3,6 +3,7 @@ package infra
 import (
 	"context"
 
+	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
@@ -13,6 +14,9 @@ type Command interface {
 
 // From returns handler for FROM command
 func From(imageName string, tag types.Tag) Command {
+	if tag == "" {
+		tag = config.DefaultTag
+	}
 	return &fromCommand{
 		imageName: imageName,
 		tag:       tag,
