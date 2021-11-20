@@ -241,19 +241,26 @@ func (b *Builder) build(ctx context.Context, stack map[buildKey]bool, img *Descr
 			return ImageManifest{}, err
 		}
 
+		// To mount specdir readonly, trick is required:
+		// 1. mount dir normally
+		// 2. remount it using read-only option
 		if err := os.Mkdir(specDir, 0o700); err != nil {
 			return ImageManifest{}, err
 		}
 		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND, ""); err != nil {
 			return ImageManifest{}, err
 		}
+		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
+			return ImageManifest{}, err
+		}
+
 		if err := syscall.Mount("/dev", filepath.Join(path, "dev"), "", syscall.MS_BIND, ""); err != nil {
 			return ImageManifest{}, err
 		}
 		if err := syscall.Mount("/proc", filepath.Join(path, "proc"), "", syscall.MS_BIND, ""); err != nil {
 			return ImageManifest{}, err
 		}
-		if err := syscall.Mount("/sys", filepath.Join(path, "sys"), "", syscall.MS_BIND|syscall.MS_RDONLY, ""); err != nil {
+		if err := syscall.Mount("/sys", filepath.Join(path, "sys"), "", syscall.MS_BIND, ""); err != nil {
 			return ImageManifest{}, err
 		}
 		return manifest, nil
