@@ -9,7 +9,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/list/config"
-	configRoot "github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc"
@@ -21,9 +20,8 @@ func Install(c *ioc.Container) {
 	c.TransientNamed("list", command)
 }
 
-func newConfig(configRoot configRoot.Root, args commands.Args) config.List {
+func newConfig(args commands.Args) config.List {
 	config := config.List{
-		Root:     configRoot,
 		BuildIDs: make([]types.BuildID, 0, len(args)),
 	}
 

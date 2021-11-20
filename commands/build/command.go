@@ -8,7 +8,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
-	configRoot "github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc"
 )
@@ -33,9 +32,8 @@ type configFactory struct {
 	Rebuild bool
 }
 
-func newConfig(cf *configFactory, configRoot configRoot.Root, args commands.Args) config.Build {
+func newConfig(cf *configFactory, args commands.Args) config.Build {
 	config := config.Build{
-		Root:      configRoot,
 		SpecFiles: args,
 		Names:     cf.Names,
 		Tags:      make([]types.Tag, 0, len(cf.Tags)),
