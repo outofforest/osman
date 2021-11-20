@@ -6,9 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-
+	"github.com/wojciech-malota-wojcik/imagebuilder/runtime"
 	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
 )
 
