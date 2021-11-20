@@ -3,10 +3,10 @@ package list
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 
 	"github.com/ridge/must"
 	"github.com/spf13/cobra"
+	"github.com/wojciech-malota-wojcik/imagebuilder"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/list/config"
 	configRoot "github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
@@ -41,37 +41,14 @@ func command(cmdF *commands.CmdFactory) *cobra.Command {
 	return &cobra.Command{
 		Short: "List information about available builds",
 		Use:   "list [...buildID]",
-		RunE: cmdF.Cmd(func(config config.List, s storage.Driver) error {
-			var buildIDs map[types.BuildID]bool
-			if len(config.BuildIDs) > 0 {
-				buildIDs = map[types.BuildID]bool{}
-				for _, buildID := range config.BuildIDs {
-					buildIDs[buildID] = true
-				}
-			}
-
-			builds, err := s.Builds()
+		RunE: cmdF.Cmd(func(c *ioc.Container) error {
+			var list []storage.BuildInfo
+			var err error
+			c.Call(imagebuilder.List, &list, &err)
 			if err != nil {
 				return err
 			}
-			res := make([]storage.BuildInfo, 0, len(builds))
-			for _, buildID := range builds {
-				if buildIDs != nil && !buildIDs[buildID] {
-					continue
-				}
-				info, err := s.Info(buildID)
-				if err != nil {
-					return err
-				}
-				sort.Sort(types.TagSlice(info.Tags))
-				res = append(res, info)
-			}
-
-			sort.Slice(res, func(i int, j int) bool {
-				return res[i].CreatedAt.Before(res[j].CreatedAt)
-			})
-
-			fmt.Println(string(must.Bytes(json.MarshalIndent(res, "", "  "))))
+			fmt.Println(string(must.Bytes(json.MarshalIndent(list, "", "  "))))
 			return nil
 		}),
 	}
