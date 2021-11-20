@@ -10,19 +10,27 @@ import (
 // DefaultTag is used if user specified empty tag list
 const DefaultTag types.Tag = "latest"
 
-// NewConfigFactory creates new config factory
-func NewConfigFactory() *ConfigFactory {
-	return &ConfigFactory{}
+// NewConfigRootFactory creates new config factory common to all commands
+func NewConfigRootFactory() *ConfigRootFactory {
+	return &ConfigRootFactory{}
 }
 
-// ConfigFactory produces config from parameters
-type ConfigFactory struct {
+// ConfigRootFactory collects config common to all commands
+type ConfigRootFactory struct {
 	// RootDir is the root directory for images
 	RootDir string
 
-	// SpecFiles is the list of specfiles to build
-	SpecFiles []string
+	// VerboseLogging turns on verbose logging
+	VerboseLogging bool
+}
 
+// NewConfigBuildFactory creates new config factory specific for build command
+func NewConfigBuildFactory() *ConfigBuildFactory {
+	return &ConfigBuildFactory{}
+}
+
+// ConfigBuildFactory collects config specific for build command
+type ConfigBuildFactory struct {
 	// Names is the list of names for corresponding specfiles
 	Names []string
 
@@ -31,23 +39,35 @@ type ConfigFactory struct {
 
 	// Rebuild forces rebuild of all parent images even if they exist
 	Rebuild bool
+}
+
+// NewConfigRoot builds config common to all commands
+func NewConfigRoot(cf *ConfigRootFactory) ConfigRoot {
+	return ConfigRoot{
+		RootDir:        cf.RootDir,
+		VerboseLogging: cf.VerboseLogging,
+	}
+}
+
+// ConfigRoot stores configuration common to all commands
+type ConfigRoot struct {
+	// RootDir is the root directory for images
+	RootDir string
 
 	// VerboseLogging turns on verbose logging
 	VerboseLogging bool
 }
 
-// NewConfigFromFactory builds final config from factory
-func NewConfigFromFactory(cf *ConfigFactory) Config {
-	config := Config{
-		RootDir:        cf.RootDir,
-		SpecFiles:      cf.SpecFiles,
-		Names:          cf.Names,
-		Tags:           make([]types.Tag, 0, len(cf.Tags)),
-		Rebuild:        cf.Rebuild,
-		VerboseLogging: cf.VerboseLogging,
+// NewConfigBuild builds config for base command
+func NewConfigBuild(cf *ConfigBuildFactory, configRoot ConfigRoot, args Args) ConfigBuild {
+	config := ConfigBuild{
+		ConfigRoot: configRoot,
+		SpecFiles:  args,
+		Names:      cf.Names,
+		Tags:       make([]types.Tag, 0, len(cf.Tags)),
+		Rebuild:    cf.Rebuild,
 	}
 
-	config.SpecFiles = cf.SpecFiles
 	for i, specFile := range config.SpecFiles {
 		if len(config.Names) < i+1 {
 			config.Names = append(config.Names, strings.TrimSuffix(filepath.Base(specFile), ".spec"))
@@ -59,10 +79,9 @@ func NewConfigFromFactory(cf *ConfigFactory) Config {
 	return config
 }
 
-// Config stores configuration
-type Config struct {
-	// RootDir is the root directory for images
-	RootDir string
+// ConfigBuild stores configuration for build command
+type ConfigBuild struct {
+	ConfigRoot
 
 	// SpecFiles is the list of specfiles to build
 	SpecFiles []string
@@ -75,7 +94,4 @@ type Config struct {
 
 	// Rebuild forces rebuild of all parent images even if they exist
 	Rebuild bool
-
-	// VerboseLogging turns on verbose logging
-	VerboseLogging bool
 }
