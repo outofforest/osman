@@ -8,6 +8,7 @@ import (
 	"hash/crc32"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const alphabet = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -145,4 +146,13 @@ type ImageManifest struct {
 	BuildID BuildID
 	BasedOn BuildID
 	Params  []string
+}
+
+// BuildInfo stores all the information about build
+type BuildInfo struct {
+	BuildID   BuildID
+	BasedOn   BuildID
+	CreatedAt time.Time
+	Name      string
+	Tags      Tags
 }

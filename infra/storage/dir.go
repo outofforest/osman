@@ -84,28 +84,34 @@ func (d *dirDriver) Builds() ([]types.BuildID, error) {
 }
 
 // Info returns information about build
-func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
+func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 	buildAbsLink, err := d.toAbsoluteBuildLink(buildID)
 	if err != nil {
-		return BuildInfo{}, err
+		return types.BuildInfo{}, err
 	}
 	buildAbsDir, err := filepath.EvalSymlinks(buildAbsLink)
 	if err != nil {
-		return BuildInfo{}, err
+		return types.BuildInfo{}, err
 	}
 	tagsAbsDir := filepath.Dir(buildAbsDir)
 
+	manifest, err := d.Manifest(buildID)
+	if err != nil {
+		return types.BuildInfo{}, err
+	}
+
 	stat, err := os.Stat(buildAbsDir)
 	if err != nil {
-		return BuildInfo{}, err
+		return types.BuildInfo{}, err
 	}
 	statT, ok := stat.Sys().(*syscall.Stat_t)
 	if !ok {
 		panic("stat can't be retrieved")
 	}
 
-	res := BuildInfo{
+	res := types.BuildInfo{
 		BuildID:   buildID,
+		BasedOn:   manifest.BasedOn,
 		CreatedAt: time.Unix(statT.Ctim.Sec, statT.Ctim.Nsec),
 		Name:      filepath.Base(tagsAbsDir),
 		Tags:      types.Tags{},
@@ -113,7 +119,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
 
 	dir, err := os.Open(tagsAbsDir)
 	if err != nil {
-		return BuildInfo{}, err
+		return types.BuildInfo{}, err
 	}
 	defer dir.Close()
 
@@ -125,7 +131,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
 				if os.IsNotExist(err) {
 					continue
 				}
-				return BuildInfo{}, err
+				return types.BuildInfo{}, err
 			}
 
 			if info.Mode()&os.ModeSymlink != 0 {
@@ -135,22 +141,22 @@ func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
 					if os.IsNotExist(err) {
 						// dead link, remove it
 						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-							return BuildInfo{}, err
+							return types.BuildInfo{}, err
 						}
 						continue
 					}
-					return BuildInfo{}, err
+					return types.BuildInfo{}, err
 				}
 				buildAbsDirFromLink, err := filepath.Abs(buildDirFromLink)
 				if err != nil {
 					if os.IsNotExist(err) {
 						// dead link, remove it
 						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-							return BuildInfo{}, err
+							return types.BuildInfo{}, err
 						}
 						continue
 					}
-					return BuildInfo{}, err
+					return types.BuildInfo{}, err
 				}
 				if buildAbsDir == buildAbsDirFromLink {
 					res.Tags = append(res.Tags, types.Tag(info.Name()))
@@ -159,7 +165,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (BuildInfo, error) {
 		}
 	}
 	if err != nil && !errors.Is(err, io.EOF) {
-		return BuildInfo{}, err
+		return types.BuildInfo{}, err
 	}
 	return res, nil
 }

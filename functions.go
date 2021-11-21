@@ -37,7 +37,7 @@ func Build(ctx context.Context, config configBuild.Build, repo *infra.Repository
 	return nil
 }
 
-func listBuild(info storage.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool) bool {
+func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool) bool {
 	if buildIDs != nil && buildIDs[info.BuildID] {
 		return true
 	}
@@ -55,7 +55,7 @@ func listBuild(info storage.BuildInfo, buildIDs map[types.BuildID]bool, buildKey
 }
 
 // List lists builds
-func List(config configList.List, s storage.Driver) ([]storage.BuildInfo, error) {
+func List(config configList.List, s storage.Driver) ([]types.BuildInfo, error) {
 	var buildIDs map[types.BuildID]bool
 	if len(config.BuildIDs) > 0 {
 		buildIDs = map[types.BuildID]bool{}
@@ -75,7 +75,7 @@ func List(config configList.List, s storage.Driver) ([]storage.BuildInfo, error)
 	if err != nil {
 		return nil, err
 	}
-	res := make([]storage.BuildInfo, 0, len(builds))
+	res := make([]types.BuildInfo, 0, len(builds))
 	for _, buildID := range builds {
 		info, err := s.Info(buildID)
 		if err != nil {
