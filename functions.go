@@ -81,3 +81,28 @@ func List(config config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 	}
 	return list, nil
 }
+
+// Drop drops builds
+func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) error {
+	// FIXME (wojciech): sort builds to delete children first
+	// FIXME (wojciech): log drop status of each build
+
+	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
+		return nil
+	}
+
+	builds, err := List(filtering, s)
+	if err != nil {
+		return err
+	}
+
+	for _, build := range builds {
+		if drop.Untagged && len(build.Tags) > 0 {
+			continue
+		}
+		if err := s.Drop(build.BuildID); err != nil {
+			return err
+		}
+	}
+	return nil
+}

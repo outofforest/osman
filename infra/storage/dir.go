@@ -22,6 +22,10 @@ const (
 	subDirManifests = "manifests"
 )
 
+// FIXME (wojciech): change how builds are structured in dir
+// FIXME (wojciech): prevent removing parents if children exist
+// FIXME (wojciech): clean empty directories
+
 // NewDirDriver returns new storage driver based on directories
 func NewDirDriver(config config.Storage) Driver {
 	return &dirDriver{
