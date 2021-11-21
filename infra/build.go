@@ -2,7 +2,6 @@ package infra
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -12,16 +11,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
-const manifestFile = "manifest.json"
-
-type cloneFromFn func(srcBuildKey types.BuildKey) (ImageManifest, error)
+type cloneFromFn func(srcBuildKey types.BuildKey) (types.ImageManifest, error)
 
 // NewBuilder creates new image builder
 func NewBuilder(config config.Build, repo *Repository, storage storage.Driver) *Builder {
@@ -154,32 +150,31 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		}
 	}
 
-	build := newImageBuild(base, path, func(srcBuildKey types.BuildKey) (ImageManifest, error) {
+	build := newImageBuild(base, path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
 		if !types.IsNameValid(srcBuildKey.Name) {
-			return ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
+			return types.ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
 		}
 		if !srcBuildKey.Tag.IsValid() {
-			return ImageManifest{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
+			return types.ImageManifest{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
 		}
 
 		errRebuild := errors.New("rebuild")
 		// Try to clone existing image
-		var cloned bool
 		err := errRebuild
+		var srcBuildID types.BuildID
 		if !b.rebuild || b.readyBuilds[srcBuildKey] {
-			err = b.storage.Clone(srcBuildKey, img.Name(), buildID)
+			srcBuildID, err = b.storage.BuildID(srcBuildKey)
 		}
 
 		switch {
 		case err == nil:
-			cloned = true
 		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
 			if srcBuildKey.Tag == config.DefaultTag {
 				_, err = b.buildFromFile(ctx, stack, srcBuildKey.Name+".spec", srcBuildKey.Name, config.DefaultTag)
 			}
 		default:
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 
 		switch {
@@ -192,58 +187,55 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				err = fmt.Errorf("can't find image %s", srcBuildKey)
 			}
 		default:
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 
 		if err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 
-		if !cloned {
-			if err := b.storage.Clone(srcBuildKey, img.Name(), buildID); err != nil {
-				return ImageManifest{}, err
+		if !srcBuildID.IsValid() {
+			srcBuildID, err = b.storage.BuildID(srcBuildKey)
+			if err != nil {
+				return types.ImageManifest{}, err
 			}
+		}
+
+		if err := b.storage.Clone(srcBuildID, img.Name(), buildID); err != nil {
+			return types.ImageManifest{}, err
 		}
 
 		imgUnmount, err = b.storage.Mount(buildID, path)
 		if err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 
-		manifestRaw, err := ioutil.ReadFile(filepath.Join(path, manifestFile))
+		manifest, err := b.storage.Manifest(srcBuildID)
 		if err != nil {
-			return ImageManifest{}, err
-		}
-		if err := os.Remove(filepath.Join(path, manifestFile)); err != nil {
-			return ImageManifest{}, err
-		}
-
-		var manifest ImageManifest
-		if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 
 		// To mount specdir readonly, trick is required:
 		// 1. mount dir normally
 		// 2. remount it using read-only option
 		if err := os.Mkdir(specDir, 0o700); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND, ""); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 
 		if err := syscall.Mount("none", filepath.Join(path, "dev"), "devtmpfs", 0, ""); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 		if err := syscall.Mount("none", filepath.Join(path, "proc"), "proc", 0, ""); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 		if err := syscall.Mount("none", filepath.Join(path, "sys"), "sysfs", 0, ""); err != nil {
-			return ImageManifest{}, err
+			return types.ImageManifest{}, err
 		}
 		return manifest, nil
 	})
@@ -254,7 +246,8 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		}
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(path, manifestFile), must.Bytes(json.Marshal(build.Manifest())), 0o444); err != nil {
+	build.manifest.BuildID = buildID
+	if err := b.storage.StoreManifest(build.manifest); err != nil {
 		return nil, err
 	}
 
@@ -263,7 +256,6 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return nil, err
 		}
 	}
-	build.manifest.BuildID = buildID
 	for _, key := range keys {
 		b.readyBuilds[key] = true
 	}
@@ -293,12 +285,6 @@ func umount(imgPath string) error {
 	return nil
 }
 
-// ImageManifest contains info about built image
-type ImageManifest struct {
-	BuildID types.BuildID
-	Params  []string
-}
-
 func newImageBuild(base bool, path string, cloneFn cloneFromFn) *ImageBuild {
 	return &ImageBuild{
 		cloneFn: cloneFn,
@@ -313,11 +299,11 @@ type ImageBuild struct {
 
 	base     bool
 	path     string
-	manifest ImageManifest
+	manifest types.ImageManifest
 }
 
 // Manifest returns image manifest
-func (b *ImageBuild) Manifest() ImageManifest {
+func (b *ImageBuild) Manifest() types.ImageManifest {
 	return b.manifest
 }
 
@@ -330,6 +316,7 @@ func (b *ImageBuild) from(cmd *fromCommand) error {
 	if err != nil {
 		return err
 	}
+	b.manifest.BasedOn = manifest.BuildID
 	b.manifest.Params = manifest.Params
 	return nil
 }
