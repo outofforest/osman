@@ -1,4 +1,4 @@
-package infra
+package parser
 
 import (
 	"errors"
@@ -6,13 +6,23 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
 )
 
-// Parse parses SpecFile
-func Parse(dockerfilePath string) ([]Command, error) {
-	file, err := os.Open(dockerfilePath)
+// NewSpecFileParser creates new specfile parser
+func NewSpecFileParser() Parser {
+	return &specFileParser{}
+}
+
+// Parser parses image description from file
+type specFileParser struct {
+}
+
+// Parse parses commands from specfile
+func (p *specFileParser) Parse(filePath string) ([]description.Command, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -23,24 +33,24 @@ func Parse(dockerfilePath string) ([]Command, error) {
 		return nil, err
 	}
 
-	commands := make([]Command, 0, len(parsed.AST.Children))
+	commands := make([]description.Command, 0, len(parsed.AST.Children))
 	for _, child := range parsed.AST.Children {
 		args := []string{}
 		for arg := child.Next; arg != nil; arg = arg.Next {
 			args = append(args, arg.Value)
 		}
 
-		var cmds []Command
+		var cmds []description.Command
 		var err error
 		switch strings.ToLower(child.Value) {
 		case "from":
-			cmds, err = cmdFrom(args)
+			cmds, err = p.cmdFrom(args)
 		case "params":
-			cmds, err = cmdParams(args)
+			cmds, err = p.cmdParams(args)
 		case "run":
-			cmds, err = cmdRun(args)
+			cmds, err = p.cmdRun(args)
 		case "include":
-			cmds, err = cmdInclude(args)
+			cmds, err = p.cmdInclude(args)
 		default:
 			return nil, fmt.Errorf("unknown command '%s' in line %d", child.Value, child.StartLine)
 		}
@@ -54,7 +64,7 @@ func Parse(dockerfilePath string) ([]Command, error) {
 	return commands, nil
 }
 
-func cmdFrom(args []string) ([]Command, error) {
+func (p *specFileParser) cmdFrom(args []string) ([]description.Command, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
 	}
@@ -67,38 +77,38 @@ func cmdFrom(args []string) ([]Command, error) {
 		return nil, err
 	}
 
-	return []Command{From(buildKey)}, nil
+	return []description.Command{description.From(buildKey)}, nil
 }
 
-func cmdParams(args []string) ([]Command, error) {
+func (p *specFileParser) cmdParams(args []string) ([]description.Command, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("no arguments passed")
 	}
-	return []Command{Params(args...)}, nil
+	return []description.Command{description.Params(args...)}, nil
 }
 
-func cmdRun(args []string) ([]Command, error) {
+func (p *specFileParser) cmdRun(args []string) ([]description.Command, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
 	}
 	if args[0] == "" {
 		return nil, errors.New("first argument is empty")
 	}
-	return []Command{Run(args[0])}, nil
+	return []description.Command{description.Run(args[0])}, nil
 }
 
-func cmdInclude(args []string) ([]Command, error) {
+func (p *specFileParser) cmdInclude(args []string) ([]description.Command, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("no arguments passed")
 	}
 
-	res := []Command{}
+	res := []description.Command{}
 	for _, arg := range args {
 		if arg == "" {
 			return nil, errors.New("empty argument passed")
 		}
 
-		cmds, err := Parse(arg)
+		cmds, err := p.Parse(arg)
 		if err != nil {
 			return nil, err
 		}

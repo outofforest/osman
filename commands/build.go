@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wojciech-malota-wojcik/imagebuilder"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 )
 
 // NewBuildCommand creates new build command
@@ -15,7 +16,7 @@ func NewBuildCommand(buildF *config.BuildFactory, cmdF *CmdFactory) *cobra.Comma
 		RunE:  cmdF.Cmd(imagebuilder.Build),
 	}
 	cmd.Flags().StringSliceVar(&buildF.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
-	cmd.Flags().StringSliceVar(&buildF.Tags, "tag", []string{string(config.DefaultTag)}, "Tags assigned to created build")
+	cmd.Flags().StringSliceVar(&buildF.Tags, "tag", []string{string(description.DefaultTag)}, "Tags assigned to created build")
 	cmd.Flags().BoolVar(&buildF.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
 	return cmd
 }
