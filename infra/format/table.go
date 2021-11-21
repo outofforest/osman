@@ -3,6 +3,7 @@ package format
 import (
 	"fmt"
 	"reflect"
+	"time"
 )
 
 // NewTableFormatter returns formatter converting slice into table string
@@ -42,10 +43,18 @@ func (f *tableFormatter) Format(slice interface{}) string {
 		row := make([]string, 0, len(fields))
 		elem := sliceValue.Index(i)
 		for j, field := range fields {
-			value := fmt.Sprintf("%s", elem.FieldByName(field.Name).Interface())
-			row = append(row, value)
-			if len(value) > lens[j] {
-				lens[j] = len(value)
+			field := elem.FieldByName(field.Name)
+			value := field.Interface()
+			var strValue string
+			switch {
+			case field.Type() == reflect.TypeOf(time.Time{}):
+				strValue = value.(time.Time).Format("2006-01-02 15:04")
+			default:
+				strValue = fmt.Sprintf("%s", value)
+			}
+			row = append(row, strValue)
+			if len(strValue) > lens[j] {
+				lens[j] = len(strValue)
 			}
 		}
 		table = append(table, row)
