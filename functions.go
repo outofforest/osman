@@ -47,7 +47,7 @@ func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys 
 }
 
 // List lists builds
-func List(config config.List, s storage.Driver) ([]types.BuildInfo, error) {
+func List(config config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 	var buildIDs map[types.BuildID]bool
 	if len(config.BuildIDs) > 0 {
 		buildIDs = map[types.BuildID]bool{}
