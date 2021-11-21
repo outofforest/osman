@@ -78,7 +78,6 @@ func List(config config.List, s storage.Driver) ([]types.BuildInfo, error) {
 		if !listBuild(info, buildIDs, buildKeys) {
 			continue
 		}
-		sort.Sort(info.Tags)
 		res = append(res, info)
 	}
 

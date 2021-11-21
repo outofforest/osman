@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -81,16 +82,14 @@ func (t Tag) IsValid() bool {
 // Tags is a sortable representation of slice of tags
 type Tags []Tag
 
-func (x Tags) String() string {
-	strs := make([]string, 0, len(x))
-	for _, tag := range x {
-		strs = append(strs, string(tag))
+func (t Tags) String() string {
+	values := make([]string, 0, len(t))
+	for _, tag := range t {
+		values = append(values, string(tag))
 	}
-	return strings.Join(strs, ", ")
+	sort.Strings(values)
+	return strings.Join(values, ", ")
 }
-func (x Tags) Len() int           { return len(x) }
-func (x Tags) Less(i, j int) bool { return x[i] < x[j] }
-func (x Tags) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 
 // IsNameValid returns true if name is valid
 func IsNameValid(name string) bool {
@@ -145,7 +144,11 @@ func (bk BuildKey) String() string {
 type Params []string
 
 func (p Params) String() string {
-	return strings.Join(p, ", ")
+	values := make([]string, len(p))
+	copy(values, p)
+	sort.Strings(values)
+
+	return strings.Join(values, ", ")
 }
 
 // ImageManifest contains info about built image
