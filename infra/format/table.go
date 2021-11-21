@@ -48,7 +48,7 @@ func (f *tableFormatter) Format(slice interface{}) string {
 			var strValue string
 			switch {
 			case field.Type() == reflect.TypeOf(time.Time{}):
-				strValue = value.(time.Time).Format("2006-01-02 15:04:05")
+				strValue = value.(time.Time).Format("2006-01-02 15:04")
 			default:
 				strValue = fmt.Sprintf("%s", value)
 			}
