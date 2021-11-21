@@ -12,8 +12,6 @@ import (
 	d "github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/logger"
-	"go.uber.org/zap"
 )
 
 // Build builds image
@@ -27,12 +25,7 @@ func Build(ctx context.Context, config config.Build, repo *infra.Repository, bui
 
 	for i, specFile := range config.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
-
-		manifest, err := builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...)
-		if err != nil {
-			return err
-		}
-		logger.Get(ctx).Info("Image built", zap.Strings("params", manifest.Params))
+		return builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...)
 	}
 	return nil
 }

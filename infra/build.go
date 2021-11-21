@@ -43,26 +43,26 @@ type Builder struct {
 }
 
 // BuildFromFile builds image from spec file
-func (b *Builder) BuildFromFile(ctx context.Context, specFile, name string, tags ...types.Tag) (manifest types.ImageManifest, retErr error) {
+func (b *Builder) BuildFromFile(ctx context.Context, specFile, name string, tags ...types.Tag) error {
 	return b.buildFromFile(ctx, map[types.BuildKey]bool{}, specFile, name, tags...)
 }
 
 // Build builds images
-func (b *Builder) Build(ctx context.Context, img *description.Descriptor) (manifest types.ImageManifest, retErr error) {
+func (b *Builder) Build(ctx context.Context, img *description.Descriptor) error {
 	return b.build(ctx, map[types.BuildKey]bool{}, img)
 }
 
-func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bool, specFile, name string, tags ...types.Tag) (manifest types.ImageManifest, retErr error) {
+func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bool, specFile, name string, tags ...types.Tag) error {
 	commands, err := b.parser.Parse(specFile)
 	if err != nil {
-		return types.ImageManifest{}, err
+		return err
 	}
 	return b.build(ctx, stack, description.Describe(name, tags, commands...))
 }
 
-func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (manifest types.ImageManifest, retErr error) {
+func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retErr error) {
 	if !types.IsNameValid(img.Name()) {
-		return types.ImageManifest{}, fmt.Errorf("name %s is invalid", img.Name())
+		return fmt.Errorf("name %s is invalid", img.Name())
 	}
 	tags := img.Tags()
 	if len(tags) == 0 {
@@ -71,11 +71,11 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	keys := make([]types.BuildKey, 0, len(tags))
 	for _, tag := range tags {
 		if !tag.IsValid() {
-			return types.ImageManifest{}, fmt.Errorf("tag %s is invalid", tag)
+			return fmt.Errorf("tag %s is invalid", tag)
 		}
 		key := types.NewBuildKey(img.Name(), tag)
 		if stack[key] {
-			return types.ImageManifest{}, fmt.Errorf("loop in dependencies detected on image %s", key)
+			return fmt.Errorf("loop in dependencies detected on image %s", key)
 		}
 		stack[key] = true
 		keys = append(keys, key)
@@ -85,7 +85,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 
 	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
 	if err != nil {
-		return types.ImageManifest{}, err
+		return err
 	}
 
 	specDir := filepath.Join(path, ".specdir")
@@ -130,22 +130,22 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	if img.Name() == "fedora" {
 		tags := img.Tags()
 		if len(img.Tags()) != 1 {
-			return types.ImageManifest{}, errors.New("for fedora image exactly one tag is required")
+			return errors.New("for fedora image exactly one tag is required")
 		}
 		if err := b.storage.CreateEmpty(img.Name(), buildID); err != nil {
-			return types.ImageManifest{}, err
+			return err
 		}
 		var err error
 		imgUnmount, err = b.storage.Mount(buildID, path)
 		if err != nil {
-			return types.ImageManifest{}, err
+			return err
 		}
 
 		if err := libexec.Exec(ctx,
 			exec.Command("dnf", "install", "-y", "--installroot="+path, "--releasever="+string(tags[0]),
 				"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
 				"dnf", "langpacks-en")); err != nil {
-			return types.ImageManifest{}, err
+			return err
 		}
 	}
 
@@ -170,7 +170,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
 			if srcBuildKey.Tag == description.DefaultTag {
-				_, err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
+				err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
 			}
 		default:
 			return types.ImageManifest{}, err
@@ -181,7 +181,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		case errors.Is(err, errRebuild) || os.IsNotExist(err) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
 			// If spec file does not exist, try building from repository
 			if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
-				_, err = b.build(ctx, stack, baseImage)
+				err = b.build(ctx, stack, baseImage)
 			} else {
 				err = fmt.Errorf("can't find image %s", srcBuildKey)
 			}
@@ -241,24 +241,24 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 
 	for _, cmd := range img.Commands() {
 		if err := cmd.Execute(ctx, build); err != nil {
-			return types.ImageManifest{}, err
+			return err
 		}
 	}
 
 	build.manifest.BuildID = buildID
 	if err := b.storage.StoreManifest(build.manifest); err != nil {
-		return types.ImageManifest{}, err
+		return err
 	}
 
 	for _, key := range keys {
 		if err := b.storage.Tag(buildID, key.Tag); err != nil {
-			return types.ImageManifest{}, err
+			return err
 		}
 	}
 	for _, key := range keys {
 		b.readyBuilds[key] = true
 	}
-	return build.manifest, nil
+	return nil
 }
 
 func umount(imgPath string) error {

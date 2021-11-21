@@ -68,12 +68,14 @@ func (bid BuildID) IsValid() bool {
 	return checksum(string(bid[len(buildIDPrefix):len(buildIDPrefix)+buildIDLength])) == string(bid[len(bid)-checksumLength:])
 }
 
+var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
+
 // Tag is the tag of build
 type Tag string
 
 // IsValid returns true if tag is valid
 func (t Tag) IsValid() bool {
-	return regExp.MatchString(string(t))
+	return validRegExp.MatchString(string(t))
 }
 
 // Tags is a sortable representation of slice of tags
@@ -90,14 +92,12 @@ func (x Tags) Len() int           { return len(x) }
 func (x Tags) Less(i, j int) bool { return x[i] < x[j] }
 func (x Tags) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 
-var regExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
-
 // IsNameValid returns true if name is valid
 func IsNameValid(name string) bool {
 	if strings.HasPrefix(name, buildIDPrefix) {
 		return false
 	}
-	return regExp.MatchString(name)
+	return validRegExp.MatchString(name)
 }
 
 // NewBuildKey returns new build key
@@ -141,11 +141,18 @@ func (bk BuildKey) String() string {
 	return fmt.Sprintf("%s:%s", bk.Name, bk.Tag)
 }
 
+// Params is a list of params configured on image
+type Params []string
+
+func (p Params) String() string {
+	return strings.Join(p, ", ")
+}
+
 // ImageManifest contains info about built image
 type ImageManifest struct {
 	BuildID BuildID
 	BasedOn BuildID
-	Params  []string
+	Params  Params
 }
 
 // BuildInfo stores all the information about build
@@ -155,4 +162,5 @@ type BuildInfo struct {
 	CreatedAt time.Time
 	Name      string
 	Tags      Tags
+	Params    Params
 }
