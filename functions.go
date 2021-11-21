@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
@@ -68,7 +67,7 @@ func List(config config.List, s storage.Driver) ([]types.BuildInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := make([]types.BuildInfo, 0, len(builds))
+	list := make([]types.BuildInfo, 0, len(builds))
 	for _, buildID := range builds {
 		info, err := s.Info(buildID)
 		if err != nil {
@@ -78,11 +77,7 @@ func List(config config.List, s storage.Driver) ([]types.BuildInfo, error) {
 		if !listBuild(info, buildIDs, buildKeys) {
 			continue
 		}
-		res = append(res, info)
+		list = append(list, info)
 	}
-
-	sort.Slice(res, func(i int, j int) bool {
-		return res[i].CreatedAt.Before(res[j].CreatedAt)
-	})
-	return res, nil
+	return list, nil
 }
