@@ -9,7 +9,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands/list/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc"
 )
@@ -54,9 +53,9 @@ func newConfig(cf *configFactory, args commands.Args) config.List {
 func command(c *ioc.Container, cf *configFactory, cmdF *commands.CmdFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Short: "List information about available builds",
-		Use:   "list [... buildID | [name][:tag]]",
+		Use:   "list [flags] [... buildID | [name][:tag]]",
 		RunE: cmdF.Cmd(func(c *ioc.Container, formatter format.Formatter) error {
-			var builds []storage.BuildInfo
+			var builds []types.BuildInfo
 			var err error
 			c.Call(imagebuilder.List, &builds, &err)
 			if err != nil {

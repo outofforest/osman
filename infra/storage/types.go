@@ -2,7 +2,6 @@ package storage
 
 import (
 	"errors"
-	"time"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
@@ -19,7 +18,7 @@ type Driver interface {
 	Builds() ([]types.BuildID, error)
 
 	// Info returns information about build
-	Info(buildID types.BuildID) (BuildInfo, error)
+	Info(buildID types.BuildID) (types.BuildInfo, error)
 
 	// BuildID returns build ID for build given by name and tag
 	BuildID(buildKey types.BuildKey) (types.BuildID, error)
@@ -44,12 +43,4 @@ type Driver interface {
 
 	// Drop drops build
 	Drop(buildID types.BuildID) error
-}
-
-// BuildInfo stores all the information about build
-type BuildInfo struct {
-	BuildID   types.BuildID
-	CreatedAt time.Time
-	Name      string
-	Tags      types.Tags
 }
