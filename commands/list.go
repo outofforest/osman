@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,6 +25,9 @@ func NewListCommand(c *ioc.Container, formatF *config.FormatFactory, cmdF *CmdFa
 			if err != nil {
 				return err
 			}
+			sort.Slice(builds, func(i int, j int) bool {
+				return builds[i].CreatedAt.Before(builds[j].CreatedAt)
+			})
 			fmt.Println(formatter.Format(builds))
 			return nil
 		}),
