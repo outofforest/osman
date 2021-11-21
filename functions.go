@@ -9,6 +9,7 @@ import (
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
+	d "github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/logger"
@@ -17,21 +18,21 @@ import (
 
 // Build builds image
 func Build(ctx context.Context, config config.Build, repo *infra.Repository, builder *infra.Builder) error {
-	fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
-		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
-		infra.Run(`rm -rf /var/cache/* /tmp/*`)}
+	fedoraCmds := []d.Command{d.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
+		d.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
+		d.Run(`rm -rf /var/cache/* /tmp/*`)}
 
-	repo.Store(infra.Describe("fedora", types.Tags{"34"}, fedoraCmds...))
-	repo.Store(infra.Describe("fedora", types.Tags{"35"}, fedoraCmds...))
+	repo.Store(d.Describe("fedora", types.Tags{"34"}, fedoraCmds...))
+	repo.Store(d.Describe("fedora", types.Tags{"35"}, fedoraCmds...))
 
 	for i, specFile := range config.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
 
-		build, err := builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...)
+		manifest, err := builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...)
 		if err != nil {
 			return err
 		}
-		logger.Get(ctx).Info("Image built", zap.Strings("params", build.Manifest().Params))
+		logger.Get(ctx).Info("Image built", zap.Strings("params", manifest.Params))
 	}
 	return nil
 }

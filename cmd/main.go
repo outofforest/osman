@@ -6,6 +6,7 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/ioc"
 	"github.com/wojciech-malota-wojcik/run"
@@ -26,6 +27,9 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(config.NewFormat)
 	c.Singleton(config.NewBuild)
 	c.Singleton(config.NewList)
+
+	c.Singleton(parser.NewResolvingParser)
+	c.SingletonNamed("spec", parser.NewSpecFileParser)
 
 	c.Singleton(format.Resolve)
 	c.SingletonNamed("table", format.NewTableFormatter)

@@ -1,4 +1,4 @@
-package infra
+package description
 
 import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
@@ -28,4 +28,9 @@ func (d *Descriptor) Name() string {
 // Tags returns tags of the image
 func (d *Descriptor) Tags() types.Tags {
 	return d.tags
+}
+
+// Commands returns commands
+func (d *Descriptor) Commands() []Command {
+	return d.commands
 }

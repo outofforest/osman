@@ -7,9 +7,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
-// DefaultTag is used if user specified empty tag list
-const DefaultTag types.Tag = "latest"
-
 // NewBuildFactory returns new build config factory
 func NewBuildFactory() *BuildFactory {
 	return &BuildFactory{}
