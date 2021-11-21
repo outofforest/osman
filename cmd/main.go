@@ -26,7 +26,7 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(config.NewStorage)
 	c.Singleton(config.NewFormat)
 	c.Singleton(config.NewBuild)
-	c.Singleton(config.NewList)
+	c.Singleton(config.NewFilter)
 
 	c.Singleton(parser.NewResolvingParser)
 	c.SingletonNamed("spec", parser.NewSpecFileParser)

@@ -6,9 +6,9 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
-// NewList returns new list config
-func NewList(args Args) List {
-	config := List{
+// NewFilter returns new filter config
+func NewFilter(args Args) Filter {
+	config := Filter{
 		BuildIDs:  make([]types.BuildID, 0, len(args)),
 		BuildKeys: make([]types.BuildKey, 0, len(args)),
 	}
@@ -29,8 +29,8 @@ func NewList(args Args) List {
 	return config
 }
 
-// List stores configuration for list command
-type List struct {
+// Filter stores configuration of filtering criteria
+type Filter struct {
 	// BuildIDs is the list of builds to return
 	BuildIDs []types.BuildID
 
