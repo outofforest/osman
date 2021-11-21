@@ -139,3 +139,10 @@ type BuildKey struct {
 func (bk BuildKey) String() string {
 	return fmt.Sprintf("%s:%s", bk.Name, bk.Tag)
 }
+
+// ImageManifest contains info about built image
+type ImageManifest struct {
+	BuildID BuildID
+	BasedOn BuildID
+	Params  []string
+}
