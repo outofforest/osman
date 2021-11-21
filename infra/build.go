@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/libexec"

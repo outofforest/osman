@@ -3,9 +3,7 @@ package main
 import (
 	"github.com/spf13/cobra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/build"
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/list"
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/root"
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
@@ -19,13 +17,23 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(infra.NewRepository)
 	c.Transient(infra.NewBuilder)
 
+	c.Singleton(config.NewRootFactory)
+	c.Singleton(config.NewStorageFactory)
+	c.Singleton(config.NewFormatFactory)
+	c.Singleton(config.NewBuildFactory)
+	c.Singleton(config.NewRoot)
+	c.Singleton(config.NewStorage)
+	c.Singleton(config.NewFormat)
+	c.Singleton(config.NewBuild)
+	c.Singleton(config.NewList)
+
 	c.Singleton(format.Resolve)
 	c.SingletonNamed("table", format.NewTableFormatter)
 	c.SingletonNamed("json", format.NewJSONFormatter)
 
-	root.Install(c)
-	build.Install(c)
-	list.Install(c)
+	c.Singleton(commands.NewRootCommand)
+	c.SingletonNamed("build", commands.NewBuildCommand)
+	c.SingletonNamed("list", commands.NewListCommand)
 }
 
 func main() {

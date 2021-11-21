@@ -1,7 +1,7 @@
 package format
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/list/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/ioc"
 )
 
@@ -12,7 +12,7 @@ type Formatter interface {
 }
 
 // Resolve resolves concrete formatter based on config
-func Resolve(c *ioc.Container, config config.List) Formatter {
+func Resolve(c *ioc.Container, config config.Format) Formatter {
 	var formatter Formatter
 	c.ResolveNamed(config.Formatter, &formatter)
 	return formatter
