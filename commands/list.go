@@ -16,7 +16,7 @@ import (
 // NewListCommand returns new list command
 func NewListCommand(c *ioc.Container, formatF *config.FormatFactory, cmdF *CmdFactory) *cobra.Command {
 	cmd := &cobra.Command{
-		Short: "List information about available builds",
+		Short: "Lists information about available builds",
 		Use:   "list [flags] [... buildID | [name][:tag]]",
 		RunE: cmdF.Cmd(func(c *ioc.Container, formatter format.Formatter) error {
 			var builds []types.BuildInfo

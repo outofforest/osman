@@ -22,11 +22,13 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(config.NewStorageFactory)
 	c.Singleton(config.NewFormatFactory)
 	c.Singleton(config.NewBuildFactory)
+	c.Singleton(config.NewDropFactory)
 	c.Singleton(config.NewRoot)
+	c.Singleton(config.NewFilter)
 	c.Singleton(config.NewStorage)
 	c.Singleton(config.NewFormat)
 	c.Singleton(config.NewBuild)
-	c.Singleton(config.NewFilter)
+	c.Singleton(config.NewDrop)
 
 	c.Singleton(parser.NewResolvingParser)
 	c.SingletonNamed("spec", parser.NewSpecFileParser)
@@ -38,6 +40,7 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(commands.NewRootCommand)
 	c.SingletonNamed("build", commands.NewBuildCommand)
 	c.SingletonNamed("list", commands.NewListCommand)
+	c.SingletonNamed("drop", commands.NewDropCommand)
 }
 
 func main() {
