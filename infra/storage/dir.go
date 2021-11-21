@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/otiai10/copy"
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
@@ -23,19 +23,19 @@ const (
 )
 
 // NewDirDriver returns new storage driver based on directories
-func NewDirDriver(config config.Root) Driver {
+func NewDirDriver(config config.Storage) Driver {
 	return &dirDriver{
-		rootPath: config.RootDir,
+		config: config,
 	}
 }
 
 type dirDriver struct {
-	rootPath string
+	config config.Storage
 }
 
 // Builds returns available builds
 func (d *dirDriver) Builds() ([]types.BuildID, error) {
-	rootPath, err := filepath.Abs(d.rootPath)
+	rootPath, err := filepath.Abs(d.config.RootDir)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +449,7 @@ func (d *dirDriver) toRelativeBuildDir(imageName string, buildID types.BuildID) 
 }
 
 func (d *dirDriver) toAbsoluteBuildDir(imageName string, buildID types.BuildID) (string, error) {
-	rootPath, err := filepath.Abs(d.rootPath)
+	rootPath, err := filepath.Abs(d.config.RootDir)
 	if err != nil {
 		return "", err
 	}
@@ -457,7 +457,7 @@ func (d *dirDriver) toAbsoluteBuildDir(imageName string, buildID types.BuildID) 
 }
 
 func (d *dirDriver) toAbsoluteBuildLink(buildID types.BuildID) (string, error) {
-	rootPath, err := filepath.Abs(d.rootPath)
+	rootPath, err := filepath.Abs(d.config.RootDir)
 	if err != nil {
 		return "", err
 	}
@@ -465,7 +465,7 @@ func (d *dirDriver) toAbsoluteBuildLink(buildID types.BuildID) (string, error) {
 }
 
 func (d *dirDriver) toAbsoluteTagLink(imageName string, tag types.Tag) (string, error) {
-	rootPath, err := filepath.Abs(d.rootPath)
+	rootPath, err := filepath.Abs(d.config.RootDir)
 	if err != nil {
 		return "", err
 	}
@@ -473,7 +473,7 @@ func (d *dirDriver) toAbsoluteTagLink(imageName string, tag types.Tag) (string, 
 }
 
 func (d *dirDriver) toAbsoluteManifestFile(buildID types.BuildID) (string, error) {
-	rootPath, err := filepath.Abs(d.rootPath)
+	rootPath, err := filepath.Abs(d.config.RootDir)
 	if err != nil {
 		return "", err
 	}

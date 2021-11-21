@@ -7,8 +7,7 @@ import (
 	"sort"
 
 	"github.com/ridge/must"
-	configBuild "github.com/wojciech-malota-wojcik/imagebuilder/commands/build/config"
-	configList "github.com/wojciech-malota-wojcik/imagebuilder/commands/list/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
@@ -17,7 +16,7 @@ import (
 )
 
 // Build builds image
-func Build(ctx context.Context, config configBuild.Build, repo *infra.Repository, builder *infra.Builder) error {
+func Build(ctx context.Context, config config.Build, repo *infra.Repository, builder *infra.Builder) error {
 	fedoraCmds := []infra.Command{infra.Run(`printf "nameserver 8.8.8.8\nnameserver 8.8.4.4\n" > /etc/resolv.conf`),
 		infra.Run(`echo 'LANG="en_US.UTF-8"' > /etc/locale.conf`),
 		infra.Run(`rm -rf /var/cache/* /tmp/*`)}
@@ -55,7 +54,7 @@ func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys 
 }
 
 // List lists builds
-func List(config configList.List, s storage.Driver) ([]types.BuildInfo, error) {
+func List(config config.List, s storage.Driver) ([]types.BuildInfo, error) {
 	var buildIDs map[types.BuildID]bool
 	if len(config.BuildIDs) > 0 {
 		buildIDs = map[types.BuildID]bool{}

@@ -2,13 +2,10 @@ package commands
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands/root/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/ioc"
 	"github.com/wojciech-malota-wojcik/logger"
 )
-
-// Args is the list of positional CLI arguments passed to application
-type Args []string
 
 // NewCmdFactory returns new CmdFactory
 func NewCmdFactory(c *ioc.Container) *CmdFactory {
@@ -25,7 +22,7 @@ type CmdFactory struct {
 // Cmd returns function compatible with RunE
 func (f *CmdFactory) Cmd(cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		f.c.Singleton(func() Args {
+		f.c.Singleton(func() config.Args {
 			return args
 		})
 		var err error
