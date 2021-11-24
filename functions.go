@@ -25,7 +25,9 @@ func Build(ctx context.Context, config config.Build, repo *infra.Repository, bui
 
 	for i, specFile := range config.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
-		return builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...)
+		if err := builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...); err != nil {
+			return err
+		}
 	}
 	return nil
 }
