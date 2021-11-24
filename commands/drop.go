@@ -9,7 +9,7 @@ import (
 )
 
 // NewDropCommand returns new drop command
-func NewDropCommand(dropF *config.DropFactory, cmdF *CmdFactory) *cobra.Command {
+func NewDropCommand(filterF *config.FilterFactory, dropF *config.DropFactory, cmdF *CmdFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Short: "Drops builds",
 		Use:   "drop [flags] [... buildID | [name][:tag]]",
@@ -19,7 +19,7 @@ func NewDropCommand(dropF *config.DropFactory, cmdF *CmdFactory) *cobra.Command 
 			return err
 		}),
 	}
-	cmd.Flags().BoolVar(&dropF.Untagged, "untagged", false, "If set, only untagged builds are deleted")
+	cmd.Flags().BoolVar(&filterF.Untagged, "untagged", false, "If set, only untagged builds are deleted")
 	cmd.Flags().BoolVar(&dropF.All, "all", false, "It is required to set this flag to drop builds if no filters are provided")
 	return cmd
 }
