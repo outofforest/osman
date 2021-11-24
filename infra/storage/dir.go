@@ -17,14 +17,13 @@ import (
 )
 
 const (
-	subDirImages    = "images"
+	subDirCatalog   = "catalog"
+	subDirLinks     = "links"
 	subDirBuilds    = "builds"
 	subDirManifests = "manifests"
+	subDirBuild     = "build"
+	subDirChildren  = "children"
 )
-
-// FIXME (wojciech): change how builds are structured in dir
-// FIXME (wojciech): prevent removing parents if children exist
-// FIXME (wojciech): clean empty directories
 
 // NewDirDriver returns new storage driver based on directories
 func NewDirDriver(config config.Storage) Driver {
@@ -39,12 +38,8 @@ type dirDriver struct {
 
 // Builds returns available builds
 func (d *dirDriver) Builds() ([]types.BuildID, error) {
-	rootPath, err := filepath.Abs(d.config.RootDir)
-	if err != nil {
-		return nil, err
-	}
-	buildsAbsDir := filepath.Join(rootPath, subDirBuilds)
-	dir, err := os.Open(buildsAbsDir)
+	buildLinks := filepath.Join(d.config.RootDir, subDirLinks)
+	dir, err := os.Open(buildLinks)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []types.BuildID{}, nil
@@ -57,28 +52,7 @@ func (d *dirDriver) Builds() ([]types.BuildID, error) {
 	var entries []os.DirEntry
 	for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
 		for _, e := range entries {
-			info, err := e.Info()
-			if err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
-				return nil, err
-			}
-
-			if info.Mode()&os.ModeSymlink != 0 {
-				buildAbsLink := filepath.Join(buildsAbsDir, info.Name())
-				if _, err := filepath.EvalSymlinks(buildAbsLink); err != nil {
-					if os.IsNotExist(err) {
-						// dead link, remove it
-						if err := os.Remove(buildAbsLink); err != nil && !os.IsNotExist(err) {
-							return nil, err
-						}
-						continue
-					}
-					return nil, err
-				}
-				res = append(res, types.BuildID(info.Name()))
-			}
+			res = append(res, types.BuildID(e.Name()))
 		}
 	}
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -89,40 +63,36 @@ func (d *dirDriver) Builds() ([]types.BuildID, error) {
 
 // Info returns information about build
 func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
-	buildAbsLink, err := d.toAbsoluteBuildLink(buildID)
+	catalogLink := filepath.Join(d.config.RootDir, subDirLinks, string(buildID))
+	stat, err := os.Stat(catalogLink)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
-	buildAbsDir, err := filepath.EvalSymlinks(buildAbsLink)
+	imageLinkStatT, ok := stat.Sys().(*syscall.Stat_t)
+	if !ok {
+		return types.BuildInfo{}, fmt.Errorf("stat can't be retrieved: %s", catalogLink)
+	}
+
+	catalogDir, err := filepath.EvalSymlinks(catalogLink)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
-	tagsAbsDir := filepath.Dir(buildAbsDir)
 
 	manifest, err := d.Manifest(buildID)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
 
-	stat, err := os.Stat(buildAbsDir)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	statT, ok := stat.Sys().(*syscall.Stat_t)
-	if !ok {
-		panic("stat can't be retrieved")
-	}
-
 	res := types.BuildInfo{
 		BuildID:   buildID,
 		BasedOn:   manifest.BasedOn,
-		CreatedAt: time.Unix(statT.Ctim.Sec, statT.Ctim.Nsec),
-		Name:      filepath.Base(tagsAbsDir),
+		CreatedAt: time.Unix(imageLinkStatT.Ctim.Sec, imageLinkStatT.Ctim.Nsec),
+		Name:      filepath.Base(catalogDir),
 		Tags:      types.Tags{},
 		Params:    manifest.Params,
 	}
 
-	dir, err := os.Open(tagsAbsDir)
+	dir, err := os.Open(catalogDir)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -131,42 +101,14 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 	var entries []os.DirEntry
 	for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
 		for _, e := range entries {
-			info, err := e.Info()
+			tagBuildID, err := os.Readlink(filepath.Join(catalogDir, e.Name()))
 			if err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
 				return types.BuildInfo{}, err
 			}
-
-			if info.Mode()&os.ModeSymlink != 0 {
-				tagAbsLink := filepath.Join(tagsAbsDir, info.Name())
-				buildDirFromLink, err := filepath.EvalSymlinks(tagAbsLink)
-				if err != nil {
-					if os.IsNotExist(err) {
-						// dead link, remove it
-						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-							return types.BuildInfo{}, err
-						}
-						continue
-					}
-					return types.BuildInfo{}, err
-				}
-				buildAbsDirFromLink, err := filepath.Abs(buildDirFromLink)
-				if err != nil {
-					if os.IsNotExist(err) {
-						// dead link, remove it
-						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-							return types.BuildInfo{}, err
-						}
-						continue
-					}
-					return types.BuildInfo{}, err
-				}
-				if buildAbsDir == buildAbsDirFromLink {
-					res.Tags = append(res.Tags, types.Tag(info.Name()))
-				}
+			if tagBuildID != string(buildID) {
+				continue
 			}
+			res.Tags = append(res.Tags, types.Tag(e.Name()))
 		}
 	}
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -177,46 +119,21 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 
 // BuildID returns build ID for build given by name and tag
 func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
-	tagLink, err := d.toAbsoluteTagLink(buildKey.Name, buildKey.Tag)
-	if err != nil {
-		return "", err
-	}
-	buildDir, err := filepath.EvalSymlinks(tagLink)
+	buildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirCatalog, buildKey.Name, string(buildKey.Tag)))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", fmt.Errorf("image %s does not exist: %w", buildKey, ErrSourceImageDoesNotExist)
 		}
 		return "", err
 	}
-	buildAbsDir, err := filepath.Abs(buildDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("image %s does not exist: %w", buildKey, ErrSourceImageDoesNotExist)
-		}
-		return "", err
-	}
-	return types.BuildID(filepath.Base(buildAbsDir)), nil
+	return types.BuildID(filepath.Base(buildDir)), nil
 }
 
 // Mount mounts build in filesystem
 func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, error) {
-	buildLink, err := d.toAbsoluteBuildLink(buildID)
-	if err != nil {
+	if err := syscall.Mount(filepath.Join(d.config.RootDir, subDirLinks, string(buildID), string(buildID), subDirBuild), dstPath, "", syscall.MS_BIND, ""); err != nil {
 		return nil, err
 	}
-	buildDir, err := filepath.EvalSymlinks(buildLink)
-	if err != nil {
-		return nil, err
-	}
-	buildAbsDir, err := filepath.Abs(buildDir)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := syscall.Mount(buildAbsDir, dstPath, "", syscall.MS_BIND, ""); err != nil {
-		return nil, err
-	}
-
 	return func() error {
 		return syscall.Unmount(dstPath, 0)
 	}, nil
@@ -224,67 +141,51 @@ func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, err
 
 // CreateEmpty creates blank build
 func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
-	buildAbsLink, err := d.toAbsoluteBuildLink(buildID)
-	if err != nil {
+	buildDir := filepath.Join(subDirBuilds, string(buildID))
+	catalogLink := filepath.Join(subDirLinks, string(buildID))
+	catalogDir := filepath.Join(subDirCatalog, imageName)
+	buildLink := filepath.Join(catalogDir, string(buildID))
+
+	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.RootDir, catalogLink)); err != nil {
 		return err
 	}
-
-	if err := os.MkdirAll(filepath.Dir(buildAbsLink), 0o700); err != nil && !os.IsExist(err) {
+	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.RootDir, buildLink)); err != nil {
 		return err
 	}
-
-	link := filepath.Join("..", d.toRelativeBuildDir(imageName, buildID))
-
-	// Create symlink before creating directory because Drop is based on this symlink
-	if err := os.Symlink(link, buildAbsLink); err != nil {
-		return err
-	}
-
-	buildAbsDir, err := d.toAbsoluteBuildDir(imageName, buildID)
-	if err != nil {
-		return err
-	}
-	return os.MkdirAll(buildAbsDir, 0o700)
+	return os.MkdirAll(filepath.Join(d.config.RootDir, buildDir, subDirBuild), 0o700)
 }
 
 // Clone clones source build to destination build
 func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) error {
-	dstBuildAbsDir, err := d.toAbsoluteBuildDir(dstImageName, dstBuildID)
+	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirLinks, string(srcBuildID), string(srcBuildID)))
 	if err != nil {
 		return err
 	}
+	srcBuildDir, err = filepath.Rel(d.config.RootDir, srcBuildDir)
+	if err != nil {
+		return err
+	}
+	buildDir := filepath.Join(srcBuildDir, subDirChildren, string(dstBuildID))
+	catalogLink := filepath.Join(subDirLinks, string(dstBuildID))
+	catalogDir := filepath.Join(subDirCatalog, dstImageName)
+	buildLink := filepath.Join(catalogDir, string(dstBuildID))
 
-	srcBuildLink, err := d.toAbsoluteBuildLink(srcBuildID)
-	if err != nil {
+	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.RootDir, catalogLink)); err != nil {
 		return err
 	}
-	srcBuildDir, err := filepath.EvalSymlinks(srcBuildLink)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("build %s does not exist", srcBuildID)
-		}
+	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.RootDir, buildLink)); err != nil {
 		return err
 	}
-	srcBuildAbsDir, err := filepath.Abs(srcBuildDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("build %s does not exist", srcBuildID)
-		}
+	dst := filepath.Join(d.config.RootDir, buildDir, subDirBuild)
+	if err := os.MkdirAll(dst, 0o700); err != nil {
 		return err
 	}
-	if err := d.CreateEmpty(dstImageName, dstBuildID); err != nil {
-		return err
-	}
-	return copy.Copy(srcBuildAbsDir, dstBuildAbsDir, copy.Options{PreserveTimes: true, PreserveOwner: true})
+	return copy.Copy(filepath.Join(d.config.RootDir, srcBuildDir, subDirBuild), dst, copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
 // Manifest returns manifest of build
 func (d *dirDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error) {
-	manifestFile, err := d.toAbsoluteManifestFile(buildID)
-	if err != nil {
-		return types.ImageManifest{}, err
-	}
-	manifestRaw, err := ioutil.ReadFile(manifestFile)
+	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.RootDir, subDirManifests, string(buildID)))
 	if err != nil {
 		return types.ImageManifest{}, err
 	}
@@ -297,10 +198,7 @@ func (d *dirDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error)
 
 // StoreManifest stores manifest of build
 func (d *dirDriver) StoreManifest(manifest types.ImageManifest) error {
-	manifestFile, err := d.toAbsoluteManifestFile(manifest.BuildID)
-	if err != nil {
-		return err
-	}
+	manifestFile := filepath.Join(d.config.RootDir, subDirManifests, string(manifest.BuildID))
 	if err := os.MkdirAll(filepath.Dir(manifestFile), 0o700); err != nil && !os.IsExist(err) {
 		return err
 	}
@@ -313,174 +211,120 @@ func (d *dirDriver) StoreManifest(manifest types.ImageManifest) error {
 
 // Tag tags build with tag
 func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
-	buildLink, err := d.toAbsoluteBuildLink(buildID)
-	if err != nil {
+	tagLink := filepath.Join(d.config.RootDir, subDirLinks, string(buildID), string(tag))
+	if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	buildDir, err := filepath.EvalSymlinks(buildLink)
-	if err != nil {
-		return err
-	}
-	buildAbsDir, err := filepath.Abs(buildDir)
-	if err != nil {
-		return err
-	}
-	parentDir := filepath.Dir(buildAbsDir)
-	tagLink := filepath.Join(parentDir, string(tag))
-retry:
-	for {
-		err := os.Symlink(string(buildID), tagLink)
-		switch {
-		case err == nil:
-			break retry
-		case os.IsExist(err):
-			if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
-				return err
-			}
-		default:
-			return err
-		}
-	}
-	return nil
+	return os.Symlink(string(buildID), tagLink)
 }
 
 // Drop drops image
 func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
-	// Sequence is important:
-	// 1. remove tags
-	// 2. remove build dir
-	// 3. remove build link
+	buildsDir := filepath.Join(d.config.RootDir, subDirBuilds)
+	catalogLink := filepath.Join(d.config.RootDir, subDirLinks, string(buildID))
+	buildDir, err := filepath.EvalSymlinks(filepath.Join(catalogLink, string(buildID)))
+	switch {
+	case os.IsNotExist(err):
+	case err != nil:
+		return err
+	default:
+		_, err := os.Stat(filepath.Join(buildDir, subDirChildren))
+		switch {
+		case err == nil:
+			return fmt.Errorf("build %s has children: %w", buildID, ErrImageHasChildren)
+		case os.IsNotExist(err):
+		default:
+			return err
+		}
+		if err := os.RemoveAll(buildDir); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		dir := buildDir
+	loop:
+		for {
+			dir = filepath.Dir(dir)
+			if dir == buildsDir {
+				break
+			}
+			err := os.Remove(dir)
+			switch {
+			case err == nil:
+			case os.IsNotExist(err):
+				break loop
+			default:
+				dirH, err2 := os.Open(dir)
+				if err2 != nil {
+					if os.IsNotExist(err2) {
+						break loop
+					}
+				}
+				_, err2 = dirH.Readdir(1)
+				switch {
+				case errors.Is(err2, io.EOF):
+					return err
+				case err2 == nil:
+					break loop
+				default:
+					return err2
+				}
+			}
+		}
+	}
 
-	buildLink, err := d.toAbsoluteBuildLink(buildID)
-	if err != nil {
+	if err := os.Remove(filepath.Join(d.config.RootDir, subDirManifests, string(buildID))); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	defer func() {
-		if retErr != nil {
-			return
-		}
-		if err := os.Remove(buildLink); err != nil && !os.IsNotExist(err) {
-			retErr = err
-		}
-	}()
 
-	buildDir, err := filepath.EvalSymlinks(buildLink)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	catalogDir, err := filepath.EvalSymlinks(catalogLink)
+	switch {
+	case os.IsNotExist(err):
+	case err != nil:
 		return err
+	default:
+		if err := os.Remove(filepath.Join(catalogDir, string(buildID))); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 
-	buildAbsDir, err := filepath.Abs(buildDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	dir, err := os.Open(catalogDir)
+	switch {
+	case os.IsNotExist(err):
+	case err != nil:
 		return err
-	}
-
-	tagsAbsDir := filepath.Dir(buildAbsDir)
-	dir, err := os.Open(tagsAbsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	defer dir.Close()
-
-	var entries []os.DirEntry
-	for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
-		for _, e := range entries {
-			info, err := e.Info()
-			if err != nil {
-				if os.IsNotExist(err) {
+	default:
+		var entries []os.DirEntry
+		empty := true
+		for entries, err = dir.ReadDir(20); err == nil; entries, err = dir.ReadDir(20) {
+			for _, e := range entries {
+				tagLink := filepath.Join(catalogDir, e.Name())
+				tagBuildID, err := os.Readlink(tagLink)
+				if err != nil {
+					return err
+				}
+				if tagBuildID != string(buildID) {
+					empty = false
 					continue
 				}
-				return err
-			}
-
-			if info.Mode()&os.ModeSymlink != 0 {
-				tagAbsLink := filepath.Join(tagsAbsDir, info.Name())
-				buildDirFromLink, err := filepath.EvalSymlinks(tagAbsLink)
-				if err != nil {
-					if os.IsNotExist(err) {
-						// dead link, remove it
-						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-							return err
-						}
-						continue
-					}
+				if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
 					return err
-				}
-				buildAbsDirFromLink, err := filepath.Abs(buildDirFromLink)
-				if err != nil {
-					if os.IsNotExist(err) {
-						// dead link, remove it
-						if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-							return err
-						}
-						continue
-					}
-					return err
-				}
-				if buildAbsDir == buildAbsDirFromLink {
-					if err := os.Remove(tagAbsLink); err != nil && !os.IsNotExist(err) {
-						return err
-					}
 				}
 			}
 		}
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		if empty {
+			if err := os.Remove(catalogDir); err != nil {
+				return err
+			}
+		}
 	}
-	if err != nil && !errors.Is(err, io.EOF) {
+	return os.Remove(catalogLink)
+}
+
+func (d *dirDriver) symlink(oldname, newname string) error {
+	if err := os.MkdirAll(filepath.Dir(newname), 0o700); err != nil && !os.IsExist(err) {
 		return err
 	}
-
-	manifestFile, err := d.toAbsoluteManifestFile(buildID)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	if err := os.Remove(manifestFile); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	return os.RemoveAll(buildDir)
-}
-
-func (d *dirDriver) toRelativeBuildDir(imageName string, buildID types.BuildID) string {
-	return filepath.Join(subDirImages, imageName, string(buildID))
-}
-
-func (d *dirDriver) toAbsoluteBuildDir(imageName string, buildID types.BuildID) (string, error) {
-	rootPath, err := filepath.Abs(d.config.RootDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(rootPath, d.toRelativeBuildDir(imageName, buildID)), nil
-}
-
-func (d *dirDriver) toAbsoluteBuildLink(buildID types.BuildID) (string, error) {
-	rootPath, err := filepath.Abs(d.config.RootDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(rootPath, subDirBuilds, string(buildID)), nil
-}
-
-func (d *dirDriver) toAbsoluteTagLink(imageName string, tag types.Tag) (string, error) {
-	rootPath, err := filepath.Abs(d.config.RootDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(rootPath, subDirImages, imageName, string(tag)), nil
-}
-
-func (d *dirDriver) toAbsoluteManifestFile(buildID types.BuildID) (string, error) {
-	rootPath, err := filepath.Abs(d.config.RootDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(rootPath, subDirManifests, string(buildID)+".json"), nil
+	return os.Symlink(oldname, newname)
 }
