@@ -25,8 +25,6 @@ const (
 	subDirChildren  = "children"
 )
 
-// FIXME (wojciech): RootDir may be a symlink. Resolve it before using
-
 // NewDirDriver returns new storage driver based on directories
 func NewDirDriver(config config.Storage) Driver {
 	return &dirDriver{
@@ -222,8 +220,13 @@ func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
 
 // Drop drops image
 func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
-	buildsDir := filepath.Join(d.config.RootDir, subDirBuilds)
-	catalogLink := filepath.Join(d.config.RootDir, subDirLinks, string(buildID))
+	rootDir, err := d.rootDir()
+	if err != nil {
+		return err
+	}
+
+	buildsDir := filepath.Join(rootDir, subDirBuilds)
+	catalogLink := filepath.Join(rootDir, subDirLinks, string(buildID))
 	buildDir, err := filepath.EvalSymlinks(filepath.Join(catalogLink, string(buildID)))
 	switch {
 	case os.IsNotExist(err):
@@ -273,7 +276,7 @@ func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
 		}
 	}
 
-	if err := os.Remove(filepath.Join(d.config.RootDir, subDirManifests, string(buildID))); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(filepath.Join(rootDir, subDirManifests, string(buildID))); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
@@ -322,6 +325,14 @@ func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
 		}
 	}
 	return os.Remove(catalogLink)
+}
+
+func (d *dirDriver) rootDir() (string, error) {
+	rootDir, err := filepath.EvalSymlinks(d.config.RootDir)
+	if os.IsNotExist(err) {
+		return d.config.RootDir, nil
+	}
+	return rootDir, err
 }
 
 func (d *dirDriver) symlink(oldname, newname string) error {

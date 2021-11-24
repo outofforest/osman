@@ -26,7 +26,7 @@ func NewDropCommand(c *ioc.Container, filterF *config.FilterFactory, dropF *conf
 			}
 			err = nil
 			for _, r := range results {
-				if r.Error != nil {
+				if r.Result != nil {
 					err = errors.New("some drops failed")
 					break
 				}
