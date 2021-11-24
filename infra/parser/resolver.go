@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
-	"github.com/wojciech-malota-wojcik/ioc"
+	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // NewResolvingParser returns new auto resolving parser
@@ -22,11 +22,6 @@ type resolvingParser struct {
 
 // Parse parses file using resolver matching the extension of a file
 func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) {
-	names := map[string]bool{}
-	for _, name := range p.c.Names((*Parser)(nil)) {
-		names[name] = true
-	}
-
 	var ext string
 	if i := strings.LastIndex(filePath, "."); i >= 0 {
 		ext = filePath[i+1:]
@@ -47,7 +42,7 @@ func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) 
 		}
 	}
 
-	if !names[ext] {
+	if !p.c.NameExists(ext, (*Parser)(nil)) {
 		return nil, fmt.Errorf("parser not found for file %s", filePath)
 	}
 
