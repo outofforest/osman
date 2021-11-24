@@ -14,7 +14,7 @@ import (
 )
 
 // NewListCommand returns new list command
-func NewListCommand(c *ioc.Container, formatF *config.FormatFactory, cmdF *CmdFactory) *cobra.Command {
+func NewListCommand(c *ioc.Container, filterF *config.FilterFactory, formatF *config.FormatFactory, cmdF *CmdFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Short: "Lists information about available builds",
 		Use:   "list [flags] [... buildID | [name][:tag]]",
@@ -32,6 +32,7 @@ func NewListCommand(c *ioc.Container, formatF *config.FormatFactory, cmdF *CmdFa
 			return nil
 		}),
 	}
+	cmd.Flags().BoolVar(&filterF.Untagged, "untagged", false, "If set, only untagged builds are listed")
 	cmd.Flags().StringVar(&formatF.Formatter, "format", "table", "Name of formatter used to format the output: "+strings.Join(c.Names((*format.Formatter)(nil)), " | "))
 	return cmd
 }

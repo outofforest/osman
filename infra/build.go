@@ -42,6 +42,9 @@ type Builder struct {
 	parser  parser.Parser
 }
 
+// FIXME (wojciech): if Build/BuildFrom file is called, readyBuilds should be checked
+// readyBuild should contain only image name, if it exists only tag should be applied without building it again
+
 // BuildFromFile builds image from spec file
 func (b *Builder) BuildFromFile(ctx context.Context, specFile, name string, tags ...types.Tag) error {
 	return b.buildFromFile(ctx, map[types.BuildKey]bool{}, specFile, name, tags...)

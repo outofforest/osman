@@ -19,6 +19,7 @@ func iocBuilder(c *ioc.Container) {
 	c.Transient(infra.NewBuilder)
 
 	c.Singleton(config.NewRootFactory)
+	c.Singleton(config.NewFilterFactory)
 	c.Singleton(config.NewStorageFactory)
 	c.Singleton(config.NewFormatFactory)
 	c.Singleton(config.NewBuildFactory)

@@ -2,6 +2,7 @@ package imagebuilder
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -29,7 +30,10 @@ func Build(ctx context.Context, config config.Build, repo *infra.Repository, bui
 	return nil
 }
 
-func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool) bool {
+func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
+	if untagged && len(info.Tags) > 0 {
+		return false
+	}
 	if buildIDs != nil && buildIDs[info.BuildID] {
 		return true
 	}
@@ -47,18 +51,18 @@ func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys 
 }
 
 // List lists builds
-func List(config config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
+func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 	var buildIDs map[types.BuildID]bool
-	if len(config.BuildIDs) > 0 {
+	if len(filtering.BuildIDs) > 0 {
 		buildIDs = map[types.BuildID]bool{}
-		for _, buildID := range config.BuildIDs {
+		for _, buildID := range filtering.BuildIDs {
 			buildIDs[buildID] = true
 		}
 	}
 	var buildKeys map[types.BuildKey]bool
-	if len(config.BuildKeys) > 0 {
+	if len(filtering.BuildKeys) > 0 {
 		buildKeys = map[types.BuildKey]bool{}
-		for _, buildKey := range config.BuildKeys {
+		for _, buildKey := range filtering.BuildKeys {
 			buildKeys[buildKey] = true
 		}
 	}
@@ -74,7 +78,7 @@ func List(config config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 			return nil, err
 		}
 
-		if !listBuild(info, buildIDs, buildKeys) {
+		if !listBuild(info, buildIDs, buildKeys, filtering.Untagged) {
 			continue
 		}
 		list = append(list, info)
@@ -84,11 +88,10 @@ func List(config config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 
 // Drop drops builds
 func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) error {
-	// FIXME (wojciech): sort builds to delete children first
 	// FIXME (wojciech): log drop status of each build
 
 	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
-		return nil
+		return errors.New("neither filters are provided nor All is set")
 	}
 
 	builds, err := List(filtering, s)
@@ -96,11 +99,47 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) error {
 		return err
 	}
 
+	toDelete := map[types.BuildID]bool{}
+	tree := map[types.BuildID]types.BuildID{}
 	for _, build := range builds {
-		if drop.Untagged && len(build.Tags) > 0 {
-			continue
+		toDelete[build.BuildID] = true
+		for {
+			if _, exists := tree[build.BuildID]; exists {
+				break
+			}
+			tree[build.BuildID] = build.BasedOn
+			if build.BasedOn == "" {
+				break
+			}
+			var err error
+			build, err = s.Info(build.BuildID)
+			if err != nil {
+				return err
+			}
 		}
-		if err := s.Drop(build.BuildID); err != nil {
+	}
+
+	enqueued := map[types.BuildID]bool{}
+	deleteSequence := make([]types.BuildID, 0, len(builds))
+	var sort func(buildID types.BuildID)
+	sort = func(buildID types.BuildID) {
+		if enqueued[buildID] {
+			return
+		}
+		if baseBuildID := tree[buildID]; baseBuildID != "" {
+			sort(baseBuildID)
+		}
+		if toDelete[buildID] {
+			enqueued[buildID] = true
+			deleteSequence = append(deleteSequence, buildID)
+		}
+	}
+	for _, build := range builds {
+		sort(build.BuildID)
+	}
+
+	for i := len(deleteSequence) - 1; i >= 0; i-- {
+		if err := s.Drop(deleteSequence[i]); err != nil {
 			return err
 		}
 	}
