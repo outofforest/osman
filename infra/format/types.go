@@ -2,7 +2,7 @@ package format
 
 import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/ioc"
+	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // Formatter formats slice into string

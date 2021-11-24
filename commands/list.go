@@ -10,7 +10,7 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/ioc"
+	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // NewListCommand returns new list command

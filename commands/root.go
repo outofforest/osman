@@ -7,7 +7,7 @@ import (
 	"github.com/ridge/must"
 	"github.com/spf13/cobra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/ioc"
+	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // NewRootCommand returns new root command
