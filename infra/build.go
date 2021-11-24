@@ -183,7 +183,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
 				err = b.build(ctx, stack, baseImage)
 			} else {
-				err = fmt.Errorf("can't find image %s", srcBuildKey)
+				err = fmt.Errorf("can't find image %s: %w", srcBuildKey, err)
 			}
 		default:
 			return types.ImageManifest{}, err

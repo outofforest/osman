@@ -9,6 +9,9 @@ import (
 // ErrSourceImageDoesNotExist is returned if source image does not exist
 var ErrSourceImageDoesNotExist = errors.New("source image does not exist")
 
+// ErrImageHasChildren is returned if image being deleted has children
+var ErrImageHasChildren = errors.New("image has children")
+
 // UnmountFn unmounts mounted image
 type UnmountFn = func() error
 
