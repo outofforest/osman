@@ -13,7 +13,8 @@ import (
 // NewRootCommand returns new root command
 func NewRootCommand(c *ioc.Container, rootF *config.RootFactory, storageF *config.StorageFactory) *cobra.Command {
 	rootCmd := &cobra.Command{
-		SilenceUsage: true,
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 	rootCmd.PersistentFlags().StringVar(&storageF.RootDir, "root-dir", filepath.Join(must.String(os.UserHomeDir()), ".images"), "Directory where built images are stored")
 	rootCmd.PersistentFlags().BoolVarP(&rootF.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")

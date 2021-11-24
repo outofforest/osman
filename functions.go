@@ -86,17 +86,21 @@ func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) 
 	return list, nil
 }
 
-// Drop drops builds
-func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) error {
-	// FIXME (wojciech): log drop status of each build
+// Result contains error realted to build ID
+type Result struct {
+	BuildID types.BuildID
+	Error   error
+}
 
+// Drop drops builds
+func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
 	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
-		return errors.New("neither filters are provided nor All is set")
+		return nil, errors.New("neither filters are provided nor All is set")
 	}
 
 	builds, err := List(filtering, s)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toDelete := map[types.BuildID]bool{}
@@ -114,7 +118,7 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) error {
 			var err error
 			build, err = s.Info(build.BuildID)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -138,10 +142,10 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) error {
 		sort(build.BuildID)
 	}
 
+	results := make([]Result, 0, len(deleteSequence))
 	for i := len(deleteSequence) - 1; i >= 0; i-- {
-		if err := s.Drop(deleteSequence[i]); err != nil {
-			return err
-		}
+		buildID := deleteSequence[i]
+		results = append(results, Result{BuildID: buildID, Error: s.Drop(buildID)})
 	}
-	return nil
+	return results, nil
 }
