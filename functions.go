@@ -89,7 +89,7 @@ func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) 
 // Result contains error realted to build ID
 type Result struct {
 	BuildID types.BuildID
-	Error   error
+	Result  error
 }
 
 // Drop drops builds
@@ -145,7 +145,7 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 	results := make([]Result, 0, len(deleteSequence))
 	for i := len(deleteSequence) - 1; i >= 0; i-- {
 		buildID := deleteSequence[i]
-		results = append(results, Result{BuildID: buildID, Error: s.Drop(buildID)})
+		results = append(results, Result{BuildID: buildID, Result: s.Drop(buildID)})
 	}
 	return results, nil
 }
