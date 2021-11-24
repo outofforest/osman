@@ -25,6 +25,8 @@ const (
 	subDirChildren  = "children"
 )
 
+// FIXME (wojciech): RootDir may be a symlink. Resolve it before using
+
 // NewDirDriver returns new storage driver based on directories
 func NewDirDriver(config config.Storage) Driver {
 	return &dirDriver{

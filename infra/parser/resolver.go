@@ -22,6 +22,11 @@ type resolvingParser struct {
 
 // Parse parses file using resolver matching the extension of a file
 func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) {
+	names := map[string]bool{}
+	for _, name := range p.c.Names((*Parser)(nil)) {
+		names[name] = true
+	}
+
 	var ext string
 	if i := strings.LastIndex(filePath, "."); i >= 0 {
 		ext = filePath[i+1:]
@@ -40,9 +45,10 @@ func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) 
 				break loop
 			}
 		}
-		if ext == "" {
-			return nil, fmt.Errorf("parser not found for file %s", filePath)
-		}
+	}
+
+	if !names[ext] {
+		return nil, fmt.Errorf("parser not found for file %s", filePath)
 	}
 
 	var parser Parser

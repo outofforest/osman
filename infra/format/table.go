@@ -47,6 +47,8 @@ func (f *tableFormatter) Format(slice interface{}) string {
 			value := field.Interface()
 			var strValue string
 			switch {
+			case field.Type().AssignableTo(reflect.TypeOf((*error)(nil)).Elem()) && value == nil:
+				strValue = "SUCCESS"
 			case field.Type() == reflect.TypeOf(time.Time{}):
 				strValue = value.(time.Time).Format("2006-01-02 15:04")
 			default:
