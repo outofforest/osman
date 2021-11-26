@@ -122,7 +122,7 @@ func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
 	buildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirCatalog, buildKey.Name, string(buildKey.Tag)))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("image %s does not exist: %w", buildKey, ErrSourceImageDoesNotExist)
+			return "", fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist)
 		}
 		return "", err
 	}
@@ -186,6 +186,9 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 // Manifest returns manifest of build
 func (d *dirDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error) {
 	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.RootDir, subDirManifests, string(buildID)))
+	if os.IsNotExist(err) {
+		return types.ImageManifest{BuildID: buildID}, nil
+	}
 	if err != nil {
 		return types.ImageManifest{}, err
 	}
@@ -230,6 +233,7 @@ func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
 	buildDir, err := filepath.EvalSymlinks(filepath.Join(catalogLink, string(buildID)))
 	switch {
 	case os.IsNotExist(err):
+		return fmt.Errorf("image %s does not exist: %w", buildID, types.ErrImageDoesNotExist)
 	case err != nil:
 		return err
 	default:

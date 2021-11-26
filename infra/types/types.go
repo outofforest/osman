@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// ErrImageDoesNotExist is returned if source image does not exist
+var ErrImageDoesNotExist = errors.New("image does not exist")
+
 const alphabet = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const buildIDPrefix = "bid"
 const buildIDLength = 16

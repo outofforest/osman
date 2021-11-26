@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
@@ -22,10 +23,11 @@ import (
 type cloneFromFn func(srcBuildKey types.BuildKey) (types.ImageManifest, error)
 
 // NewBuilder creates new image builder
-func NewBuilder(config config.Build, repo *Repository, storage storage.Driver, parser parser.Parser) *Builder {
+func NewBuilder(config config.Build, initializer base.Initializer, repo *Repository, storage storage.Driver, parser parser.Parser) *Builder {
 	return &Builder{
 		rebuild:     config.Rebuild,
 		readyBuilds: map[types.BuildKey]bool{},
+		initializer: initializer,
 		repo:        repo,
 		storage:     storage,
 		parser:      parser,
@@ -37,9 +39,10 @@ type Builder struct {
 	rebuild     bool
 	readyBuilds map[types.BuildKey]bool
 
-	repo    *Repository
-	storage storage.Driver
-	parser  parser.Parser
+	initializer base.Initializer
+	repo        *Repository
+	storage     storage.Driver
+	parser      parser.Parser
 }
 
 // BuildFromFile builds image from spec file
@@ -93,20 +96,20 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	var imgUnmount storage.UnmountFn
 	defer func() {
 		if err := umount(path); err != nil {
-			if retErr != nil {
+			if retErr == nil {
 				retErr = err
 			}
 			return
 		}
 		if err := os.Remove(specDir); err != nil && !os.IsNotExist(err) {
-			if retErr != nil {
+			if retErr == nil {
 				retErr = err
 			}
 			return
 		}
 		if imgUnmount != nil {
 			if err := imgUnmount(); err != nil {
-				if retErr != nil {
+				if retErr == nil {
 					retErr = err
 				}
 				return
@@ -119,18 +122,16 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return
 		}
 		if retErr != nil {
-			if err := b.storage.Drop(buildID); err != nil {
+			if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
 				retErr = err
 			}
 			return
 		}
 	}()
 
-	var base bool
-	if img.Name() == "fedora" {
-		tags := img.Tags()
-		if len(img.Tags()) != 1 {
-			return errors.New("for fedora image exactly one tag is required")
+	if len(img.Commands()) == 0 {
+		if len(tags) != 1 {
+			return errors.New("for base image exactly one tag is required")
 		}
 		if err := b.storage.CreateEmpty(img.Name(), buildID); err != nil {
 			return err
@@ -141,113 +142,109 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 
-		if err := libexec.Exec(ctx,
-			exec.Command("dnf", "install", "-y", "--installroot="+path, "--releasever="+string(tags[0]),
-				"--setopt=install_weak_deps=False", "--setopt=keepcache=False", "--nodocs",
-				"dnf", "langpacks-en")); err != nil {
+		if err := b.initializer.Init(ctx, types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
 			return err
 		}
-	}
-
-	build := newImageBuild(base, path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
-		if !types.IsNameValid(srcBuildKey.Name) {
-			return types.ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
-		}
-		if !srcBuildKey.Tag.IsValid() {
-			return types.ImageManifest{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
-		}
-
-		errRebuild := errors.New("rebuild")
-		// Try to clone existing image
-		err := errRebuild
-		var srcBuildID types.BuildID
-		if !b.rebuild || b.readyBuilds[srcBuildKey] {
-			srcBuildID, err = b.storage.BuildID(srcBuildKey)
-		}
-
-		switch {
-		case err == nil:
-		case errors.Is(err, errRebuild) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
-			// If image does not exist try to build it from spec file in the current directory but only if tag is a default one
-			if srcBuildKey.Tag == description.DefaultTag {
-				err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
+	} else {
+		build := newImageBuild(path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
+			if !types.IsNameValid(srcBuildKey.Name) {
+				return types.ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
 			}
-		default:
-			return types.ImageManifest{}, err
-		}
-
-		switch {
-		case err == nil:
-		case errors.Is(err, errRebuild) || os.IsNotExist(err) || errors.Is(err, storage.ErrSourceImageDoesNotExist):
-			// If spec file does not exist, try building from repository
-			if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
-				err = b.build(ctx, stack, baseImage)
-			} else {
-				err = fmt.Errorf("can't find image %s: %w", srcBuildKey, err)
+			if !srcBuildKey.Tag.IsValid() {
+				return types.ImageManifest{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
 			}
-		default:
-			return types.ImageManifest{}, err
-		}
 
-		if err != nil {
-			return types.ImageManifest{}, err
-		}
+			// Try to clone existing image
+			err := types.ErrImageDoesNotExist
+			var srcBuildID types.BuildID
+			if !b.rebuild || b.readyBuilds[srcBuildKey] {
+				srcBuildID, err = b.storage.BuildID(srcBuildKey)
+			}
 
-		if !srcBuildID.IsValid() {
-			srcBuildID, err = b.storage.BuildID(srcBuildKey)
+			switch {
+			case err == nil:
+			case errors.Is(err, types.ErrImageDoesNotExist):
+				// If image does not exist try to build it from file in the current directory but only if tag is a default one
+				if srcBuildKey.Tag == description.DefaultTag {
+					err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
+				}
+			default:
+				return types.ImageManifest{}, err
+			}
+
+			switch {
+			case err == nil:
+			case errors.Is(err, types.ErrImageDoesNotExist):
+				// If spec file does not exist, try building from repository
+				if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
+					err = b.build(ctx, stack, baseImage)
+				} else {
+					err = b.build(ctx, stack, description.Describe(srcBuildKey.Name, types.Tags{srcBuildKey.Tag}))
+				}
+			default:
+				return types.ImageManifest{}, err
+			}
+
 			if err != nil {
 				return types.ImageManifest{}, err
 			}
+
+			if !srcBuildID.IsValid() {
+				srcBuildID, err = b.storage.BuildID(srcBuildKey)
+				if err != nil {
+					return types.ImageManifest{}, err
+				}
+			}
+
+			if err := b.storage.Clone(srcBuildID, img.Name(), buildID); err != nil {
+				return types.ImageManifest{}, err
+			}
+
+			imgUnmount, err = b.storage.Mount(buildID, path)
+			if err != nil {
+				return types.ImageManifest{}, err
+			}
+
+			manifest, err := b.storage.Manifest(srcBuildID)
+			if err != nil {
+				return types.ImageManifest{}, err
+			}
+
+			// To mount specdir readonly, trick is required:
+			// 1. mount dir normally
+			// 2. remount it using read-only option
+			if err := os.Mkdir(specDir, 0o700); err != nil {
+				return types.ImageManifest{}, err
+			}
+			if err := syscall.Mount(".", specDir, "", syscall.MS_BIND, ""); err != nil {
+				return types.ImageManifest{}, err
+			}
+			if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
+				return types.ImageManifest{}, err
+			}
+
+			if err := syscall.Mount("none", filepath.Join(path, "dev"), "devtmpfs", 0, ""); err != nil {
+				return types.ImageManifest{}, err
+			}
+			if err := syscall.Mount("none", filepath.Join(path, "proc"), "proc", 0, ""); err != nil {
+				return types.ImageManifest{}, err
+			}
+			if err := syscall.Mount("none", filepath.Join(path, "sys"), "sysfs", 0, ""); err != nil {
+				return types.ImageManifest{}, err
+			}
+			return manifest, nil
+		})
+
+		for _, cmd := range img.Commands() {
+			if err := cmd.Execute(ctx, build); err != nil {
+				return err
+			}
 		}
 
-		if err := b.storage.Clone(srcBuildID, img.Name(), buildID); err != nil {
-			return types.ImageManifest{}, err
-		}
-
-		imgUnmount, err = b.storage.Mount(buildID, path)
-		if err != nil {
-			return types.ImageManifest{}, err
-		}
-
-		manifest, err := b.storage.Manifest(srcBuildID)
-		if err != nil {
-			return types.ImageManifest{}, err
-		}
-
-		// To mount specdir readonly, trick is required:
-		// 1. mount dir normally
-		// 2. remount it using read-only option
-		if err := os.Mkdir(specDir, 0o700); err != nil {
-			return types.ImageManifest{}, err
-		}
-		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND, ""); err != nil {
-			return types.ImageManifest{}, err
-		}
-		if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
-			return types.ImageManifest{}, err
-		}
-
-		if err := syscall.Mount("none", filepath.Join(path, "dev"), "devtmpfs", 0, ""); err != nil {
-			return types.ImageManifest{}, err
-		}
-		if err := syscall.Mount("none", filepath.Join(path, "proc"), "proc", 0, ""); err != nil {
-			return types.ImageManifest{}, err
-		}
-		if err := syscall.Mount("none", filepath.Join(path, "sys"), "sysfs", 0, ""); err != nil {
-			return types.ImageManifest{}, err
-		}
-		return manifest, nil
-	})
-
-	for _, cmd := range img.Commands() {
-		if err := cmd.Execute(ctx, build); err != nil {
+		build.manifest.BuildID = buildID
+		if err := b.storage.StoreManifest(build.manifest); err != nil {
 			return err
 		}
-	}
-
-	build.manifest.BuildID = buildID
-	if err := b.storage.StoreManifest(build.manifest); err != nil {
-		return err
 	}
 
 	for _, key := range keys {
@@ -284,10 +281,9 @@ func umount(imgPath string) error {
 	return nil
 }
 
-func newImageBuild(base bool, path string, cloneFn cloneFromFn) *imageBuild {
+func newImageBuild(path string, cloneFn cloneFromFn) *imageBuild {
 	return &imageBuild{
 		cloneFn: cloneFn,
-		base:    base,
 		path:    path,
 	}
 }
@@ -295,16 +291,12 @@ func newImageBuild(base bool, path string, cloneFn cloneFromFn) *imageBuild {
 type imageBuild struct {
 	cloneFn cloneFromFn
 
-	base     bool
 	path     string
 	manifest types.ImageManifest
 }
 
 // from is a handler for FROM
 func (b *imageBuild) From(cmd *description.FromCommand) error {
-	if b.base {
-		return errors.New("command FROM is forbidden for base image")
-	}
 	manifest, err := b.cloneFn(cmd.BuildKey)
 	if err != nil {
 		return err
@@ -362,5 +354,5 @@ func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) (retE
 		}
 	}()
 
-	return libexec.Exec(ctx, exec.Command("sh", "-c", cmd.Command))
+	return libexec.Exec(ctx, exec.Command("/bin/sh", "-c", cmd.Command))
 }
