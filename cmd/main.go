@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
@@ -15,6 +18,7 @@ import (
 func iocBuilder(c *ioc.Container) {
 	c.Singleton(commands.NewCmdFactory)
 	c.Singleton(storage.NewDirDriver)
+	c.Singleton(base.NewDockerInitializer)
 	c.Singleton(infra.NewRepository)
 	c.Transient(infra.NewBuilder)
 
@@ -45,7 +49,7 @@ func iocBuilder(c *ioc.Container) {
 }
 
 func main() {
-	run.Tool("imagebuilder", iocBuilder, func(rootCmd *cobra.Command) error {
+	run.Tool("imagebuilder", iocBuilder, func(ctx context.Context, rootCmd *cobra.Command) error {
 		return rootCmd.Execute()
 	})
 }

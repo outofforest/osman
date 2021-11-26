@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
+	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
@@ -43,7 +44,7 @@ func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) 
 	}
 
 	if !p.c.NameExists(ext, (*Parser)(nil)) {
-		return nil, fmt.Errorf("parser not found for file %s", filePath)
+		return nil, fmt.Errorf("parser not found for file %s: %w", filePath, types.ErrImageDoesNotExist)
 	}
 
 	var parser Parser
