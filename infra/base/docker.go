@@ -14,38 +14,53 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/wojciech-malota-wojcik/imagebuilder/lib/retry"
 	"github.com/wojciech-malota-wojcik/logger"
 	"go.uber.org/zap"
 )
 
-// FIXME (wojciech): return types.ErrImageDoesNotExist if image dos not exist in registry
-
 // NewDockerInitializer creates new initializer getting base images from docker registry
-func NewDockerInitializer() Initializer {
-	return &dockerInitializer{}
+func NewDockerInitializer(client *http.Client) Initializer {
+	return &dockerInitializer{
+		client: client,
+	}
 }
 
 type dockerInitializer struct {
+	client *http.Client
 }
 
 // Initialize fetches image from docker registry and integrates it inside directory
-func (f *dockerInitializer) Init(ctx context.Context, buildKey types.BuildKey, dstDir string) error {
+func (f *dockerInitializer) Init(ctx context.Context, buildKey types.BuildKey) error {
 	log := logger.Get(ctx)
 
-	token, err := f.authorize(ctx, buildKey.Name)
-	if err != nil {
+	var token string
+	if err := retry.Do(ctx, 10, 5*time.Second, func() error {
+		var err error
+		token, err = f.authorize(ctx, buildKey.Name)
+		return err
+	}); err != nil {
 		return err
 	}
-	layers, err := f.layers(ctx, token, buildKey)
-	if err != nil {
+
+	var layers []string
+	if err := retry.Do(ctx, 10, 5*time.Second, func() error {
+		var err error
+		layers, err = f.layers(ctx, token, buildKey)
+		return err
+	}); err != nil {
 		return err
 	}
 	for _, digest := range layers {
+		digest := digest
 		log.Info("Incrementing filesystem", zap.String("digest", digest))
-		if err := f.increment(ctx, token, buildKey.Name, digest, dstDir); err != nil {
+		if err := retry.Do(ctx, 10, 10*time.Second, func() error {
+			return f.increment(ctx, token, buildKey.Name, digest)
+		}); err != nil {
 			return err
 		}
 	}
@@ -53,17 +68,17 @@ func (f *dockerInitializer) Init(ctx context.Context, buildKey types.BuildKey, d
 }
 
 func (f *dockerInitializer) authorize(ctx context.Context, imageName string) (string, error) {
-	resp, err := http.DefaultClient.Do(must.HTTPRequest(http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/%s:pull", imageName), nil)))
+	resp, err := f.client.Do(must.HTTPRequest(http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/%s:pull", imageName), nil)))
 	if err != nil {
-		return "", err
+		return "", retry.Retryable(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected response status: %d", resp.StatusCode)
+		return "", retry.Retryable(fmt.Errorf("unexpected response status: %d", resp.StatusCode))
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", retry.Retryable(err)
 	}
 
 	data := struct {
@@ -71,29 +86,32 @@ func (f *dockerInitializer) authorize(ctx context.Context, imageName string) (st
 		AccessToken string `json:"access_token"` // nolint: tagliatelle
 	}{}
 	if err := json.Unmarshal(body, &data); err != nil {
-		return "", err
+		return "", retry.Retryable(err)
 	}
 	if data.Token != "" {
 		return data.Token, nil
 	}
-	return data.AccessToken, nil
+	if data.AccessToken != "" {
+		return data.AccessToken, nil
+	}
+	return "", retry.Retryable(errors.New("no token in response"))
 }
 
 func (f *dockerInitializer) layers(ctx context.Context, token string, buildKey types.BuildKey) ([]string, error) {
 	req := must.HTTPRequest(http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/manifests/%s", buildKey.Name, buildKey.Tag), nil))
 	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 	req.Header.Add("Authorization", "Bearer "+token)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, retry.Retryable(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected response status: %d", resp.StatusCode)
+		return nil, retry.Retryable(fmt.Errorf("unexpected response status: %d", resp.StatusCode))
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, retry.Retryable(err)
 	}
 
 	data := struct {
@@ -103,7 +121,7 @@ func (f *dockerInitializer) layers(ctx context.Context, token string, buildKey t
 	}{}
 
 	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, err
+		return nil, retry.Retryable(err)
 	}
 
 	layers := make([]string, 0, len(data.Layers))
@@ -113,32 +131,28 @@ func (f *dockerInitializer) layers(ctx context.Context, token string, buildKey t
 	return layers, nil
 }
 
-func (f *dockerInitializer) increment(ctx context.Context, token, imageName, digest string, dstDir string) error {
-	// FIXME (wojciech): ensure that we don't remove linked or symlinked content when using RemoveAll
-
+func (f *dockerInitializer) increment(ctx context.Context, token, imageName, digest string) error {
 	req := must.HTTPRequest(http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, digest), nil))
 	req.Header.Add("Authorization", "Bearer "+token)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := f.client.Do(req)
 	if err != nil {
-		return err
+		return retry.Retryable(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected response status: %d", resp.StatusCode)
+		return retry.Retryable(fmt.Errorf("unexpected response status: %d", resp.StatusCode))
 	}
 
 	hasher := sha256.New()
 	gr, err := gzip.NewReader(io.TeeReader(resp.Body, hasher))
 	if err != nil {
-		return err
+		return retry.Retryable(err)
 	}
 	defer gr.Close()
 
 	tr := tar.NewReader(gr)
 	del := map[string]bool{}
 	added := map[string]bool{}
-	// for hardlinks linked inode has to exist so we have to create them only when target is created
-	links := map[string]string{}
 loop:
 	for {
 		header, err := tr.Next()
@@ -146,23 +160,22 @@ loop:
 		case err == io.EOF:
 			break loop
 		case err != nil:
-			return err
+			return retry.Retryable(err)
 		case header == nil:
 			continue
 		}
-		dst := filepath.Join(dstDir, header.Name)
-
-		if err := os.RemoveAll(dst); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(header.Name); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
 		switch {
 		case filepath.Base(header.Name) == ".wh..wh..plnk":
 			// just ignore this
+			continue
 		case filepath.Base(header.Name) == ".wh..wh..opq":
-			// It means that content in this directory created by earlier layers should not be visible
+			// It means that content in this directory created by earlier layers should not be visible,
 			// so content created earlier should be deleted
-			dir := filepath.Dir(dst)
+			dir := filepath.Dir(header.Name)
 			files, err := os.ReadDir(dir)
 			if err != nil {
 				return err
@@ -176,11 +189,11 @@ loop:
 					return err
 				}
 			}
-		case strings.HasPrefix(filepath.Base(dst), ".wh."):
+			continue
+		case strings.HasPrefix(filepath.Base(header.Name), ".wh."):
 			// delete or mark to delete corresponding file
-			toDelete := filepath.Join(filepath.Dir(dst), strings.TrimPrefix(filepath.Base(dst), ".wh."))
+			toDelete := filepath.Join(filepath.Dir(header.Name), strings.TrimPrefix(filepath.Base(header.Name), ".wh."))
 			delete(added, toDelete)
-			delete(links, toDelete)
 			if err := os.RemoveAll(toDelete); err != nil {
 				if os.IsNotExist(err) {
 					del[toDelete] = true
@@ -188,59 +201,58 @@ loop:
 				}
 				return err
 			}
-		case del[dst]:
-			delete(del, dst)
-			delete(added, dst)
-			delete(links, dst)
+			continue
+		case del[header.Name]:
+			delete(del, header.Name)
+			delete(added, header.Name)
+			continue
 		case header.Typeflag == tar.TypeDir:
-			added[dst] = true
-			if err := os.MkdirAll(dst, os.FileMode(header.Mode)); err != nil {
+			if err := os.MkdirAll(header.Name, os.FileMode(header.Mode)); err != nil {
 				return err
 			}
 		case header.Typeflag == tar.TypeReg:
-			added[dst] = true
-			if err := func() error {
-				f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, os.FileMode(header.Mode))
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-
-				_, err = io.Copy(f, tr)
-				if errors.Is(err, io.EOF) {
-					err = nil
-				}
+			f, err := os.OpenFile(header.Name, os.O_CREATE|os.O_WRONLY, os.FileMode(header.Mode))
+			if err != nil {
 				return err
-			}(); err != nil {
+			}
+			_, err = io.Copy(f, tr)
+			if errors.Is(err, io.EOF) {
+				err = nil
+			}
+			_ = f.Close()
+			if err != nil {
 				return err
 			}
 		case header.Typeflag == tar.TypeSymlink:
-			added[dst] = true
-			if err := os.Symlink(header.Linkname, dst); err != nil {
+			if err := os.Symlink(header.Linkname, header.Name); err != nil {
 				return err
 			}
 		case header.Typeflag == tar.TypeLink:
-			added[dst] = true
-			links[dst] = filepath.Join(dstDir, header.Linkname)
+			// linked file may not exist yet, so let's create it - i will be overwritten later
+			f, err := os.OpenFile(header.Linkname, os.O_CREATE|os.O_EXCL, os.FileMode(header.Mode))
+			if err != nil {
+				if !os.IsExist(err) {
+					return err
+				}
+			} else {
+				_ = f.Close()
+			}
+			if err := os.Link(header.Linkname, header.Name); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unsupported file type: %d", header.Typeflag)
 		}
 
-		// symlinks can't be chowned - in this case os.ErrNotExist is returned
-		if err := os.Chown(dst, header.Uid, header.Gid); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-	}
-
-	for dst, linkName := range links {
-		if err := os.Link(linkName, dst); err != nil {
+		added[header.Name] = true
+		if err := os.Lchown(header.Name, header.Uid, header.Gid); err != nil {
 			return err
 		}
 	}
 
 	computedDigest := "sha256:" + hex.EncodeToString(hasher.Sum(nil))
 	if computedDigest != digest {
-		return fmt.Errorf("digest doesn't match, expected: %s, got: %s", digest, computedDigest)
+		return retry.Retryable(fmt.Errorf("digest doesn't match, expected: %s, got: %s", digest, computedDigest))
 	}
 	return nil
 }

@@ -11,12 +11,14 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
+	"github.com/wojciech-malota-wojcik/imagebuilder/lib/libhttp"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 	"github.com/wojciech-malota-wojcik/run"
 )
 
 func iocBuilder(c *ioc.Container) {
 	c.Singleton(commands.NewCmdFactory)
+	c.Singleton(libhttp.NewSelfClient)
 	c.Singleton(storage.NewDirDriver)
 	c.Singleton(base.NewDockerInitializer)
 	c.Singleton(infra.NewRepository)

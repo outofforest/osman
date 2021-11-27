@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
+
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
@@ -61,6 +63,19 @@ func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bo
 		return err
 	}
 	return b.build(ctx, stack, description.Describe(name, tags, commands...))
+}
+
+func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path string) (retErr error) {
+	exit, err := chroot.Enter(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := exit(); retErr == nil {
+			retErr = err
+		}
+	}()
+	return b.initializer.Init(ctx, buildKey)
 }
 
 func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retErr error) {
@@ -142,7 +157,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 
-		if err := b.initializer.Init(ctx, types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
+		if err := b.initialize(ctx, types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
 			return err
 		}
 	} else {
@@ -314,45 +329,14 @@ func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 
 // run is a handler for RUN
 func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) (retErr error) {
-	root, err := os.Open("/")
+	exit, err := chroot.Enter(b.path)
 	if err != nil {
 		return err
 	}
-	defer root.Close()
-
-	curr, err := os.Open(".")
-	if err != nil {
-		return err
-	}
-	defer curr.Close()
-
-	if err := syscall.Chroot(b.path); err != nil {
-		return err
-	}
-	if err := os.Chdir("/"); err != nil {
-		return err
-	}
-
 	defer func() {
-		defer func() {
-			if err := curr.Chdir(); err != nil && retErr == nil {
-				retErr = err
-			}
-		}()
-
-		if err := root.Chdir(); err != nil {
-			if retErr == nil {
-				retErr = err
-			}
-			return
-		}
-		if err := syscall.Chroot("."); err != nil {
-			if retErr == nil {
-				retErr = err
-			}
-			return
+		if err := exit(); retErr == nil {
+			retErr = err
 		}
 	}()
-
 	return libexec.Exec(ctx, exec.Command("/bin/sh", "-c", cmd.Command))
 }
