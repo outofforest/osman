@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -237,16 +238,6 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
 				return types.ImageManifest{}, err
 			}
-
-			if err := syscall.Mount("none", filepath.Join(path, "dev"), "devtmpfs", 0, ""); err != nil {
-				return types.ImageManifest{}, err
-			}
-			if err := syscall.Mount("none", filepath.Join(path, "proc"), "proc", 0, ""); err != nil {
-				return types.ImageManifest{}, err
-			}
-			if err := syscall.Mount("none", filepath.Join(path, "sys"), "sysfs", 0, ""); err != nil {
-				return types.ImageManifest{}, err
-			}
 			return manifest, nil
 		})
 
@@ -338,5 +329,9 @@ func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) (retE
 			retErr = err
 		}
 	}()
-	return libexec.Exec(ctx, exec.Command("/bin/sh", "-c", cmd.Command))
+	cmd2 := exec.Command("/bin/sh", "-c", cmd.Command)
+	// If Stdin is nil, then exec library tries to assign it to /dev/null
+	// Null device does not exist in chrooted environment, so we set a fake nil buffer
+	cmd2.Stdin = bytes.NewReader(nil)
+	return libexec.Exec(ctx, cmd2)
 }
