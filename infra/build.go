@@ -333,5 +333,6 @@ func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) (retE
 	// If Stdin is nil, then exec library tries to assign it to /dev/null
 	// Null device does not exist in chrooted environment, so we set a fake nil buffer
 	cmd2.Stdin = bytes.NewReader(nil)
+	cmd2.Env = []string{"PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin"}
 	return libexec.Exec(ctx, cmd2)
 }
