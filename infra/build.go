@@ -65,6 +65,9 @@ func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bo
 }
 
 func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path string) (retErr error) {
+	if buildKey.Name == "scratch" {
+		return nil
+	}
 	exit, err := chroot.Enter(path)
 	if err != nil {
 		return err
