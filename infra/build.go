@@ -1,7 +1,6 @@
 package infra
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,14 +11,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
-
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
 	"github.com/wojciech-malota-wojcik/libexec"
 )
 
@@ -330,9 +328,6 @@ func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) (retE
 		}
 	}()
 	cmd2 := exec.Command("/bin/sh", "-c", cmd.Command)
-	// If Stdin is nil, then exec library tries to assign it to /dev/null
-	// Null device does not exist in chrooted environment, so we set a fake nil buffer
-	cmd2.Stdin = bytes.NewReader(nil)
 	cmd2.Env = []string{"PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin"}
 	return libexec.Exec(ctx, cmd2)
 }
