@@ -244,8 +244,9 @@ github.com/wojciech-malota-wojcik/ioc v1.3.1-0.20210829092813-3edb43f522c7 h1:vm
 github.com/wojciech-malota-wojcik/ioc v1.3.1-0.20210829092813-3edb43f522c7/go.mod h1:6ZFRcYxphk5TtF3iJygJRL+b9MIYpce5DnjLl5vl/N0=
 github.com/wojciech-malota-wojcik/ioc/v2 v2.4.0 h1:VQQlYhKLej0ajf8d7SLlMkenvNblpNbGWN85fFJkz4E=
 github.com/wojciech-malota-wojcik/ioc/v2 v2.4.0/go.mod h1:MrPPB+hWjzKIeK8HFAFjtwZVTmY33h6SCdtU916gjnY=
-github.com/wojciech-malota-wojcik/libexec v0.1.0 h1:sPsaYDxbbLdXyOa4b+9BUErl//sIdu6zZHa2hBjhJgo=
 github.com/wojciech-malota-wojcik/libexec v0.1.0/go.mod h1:LlxW8wAiJdyMPNDjpB8xjO4Bm4HgAZumBMoMyp7HZwk=
+github.com/wojciech-malota-wojcik/libexec v0.1.1 h1:cRStCTmVe+ii/FPBHS6/NMDeh++ms3I7JspP+0E+xps=
+github.com/wojciech-malota-wojcik/libexec v0.1.1/go.mod h1:LlxW8wAiJdyMPNDjpB8xjO4Bm4HgAZumBMoMyp7HZwk=
 github.com/wojciech-malota-wojcik/logger v0.1.0 h1:EGIvNa6GDLYFt2HNwouXrHipm0vrk1sY8VGfjNeQ+wQ=
 github.com/wojciech-malota-wojcik/logger v0.1.0/go.mod h1:9gh0eyiW2ymqS0O8fHqJLE/7yy3efYYO2pXTgt14Uq4=
 github.com/wojciech-malota-wojcik/parallel v0.1.2 h1:cFfstB0JHLapXyKUD+82gajiw8Gg0g/kn7F5UFIkBgk=
