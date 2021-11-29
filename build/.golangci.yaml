@@ -52,6 +52,7 @@ linters:
     # The following checks are disabled due to their all'round silliness:
     - wsl
     - godot
+    - varnamelen
     # Temporarily disabled until all existing problems are fixed
     - exhaustive
     - noctx
@@ -66,6 +67,7 @@ linters:
     - forbidigo
     - gomoddirectives
     - cyclop
+    - ireturn
 
 linters-settings:
   nakedret:

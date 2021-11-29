@@ -2,15 +2,19 @@ package infra
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/ridge/must"
+	"github.com/ridge/parallel"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
@@ -18,7 +22,9 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
-	"github.com/wojciech-malota-wojcik/libexec"
+	"github.com/wojciech-malota-wojcik/imagebuilder/lib/retry"
+	"github.com/wojciech-malota-wojcik/isolator"
+	"github.com/wojciech-malota-wojcik/isolator/executor/wire"
 )
 
 type cloneFromFn func(srcBuildKey types.BuildKey) (types.ImageManifest, error)
@@ -163,7 +169,11 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 	} else {
-		build := newImageBuild(path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
+		ctxBuild, cancel := context.WithCancel(ctx)
+		defer cancel()
+		group := parallel.NewGroup(ctxBuild)
+		var build *imageBuild
+		build = newImageBuild(path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
 			if !types.IsNameValid(srcBuildKey.Name) {
 				return types.ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
 			}
@@ -239,13 +249,43 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
 				return types.ImageManifest{}, err
 			}
+
+			group.Spawn("isolator", parallel.Fail, func(ctx context.Context) error {
+				return isolator.Run(ctx, isolator.Config{
+					ExecutorPath: filepath.Join(path, "tmp", "executor"),
+					Address:      "unix:///tmp/executor.sock",
+					RootDir:      path,
+				})
+			})
+
+			if err := retry.Do(ctx, 10, time.Second, func() error {
+				var err error
+				build.isolator, err = net.Dial("unix", filepath.Join(path, "tmp", "executor.sock"))
+				return retry.Retryable(err)
+			}); err != nil {
+				return types.ImageManifest{}, err
+			}
+
 			return manifest, nil
 		})
 
-		for _, cmd := range img.Commands() {
-			if err := cmd.Execute(ctx, build); err != nil {
-				return err
+		group.Spawn("commands", parallel.Exit, func(ctx context.Context) error {
+			for _, cmd := range img.Commands() {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
+
+				if err := cmd.Execute(build); err != nil {
+					return err
+				}
 			}
+			return nil
+		})
+
+		if err := group.Wait(); err != nil && (!errors.Is(err, ctxBuild.Err()) || errors.Is(err, ctx.Err())) {
+			return err
 		}
 
 		build.manifest.BuildID = buildID
@@ -300,6 +340,7 @@ type imageBuild struct {
 
 	path     string
 	manifest types.ImageManifest
+	isolator net.Conn
 }
 
 // from is a handler for FROM
@@ -320,17 +361,17 @@ func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 }
 
 // run is a handler for RUN
-func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) (retErr error) {
-	exit, err := chroot.Enter(b.path)
-	if err != nil {
+func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
+	decoder := json.NewDecoder(b.isolator)
+	if _, err := b.isolator.Write(must.Bytes(json.Marshal(wire.RunMessage{Command: cmd.Command}))); err != nil {
 		return err
 	}
-	defer func() {
-		if err := exit(); retErr == nil {
-			retErr = err
-		}
-	}()
-	cmd2 := exec.Command("/bin/sh", "-c", cmd.Command)
-	cmd2.Env = []string{"PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin"}
-	return libexec.Exec(ctx, cmd2)
+	var ack wire.Ack
+	if err := decoder.Decode(&ack); err != nil {
+		return err
+	}
+	if ack.Error != "" {
+		return errors.New(ack.Error)
+	}
+	return nil
 }
