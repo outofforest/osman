@@ -14,21 +14,21 @@ func Retryable(err error) error {
 	if err == nil {
 		return nil
 	}
-	return ErrRetryable{err: err}
+	return RetryableError{err: err}
 }
 
-// ErrRetryable represents retryable error
-type ErrRetryable struct {
+// RetryableError represents retryable error
+type RetryableError struct {
 	err error
 }
 
 // Error returns string representation of error
-func (e ErrRetryable) Error() string {
+func (e RetryableError) Error() string {
 	return e.err.Error()
 }
 
 // Unwrap returns next error
-func (e ErrRetryable) Unwrap() error {
+func (e RetryableError) Unwrap() error {
 	return e.err
 }
 
@@ -39,7 +39,7 @@ func Do(ctx context.Context, count int, retryAfter time.Duration, fn func() erro
 	}
 	log := logger.Get(ctx)
 	var lastMessage string
-	var r ErrRetryable
+	var r RetryableError
 	for ; ; count-- {
 		if err := fn(); !errors.As(err, &r) {
 			return err
