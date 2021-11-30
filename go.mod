@@ -15,12 +15,11 @@ require (
 	github.com/otiai10/copy v1.7.0
 	github.com/pkg/errors v0.8.1
 	github.com/ridge/must v0.6.0
-	github.com/ridge/parallel v0.1.1
 	github.com/spf13/cobra v1.2.1
 	github.com/wojciech-malota-wojcik/build v1.3.0
 	github.com/wojciech-malota-wojcik/buildgo v0.1.1
 	github.com/wojciech-malota-wojcik/ioc/v2 v2.4.0
-	github.com/wojciech-malota-wojcik/isolator v0.0.0-20211129213108-d293936e47b4
+	github.com/wojciech-malota-wojcik/isolator v0.0.0-20211130165000-e298f4915e98
 	github.com/wojciech-malota-wojcik/libexec v0.1.1
 	github.com/wojciech-malota-wojcik/logger v0.1.0
 	github.com/wojciech-malota-wojcik/run v0.1.3

@@ -11,10 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/ridge/must"
-	"github.com/ridge/parallel"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
@@ -22,7 +20,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
-	"github.com/wojciech-malota-wojcik/imagebuilder/lib/retry"
 	"github.com/wojciech-malota-wojcik/isolator"
 	"github.com/wojciech-malota-wojcik/isolator/executor/wire"
 )
@@ -117,7 +114,13 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	specDir := filepath.Join(path, ".specdir")
 
 	var imgUnmount storage.UnmountFn
+	var terminateIsolator func() error
 	defer func() {
+		if terminateIsolator != nil {
+			if err := terminateIsolator(); retErr == nil {
+				retErr = err
+			}
+		}
 		if err := umount(path); err != nil {
 			if retErr == nil {
 				retErr = err
@@ -169,9 +172,6 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 	} else {
-		ctxBuild, cancel := context.WithCancel(ctx)
-		defer cancel()
-		group := parallel.NewGroup(ctxBuild)
 		var build *imageBuild
 		build = newImageBuild(path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
 			if !types.IsNameValid(srcBuildKey.Name) {
@@ -250,42 +250,23 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return types.ImageManifest{}, err
 			}
 
-			group.Spawn("isolator", parallel.Fail, func(ctx context.Context) error {
-				return isolator.Run(ctx, isolator.Config{
-					ExecutorPath: filepath.Join(path, "tmp", "executor"),
-					Address:      "unix:///tmp/executor.sock",
-					RootDir:      path,
-				})
-			})
-
-			if err := retry.Do(ctx, 10, time.Second, func() error {
-				var err error
-				build.isolator, err = net.Dial("unix", filepath.Join(path, "tmp", "executor.sock"))
-				return retry.Retryable(err)
-			}); err != nil {
+			build.isolator, terminateIsolator, err = isolator.Start(ctx, path)
+			if err != nil {
 				return types.ImageManifest{}, err
 			}
-
 			return manifest, nil
 		})
 
-		group.Spawn("commands", parallel.Exit, func(ctx context.Context) error {
-			for _, cmd := range img.Commands() {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				default:
-				}
-
-				if err := cmd.Execute(build); err != nil {
-					return err
-				}
+		for _, cmd := range img.Commands() {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
 			}
-			return nil
-		})
 
-		if err := group.Wait(); err != nil && (!errors.Is(err, ctxBuild.Err()) || errors.Is(err, ctx.Err())) {
-			return err
+			if err := cmd.Execute(build); err != nil {
+				return err
+			}
 		}
 
 		build.manifest.BuildID = buildID
@@ -363,10 +344,10 @@ func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 // run is a handler for RUN
 func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 	decoder := json.NewDecoder(b.isolator)
-	if _, err := b.isolator.Write(must.Bytes(json.Marshal(wire.RunMessage{Command: cmd.Command}))); err != nil {
+	if _, err := b.isolator.Write(must.Bytes(json.Marshal(wire.Execute{Command: cmd.Command}))); err != nil {
 		return err
 	}
-	var ack wire.Ack
+	var ack wire.Completed
 	if err := decoder.Decode(&ack); err != nil {
 		return err
 	}
