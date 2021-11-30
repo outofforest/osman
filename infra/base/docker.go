@@ -216,9 +216,6 @@ loop:
 				return err
 			}
 			_, err = io.Copy(f, tr)
-			if errors.Is(err, io.EOF) {
-				err = nil
-			}
 			_ = f.Close()
 			if err != nil {
 				return err
