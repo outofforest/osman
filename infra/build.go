@@ -2,17 +2,14 @@ package infra
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
@@ -21,7 +18,8 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
 	"github.com/wojciech-malota-wojcik/isolator"
-	"github.com/wojciech-malota-wojcik/isolator/executor/wire"
+	"github.com/wojciech-malota-wojcik/isolator/client"
+	"github.com/wojciech-malota-wojcik/isolator/client/wire"
 )
 
 type cloneFromFn func(srcBuildKey types.BuildKey) (types.ImageManifest, error)
@@ -287,26 +285,29 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 }
 
 func umount(imgPath string) error {
-	mountsRaw, err := ioutil.ReadFile("/proc/mounts")
-	if err != nil {
-		return err
-	}
-	for _, mount := range strings.Split(string(mountsRaw), "\n") {
-		props := strings.SplitN(mount, " ", 3)
-		if len(props) < 2 {
-			// last empty line
-			break
-		}
-		mountpoint := props[1]
-		prefix := imgPath + "/"
-		if !strings.HasPrefix(mountpoint, prefix) && mount != prefix {
-			continue
-		}
-		if err := syscall.Unmount(mountpoint, 0); err != nil {
+	for {
+		// one umount command may eventually remove many mountpoints so list has to be refreshed after each unmount
+		mountsRaw, err := ioutil.ReadFile("/proc/mounts")
+		if err != nil {
 			return err
 		}
+		for _, mount := range strings.Split(string(mountsRaw), "\n") {
+			props := strings.SplitN(mount, " ", 3)
+			if len(props) < 2 {
+				// last empty line
+				return nil
+			}
+			mountpoint := props[1]
+			prefix := imgPath + "/"
+			if !strings.HasPrefix(mountpoint, prefix) && mount != prefix {
+				continue
+			}
+			if err := syscall.Unmount(mountpoint, 0); err != nil {
+				return err
+			}
+			break
+		}
 	}
-	return nil
 }
 
 func newImageBuild(path string, cloneFn cloneFromFn) *imageBuild {
@@ -321,7 +322,7 @@ type imageBuild struct {
 
 	path     string
 	manifest types.ImageManifest
-	isolator net.Conn
+	isolator *client.Client
 }
 
 // from is a handler for FROM
@@ -343,16 +344,43 @@ func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 
 // run is a handler for RUN
 func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
-	decoder := json.NewDecoder(b.isolator)
-	if _, err := b.isolator.Write(must.Bytes(json.Marshal(wire.Execute{Command: cmd.Command}))); err != nil {
+	if err := b.isolator.Send(wire.Execute{Command: cmd.Command}); err != nil {
 		return err
 	}
-	var ack wire.Completed
-	if err := decoder.Decode(&ack); err != nil {
-		return err
+	for {
+		msg, err := b.isolator.Receive()
+		if err != nil {
+			return err
+		}
+		switch m := msg.(type) {
+		case wire.Log:
+			stream, err := toStream(m.Stream)
+			if err != nil {
+				return err
+			}
+			if _, err := stream.Write([]byte(m.Text)); err != nil {
+				return err
+			}
+		case wire.Completed:
+			if m.ExitCode != 0 || m.Error != "" {
+				return fmt.Errorf("command failed: %s, exit code: %d", m.Error, m.ExitCode)
+			}
+			return nil
+		default:
+			return errors.New("unexpected message received")
+		}
 	}
-	if ack.Error != "" {
-		return errors.New(ack.Error)
+}
+
+func toStream(stream wire.Stream) (*os.File, error) {
+	var f *os.File
+	switch stream {
+	case wire.StreamOut:
+		f = os.Stdout
+	case wire.StreamErr:
+		f = os.Stderr
+	default:
+		return nil, fmt.Errorf("unknown stream: %d", stream)
 	}
-	return nil
+	return f, nil
 }
