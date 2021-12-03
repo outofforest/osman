@@ -244,8 +244,8 @@ github.com/wojciech-malota-wojcik/ioc v1.3.1-0.20210829092813-3edb43f522c7 h1:vm
 github.com/wojciech-malota-wojcik/ioc v1.3.1-0.20210829092813-3edb43f522c7/go.mod h1:6ZFRcYxphk5TtF3iJygJRL+b9MIYpce5DnjLl5vl/N0=
 github.com/wojciech-malota-wojcik/ioc/v2 v2.4.0 h1:VQQlYhKLej0ajf8d7SLlMkenvNblpNbGWN85fFJkz4E=
 github.com/wojciech-malota-wojcik/ioc/v2 v2.4.0/go.mod h1:MrPPB+hWjzKIeK8HFAFjtwZVTmY33h6SCdtU916gjnY=
-github.com/wojciech-malota-wojcik/isolator v0.1.0 h1:uLxGC89AAa9X4EKk+Nwhayfohe/kQGEQ4Cr7E+adW0Y=
-github.com/wojciech-malota-wojcik/isolator v0.1.0/go.mod h1:R0IeIjncpetq4byCoklHPBdUnuSqZWchjAGjyeVqEz4=
+github.com/wojciech-malota-wojcik/isolator v0.1.1 h1:AC/B2JTG+FSc8YBc3mHx3qF8MbH3t3cgsT+GnmB0aOE=
+github.com/wojciech-malota-wojcik/isolator v0.1.1/go.mod h1:R0IeIjncpetq4byCoklHPBdUnuSqZWchjAGjyeVqEz4=
 github.com/wojciech-malota-wojcik/libexec v0.1.0/go.mod h1:LlxW8wAiJdyMPNDjpB8xjO4Bm4HgAZumBMoMyp7HZwk=
 github.com/wojciech-malota-wojcik/libexec v0.1.1 h1:cRStCTmVe+ii/FPBHS6/NMDeh++ms3I7JspP+0E+xps=
 github.com/wojciech-malota-wojcik/libexec v0.1.1/go.mod h1:LlxW8wAiJdyMPNDjpB8xjO4Bm4HgAZumBMoMyp7HZwk=
