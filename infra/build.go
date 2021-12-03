@@ -69,7 +69,11 @@ func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path 
 	if buildKey.Name == "scratch" {
 		return nil
 	}
-	exit, err := chroot.Enter(path)
+	root := filepath.Join(path, "root")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		return err
+	}
+	exit, err := chroot.Enter(root)
 	if err != nil {
 		return err
 	}

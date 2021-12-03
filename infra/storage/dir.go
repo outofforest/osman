@@ -176,11 +176,11 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.RootDir, buildLink)); err != nil {
 		return err
 	}
-	dst := filepath.Join(d.config.RootDir, buildDir, subDirBuild)
+	dst := filepath.Join(d.config.RootDir, buildDir, subDirBuild, "root")
 	if err := os.MkdirAll(dst, 0o700); err != nil {
 		return err
 	}
-	return copy.Copy(filepath.Join(d.config.RootDir, srcBuildDir, subDirBuild), dst, copy.Options{PreserveTimes: true, PreserveOwner: true})
+	return copy.Copy(filepath.Join(d.config.RootDir, srcBuildDir, subDirBuild, "root"), dst, copy.Options{PreserveTimes: true, PreserveOwner: true})
 }
 
 // Manifest returns manifest of build
