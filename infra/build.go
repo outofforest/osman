@@ -113,8 +113,6 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		return err
 	}
 
-	specDir := filepath.Join(path, ".specdir")
-
 	var imgUnmount storage.UnmountFn
 	var terminateIsolator func() error
 	defer func() {
@@ -129,7 +127,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 			return
 		}
-		if err := os.Remove(specDir); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(path, "root", ".specdir")); err != nil && !os.IsNotExist(err) {
 			if retErr == nil {
 				retErr = err
 			}
@@ -239,20 +237,18 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return types.ImageManifest{}, err
 			}
 
-			// To mount specdir readonly, trick is required:
-			// 1. mount dir normally
-			// 2. remount it using read-only option
-			if err := os.Mkdir(specDir, 0o700); err != nil {
-				return types.ImageManifest{}, err
-			}
-			if err := syscall.Mount(".", specDir, "", syscall.MS_BIND, ""); err != nil {
-				return types.ImageManifest{}, err
-			}
-			if err := syscall.Mount(".", specDir, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
-				return types.ImageManifest{}, err
-			}
-
-			build.isolator, terminateIsolator, err = isolator.Start(ctx, path)
+			build.isolator, terminateIsolator, err = isolator.Start(isolator.Config{
+				Dir: path,
+				Executor: wire.Config{
+					Mounts: []wire.Mount{
+						{
+							Host:      ".",
+							Container: "/.specdir",
+							Writable:  true,
+						},
+					},
+				},
+			})
 			if err != nil {
 				return types.ImageManifest{}, err
 			}
