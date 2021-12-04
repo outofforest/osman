@@ -130,13 +130,14 @@ func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
 }
 
 // Mount mounts build in filesystem
-func (d *dirDriver) Mount(buildID types.BuildID, dstPath string) (UnmountFn, error) {
-	if err := syscall.Mount(filepath.Join(d.config.RootDir, subDirLinks, string(buildID), string(buildID), subDirBuild), dstPath, "", syscall.MS_BIND, ""); err != nil {
-		return nil, err
+func (d *dirDriver) Mount(buildID types.BuildID) (UnmountFn, string, error) {
+	path, err := filepath.Abs(filepath.Join(d.config.RootDir, subDirLinks, string(buildID), string(buildID), subDirBuild))
+	if err != nil {
+		return nil, "", err
 	}
 	return func() error {
-		return syscall.Unmount(dstPath, 0)
-	}, nil
+		return nil
+	}, path, nil
 }
 
 // CreateEmpty creates blank build
