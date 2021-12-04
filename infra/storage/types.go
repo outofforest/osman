@@ -24,7 +24,7 @@ type Driver interface {
 	BuildID(buildKey types.BuildKey) (types.BuildID, error)
 
 	// Mount mounts the build in filesystem
-	Mount(buildID types.BuildID, dstPath string) (UnmountFn, error)
+	Mount(buildID types.BuildID) (UnmountFn, string, error)
 
 	// CreateEmpty creates blank build
 	CreateEmpty(imageName string, buildID types.BuildID) error

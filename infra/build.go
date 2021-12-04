@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
-	"syscall"
 
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
@@ -108,12 +105,8 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 
 	buildID := types.NewBuildID()
 
-	path, err := ioutil.TempDir("/tmp", "imagebuilder-*")
-	if err != nil {
-		return err
-	}
-
 	var imgUnmount storage.UnmountFn
+	var path string
 	var terminateIsolator func() error
 	defer func() {
 		if terminateIsolator != nil {
@@ -121,17 +114,13 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				retErr = err
 			}
 		}
-		if err := umount(path); err != nil {
-			if retErr == nil {
-				retErr = err
+		if path != "" {
+			if err := os.Remove(filepath.Join(path, "root", ".specdir")); err != nil && !os.IsNotExist(err) {
+				if retErr == nil {
+					retErr = err
+				}
+				return
 			}
-			return
-		}
-		if err := os.Remove(filepath.Join(path, "root", ".specdir")); err != nil && !os.IsNotExist(err) {
-			if retErr == nil {
-				retErr = err
-			}
-			return
 		}
 		if imgUnmount != nil {
 			if err := imgUnmount(); err != nil {
@@ -140,12 +129,6 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				}
 				return
 			}
-		}
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			if retErr == nil {
-				retErr = err
-			}
-			return
 		}
 		if retErr != nil {
 			if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
@@ -163,7 +146,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 		var err error
-		imgUnmount, err = b.storage.Mount(buildID, path)
+		imgUnmount, path, err = b.storage.Mount(buildID)
 		if err != nil {
 			return err
 		}
@@ -173,7 +156,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		}
 	} else {
 		var build *imageBuild
-		build = newImageBuild(path, func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
+		build = newImageBuild(func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
 			if !types.IsNameValid(srcBuildKey.Name) {
 				return types.ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
 			}
@@ -227,7 +210,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return types.ImageManifest{}, err
 			}
 
-			imgUnmount, err = b.storage.Mount(buildID, path)
+			imgUnmount, path, err = b.storage.Mount(buildID)
 			if err != nil {
 				return types.ImageManifest{}, err
 			}
@@ -284,36 +267,9 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	return nil
 }
 
-func umount(imgPath string) error {
-	for {
-		// one umount command may eventually remove many mountpoints so list has to be refreshed after each unmount
-		mountsRaw, err := ioutil.ReadFile("/proc/mounts")
-		if err != nil {
-			return err
-		}
-		for _, mount := range strings.Split(string(mountsRaw), "\n") {
-			props := strings.SplitN(mount, " ", 3)
-			if len(props) < 2 {
-				// last empty line
-				return nil
-			}
-			mountpoint := props[1]
-			prefix := imgPath + "/"
-			if !strings.HasPrefix(mountpoint, prefix) && mount != prefix {
-				continue
-			}
-			if err := syscall.Unmount(mountpoint, 0); err != nil {
-				return err
-			}
-			break
-		}
-	}
-}
-
-func newImageBuild(path string, cloneFn cloneFromFn) *imageBuild {
+func newImageBuild(cloneFn cloneFromFn) *imageBuild {
 	return &imageBuild{
 		cloneFn: cloneFn,
-		path:    path,
 	}
 }
 
@@ -321,7 +277,6 @@ type imageBuild struct {
 	cloneFn cloneFromFn
 
 	fromDone bool
-	path     string
 	manifest types.ImageManifest
 	isolator *client.Client
 }
