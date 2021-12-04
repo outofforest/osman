@@ -320,6 +320,7 @@ func newImageBuild(path string, cloneFn cloneFromFn) *imageBuild {
 type imageBuild struct {
 	cloneFn cloneFromFn
 
+	fromDone bool
 	path     string
 	manifest types.ImageManifest
 	isolator *client.Client
@@ -327,23 +328,33 @@ type imageBuild struct {
 
 // from is a handler for FROM
 func (b *imageBuild) From(cmd *description.FromCommand) error {
+	if b.fromDone {
+		return errors.New("directive FROM may be specified only once")
+	}
 	manifest, err := b.cloneFn(cmd.BuildKey)
 	if err != nil {
 		return err
 	}
 	b.manifest.BasedOn = manifest.BuildID
 	b.manifest.Params = manifest.Params
+	b.fromDone = true
 	return nil
 }
 
 // params sets kernel params for image
 func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
+	if !b.fromDone {
+		return errors.New("description has to start with FROM directive")
+	}
 	b.manifest.Params = append(b.manifest.Params, cmd.Params...)
 	return nil
 }
 
 // run is a handler for RUN
 func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
+	if !b.fromDone {
+		return errors.New("description has to start with FROM directive")
+	}
 	if err := b.isolator.Send(wire.Execute{Command: cmd.Command}); err != nil {
 		return err
 	}
