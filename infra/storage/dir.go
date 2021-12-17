@@ -158,7 +158,7 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
 }
 
 // Clone clones source build to destination build
-func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) error {
+func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (retErr error) {
 	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirLinks, string(srcBuildID), string(srcBuildID)))
 	if err != nil {
 		return err
@@ -187,7 +187,12 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	if err != nil {
 		return err
 	}
-	defer clean()
+	defer func() {
+		if err := clean(); retErr == nil {
+			retErr = err
+		}
+	}()
+
 	if err := isolator.Send(wire.Copy{
 		Src: filepath.Join(srcBuildDir, subDirBuild, "root"),
 		Dst: dst,

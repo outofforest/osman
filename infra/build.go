@@ -61,7 +61,7 @@ func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bo
 	return b.build(ctx, stack, description.Describe(name, tags, commands...))
 }
 
-func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path string) (retErr error) {
+func (b *Builder) initialize(buildKey types.BuildKey, path string) (retErr error) {
 	if buildKey.Name == "scratch" {
 		return nil
 	}
@@ -121,9 +121,9 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 		}
 		if retErr != nil {
-			//if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
-			//	retErr = err
-			//}
+			if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
+				retErr = err
+			}
 			return
 		}
 	}()
@@ -141,7 +141,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 
-		if err := b.initialize(ctx, types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
+		if err := b.initialize(types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
 			return err
 		}
 	} else {

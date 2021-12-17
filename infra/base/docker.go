@@ -18,12 +18,17 @@ type dockerInitializer struct {
 }
 
 // Initialize fetches image from docker registry and integrates it inside directory
-func (f *dockerInitializer) Init(dir string, buildKey types.BuildKey) error {
+func (f *dockerInitializer) Init(dir string, buildKey types.BuildKey) (retErr error) {
 	isolator, clean, err := isolator.Start(isolator.Config{Dir: dir, Executor: wire.Config{Chroot: true}})
 	if err != nil {
 		return err
 	}
-	defer clean()
+	defer func() {
+		if err := clean(); retErr == nil {
+			retErr = err
+		}
+	}()
+
 	if err := isolator.Send(wire.InitFromDocker{
 		Image: buildKey.Name,
 		Tag:   string(buildKey.Tag),
