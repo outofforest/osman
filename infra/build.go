@@ -13,7 +13,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
 	"github.com/wojciech-malota-wojcik/isolator"
 	"github.com/wojciech-malota-wojcik/isolator/client"
 	"github.com/wojciech-malota-wojcik/isolator/client/wire"
@@ -62,7 +61,7 @@ func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bo
 	return b.build(ctx, stack, description.Describe(name, tags, commands...))
 }
 
-func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path string) (retErr error) {
+func (b *Builder) initialize(buildKey types.BuildKey, path string) (retErr error) {
 	if buildKey.Name == "scratch" {
 		return nil
 	}
@@ -70,16 +69,7 @@ func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path 
 	if err := os.Mkdir(root, 0o700); err != nil {
 		return err
 	}
-	exit, err := chroot.Enter(root)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := exit(); retErr == nil {
-			retErr = err
-		}
-	}()
-	return b.initializer.Init(ctx, buildKey)
+	return b.initializer.Init(root, buildKey)
 }
 
 func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retErr error) {
@@ -151,7 +141,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return err
 		}
 
-		if err := b.initialize(ctx, types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
+		if err := b.initialize(types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
 			return err
 		}
 	} else {
@@ -327,9 +317,9 @@ func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 			if _, err := stream.Write([]byte(m.Text)); err != nil {
 				return err
 			}
-		case wire.Completed:
-			if m.ExitCode != 0 || m.Error != "" {
-				return fmt.Errorf("command failed: %s, exit code: %d", m.Error, m.ExitCode)
+		case wire.Result:
+			if m.Error != "" {
+				return fmt.Errorf("command failed: %s", m.Error)
 			}
 			return nil
 		default:

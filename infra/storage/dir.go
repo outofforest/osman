@@ -11,9 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/otiai10/copy"
 	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/wojciech-malota-wojcik/isolator"
+	"github.com/wojciech-malota-wojcik/isolator/client/wire"
 )
 
 const (
@@ -157,7 +158,7 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
 }
 
 // Clone clones source build to destination build
-func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) error {
+func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (retErr error) {
 	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirLinks, string(srcBuildID), string(srcBuildID)))
 	if err != nil {
 		return err
@@ -177,11 +178,39 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.RootDir, buildLink)); err != nil {
 		return err
 	}
-	dst := filepath.Join(d.config.RootDir, buildDir, subDirBuild, "root")
-	if err := os.MkdirAll(dst, 0o700); err != nil {
+	dst := filepath.Join(buildDir, subDirBuild, "root")
+	if err := os.MkdirAll(filepath.Join(d.config.RootDir, dst), 0o700); err != nil {
 		return err
 	}
-	return copy.Copy(filepath.Join(d.config.RootDir, srcBuildDir, subDirBuild, "root"), dst, copy.Options{PreserveTimes: true, PreserveOwner: true})
+
+	isolator, clean, err := isolator.Start(isolator.Config{Dir: d.config.RootDir, Executor: wire.Config{Chroot: true}})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := clean(); retErr == nil {
+			retErr = err
+		}
+	}()
+
+	if err := isolator.Send(wire.Copy{
+		Src: filepath.Join(srcBuildDir, subDirBuild, "root"),
+		Dst: dst,
+	}); err != nil {
+		return err
+	}
+	msg, err := isolator.Receive()
+	if err != nil {
+		return err
+	}
+	result, ok := msg.(wire.Result)
+	if !ok {
+		return fmt.Errorf("expected Result, got: %T", msg)
+	}
+	if result.Error != "" {
+		return errors.New(result.Error)
+	}
+	return nil
 }
 
 // Manifest returns manifest of build
