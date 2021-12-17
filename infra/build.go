@@ -13,7 +13,6 @@ import (
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/lib/chroot"
 	"github.com/wojciech-malota-wojcik/isolator"
 	"github.com/wojciech-malota-wojcik/isolator/client"
 	"github.com/wojciech-malota-wojcik/isolator/client/wire"
@@ -70,16 +69,7 @@ func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path 
 	if err := os.Mkdir(root, 0o700); err != nil {
 		return err
 	}
-	exit, err := chroot.Enter(root)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := exit(); retErr == nil {
-			retErr = err
-		}
-	}()
-	return b.initializer.Init(ctx, buildKey)
+	return b.initializer.Init(root, buildKey)
 }
 
 func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retErr error) {
@@ -131,9 +121,9 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 		}
 		if retErr != nil {
-			if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
-				retErr = err
-			}
+			//if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
+			//	retErr = err
+			//}
 			return
 		}
 	}()
@@ -327,9 +317,9 @@ func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 			if _, err := stream.Write([]byte(m.Text)); err != nil {
 				return err
 			}
-		case wire.Completed:
-			if m.ExitCode != 0 || m.Error != "" {
-				return fmt.Errorf("command failed: %s, exit code: %d", m.Error, m.ExitCode)
+		case wire.Result:
+			if m.Error != "" {
+				return fmt.Errorf("command failed: %s", m.Error)
 			}
 			return nil
 		default:
