@@ -17,7 +17,6 @@ import (
 
 func iocBuilder(c *ioc.Container) {
 	c.Singleton(commands.NewCmdFactory)
-	c.Singleton(storage.NewDirDriver)
 	c.Singleton(base.NewDockerInitializer)
 	c.Singleton(infra.NewRepository)
 	c.Transient(infra.NewBuilder)
@@ -34,6 +33,9 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(config.NewFormat)
 	c.Singleton(config.NewBuild)
 	c.Singleton(config.NewDrop)
+
+	c.Singleton(storage.Resolve)
+	c.SingletonNamed("dir", storage.NewDirDriver)
 
 	c.Singleton(parser.NewResolvingParser)
 	c.SingletonNamed("spec", parser.NewSpecFileParser)

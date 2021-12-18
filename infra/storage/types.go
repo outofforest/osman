@@ -3,7 +3,9 @@ package storage
 import (
 	"errors"
 
+	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // ErrImageHasChildren is returned if image being deleted has children
@@ -43,4 +45,11 @@ type Driver interface {
 
 	// Drop drops build
 	Drop(buildID types.BuildID) error
+}
+
+// Resolve resolves concrete storage driver based on config
+func Resolve(c *ioc.Container, config config.Storage) Driver {
+	var driver Driver
+	c.ResolveNamed(config.Driver, &driver)
+	return driver
 }
