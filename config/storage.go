@@ -7,19 +7,26 @@ func NewStorageFactory() *StorageFactory {
 
 // StorageFactory collects data for storage config
 type StorageFactory struct {
-	// RootDir is the root directory for images
-	RootDir string
+	// Root is the root location for images
+	Root string
+
+	// Driver specifies storage driver to use
+	Driver string
 }
 
 // NewStorage returns new storage config
 func NewStorage(f *StorageFactory) Storage {
 	return Storage{
-		RootDir: f.RootDir,
+		Root:   f.Root,
+		Driver: f.Driver,
 	}
 }
 
 // Storage stores configuration related to storage drivers
 type Storage struct {
-	// RootDir is the root directory for images
-	RootDir string
+	// Root is the root location for images
+	Root string
+
+	// Driver specifies storage driver to use
+	Driver string
 }

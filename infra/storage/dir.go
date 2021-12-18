@@ -39,7 +39,7 @@ type dirDriver struct {
 
 // Builds returns available builds
 func (d *dirDriver) Builds() ([]types.BuildID, error) {
-	buildLinks := filepath.Join(d.config.RootDir, subDirLinks)
+	buildLinks := filepath.Join(d.config.Root, subDirLinks)
 	dir, err := os.Open(buildLinks)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -64,7 +64,7 @@ func (d *dirDriver) Builds() ([]types.BuildID, error) {
 
 // Info returns information about build
 func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
-	catalogLink := filepath.Join(d.config.RootDir, subDirLinks, string(buildID))
+	catalogLink := filepath.Join(d.config.Root, subDirLinks, string(buildID))
 	stat, err := os.Stat(catalogLink)
 	if err != nil {
 		return types.BuildInfo{}, err
@@ -120,7 +120,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 
 // BuildID returns build ID for build given by name and tag
 func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
-	buildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirCatalog, buildKey.Name, string(buildKey.Tag)))
+	buildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.Root, subDirCatalog, buildKey.Name, string(buildKey.Tag)))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist)
@@ -132,7 +132,7 @@ func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
 
 // Mount mounts build in filesystem
 func (d *dirDriver) Mount(buildID types.BuildID) (UnmountFn, string, error) {
-	path, err := filepath.Abs(filepath.Join(d.config.RootDir, subDirLinks, string(buildID), string(buildID), subDirBuild))
+	path, err := filepath.Abs(filepath.Join(d.config.Root, subDirLinks, string(buildID), string(buildID), subDirBuild))
 	if err != nil {
 		return nil, "", err
 	}
@@ -148,22 +148,22 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
 	catalogDir := filepath.Join(subDirCatalog, imageName)
 	buildLink := filepath.Join(catalogDir, string(buildID))
 
-	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.RootDir, catalogLink)); err != nil {
+	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.Root, catalogLink)); err != nil {
 		return err
 	}
-	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.RootDir, buildLink)); err != nil {
+	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.Root, buildLink)); err != nil {
 		return err
 	}
-	return os.MkdirAll(filepath.Join(d.config.RootDir, buildDir, subDirBuild), 0o700)
+	return os.MkdirAll(filepath.Join(d.config.Root, buildDir, subDirBuild), 0o700)
 }
 
 // Clone clones source build to destination build
 func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (retErr error) {
-	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.RootDir, subDirLinks, string(srcBuildID), string(srcBuildID)))
+	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.Root, subDirLinks, string(srcBuildID), string(srcBuildID)))
 	if err != nil {
 		return err
 	}
-	srcBuildDir, err = filepath.Rel(d.config.RootDir, srcBuildDir)
+	srcBuildDir, err = filepath.Rel(d.config.Root, srcBuildDir)
 	if err != nil {
 		return err
 	}
@@ -172,18 +172,18 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	catalogDir := filepath.Join(subDirCatalog, dstImageName)
 	buildLink := filepath.Join(catalogDir, string(dstBuildID))
 
-	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.RootDir, catalogLink)); err != nil {
+	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.Root, catalogLink)); err != nil {
 		return err
 	}
-	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.RootDir, buildLink)); err != nil {
+	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.Root, buildLink)); err != nil {
 		return err
 	}
 	dst := filepath.Join(buildDir, subDirBuild, "root")
-	if err := os.MkdirAll(filepath.Join(d.config.RootDir, dst), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(d.config.Root, dst), 0o700); err != nil {
 		return err
 	}
 
-	isolator, clean, err := isolator.Start(isolator.Config{Dir: d.config.RootDir, Executor: wire.Config{Chroot: true}})
+	isolator, clean, err := isolator.Start(isolator.Config{Dir: d.config.Root, Executor: wire.Config{Chroot: true}})
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 
 // Manifest returns manifest of build
 func (d *dirDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error) {
-	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.RootDir, subDirManifests, string(buildID)))
+	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.Root, subDirManifests, string(buildID)))
 	if os.IsNotExist(err) {
 		return types.ImageManifest{BuildID: buildID}, nil
 	}
@@ -231,7 +231,7 @@ func (d *dirDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error)
 
 // StoreManifest stores manifest of build
 func (d *dirDriver) StoreManifest(manifest types.ImageManifest) error {
-	manifestFile := filepath.Join(d.config.RootDir, subDirManifests, string(manifest.BuildID))
+	manifestFile := filepath.Join(d.config.Root, subDirManifests, string(manifest.BuildID))
 	if err := os.MkdirAll(filepath.Dir(manifestFile), 0o700); err != nil && !os.IsExist(err) {
 		return err
 	}
@@ -244,7 +244,7 @@ func (d *dirDriver) StoreManifest(manifest types.ImageManifest) error {
 
 // Tag tags build with tag
 func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
-	tagLink := filepath.Join(d.config.RootDir, subDirLinks, string(buildID), string(tag))
+	tagLink := filepath.Join(d.config.Root, subDirLinks, string(buildID), string(tag))
 	if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -362,9 +362,9 @@ func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
 }
 
 func (d *dirDriver) rootDir() (string, error) {
-	rootDir, err := filepath.EvalSymlinks(d.config.RootDir)
+	rootDir, err := filepath.EvalSymlinks(d.config.Root)
 	if os.IsNotExist(err) {
-		return d.config.RootDir, nil
+		return d.config.Root, nil
 	}
 	return rootDir, err
 }
