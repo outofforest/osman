@@ -12,6 +12,8 @@ replace (
 )
 
 require (
+	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
+	github.com/outofforest/go-zfs/v2 v2.1.3
 	github.com/pkg/errors v0.8.1
 	github.com/ridge/must v0.6.0
 	github.com/spf13/cobra v1.2.1

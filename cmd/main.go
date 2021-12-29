@@ -36,6 +36,7 @@ func iocBuilder(c *ioc.Container) {
 
 	c.Singleton(storage.Resolve)
 	c.SingletonNamed("dir", storage.NewDirDriver)
+	c.SingletonNamed("zfs", storage.NewZFSDriver)
 
 	c.Singleton(parser.NewResolvingParser)
 	c.SingletonNamed("spec", parser.NewSpecFileParser)
