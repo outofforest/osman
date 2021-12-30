@@ -96,7 +96,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 
 	buildID := types.NewBuildID()
 
-	var imgUnmount storage.UnmountFn
+	var imgFinalize storage.FinalizeFn
 	var path string
 	var terminateIsolator func() error
 	defer func() {
@@ -113,8 +113,8 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return
 			}
 		}
-		if imgUnmount != nil {
-			if err := imgUnmount(); err != nil {
+		if imgFinalize != nil {
+			if err := imgFinalize(); err != nil {
 				if retErr == nil {
 					retErr = err
 				}
@@ -133,11 +133,9 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		if len(tags) != 1 {
 			return errors.New("for base image exactly one tag is required")
 		}
-		if err := b.storage.CreateEmpty(img.Name(), buildID); err != nil {
-			return err
-		}
+
 		var err error
-		imgUnmount, path, err = b.storage.Mount(buildID)
+		imgFinalize, path, err = b.storage.CreateEmpty(img.Name(), buildID)
 		if err != nil {
 			return err
 		}
@@ -197,11 +195,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				}
 			}
 
-			if err := b.storage.Clone(srcBuildID, img.Name(), buildID); err != nil {
-				return types.ImageManifest{}, err
-			}
-
-			imgUnmount, path, err = b.storage.Mount(buildID)
+			imgFinalize, path, err = b.storage.Clone(srcBuildID, img.Name(), buildID)
 			if err != nil {
 				return types.ImageManifest{}, err
 			}

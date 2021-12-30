@@ -88,18 +88,16 @@ func (d *zfsDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
 	return "", fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist)
 }
 
-// Mount mounts build in filesystem
-func (d *zfsDriver) Mount(buildID types.BuildID) (UnmountFn, string, error) {
-	filesystems, err := zfs.Filesystems(d.config.Root + "/" + string(buildID))
+// CreateEmpty creates blank build
+func (d *zfsDriver) CreateEmpty(imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
+	filesystem, err := zfs.CreateFilesystem(d.config.Root+"/"+string(buildID), map[string]string{
+		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
+			BuildID:   buildID,
+			Name:      imageName,
+			CreatedAt: time.Now(),
+		}))),
+	})
 	if err != nil {
-		return nil, "", err
-	}
-
-	filesystem := filesystems[0]
-	if err := filesystem.SetProperty("canmount", "on"); err != nil {
-		return nil, "", err
-	}
-	if _, err := filesystem.Mount(false, nil); err != nil {
 		return nil, "", err
 	}
 
@@ -115,37 +113,36 @@ func (d *zfsDriver) Mount(buildID types.BuildID) (UnmountFn, string, error) {
 	}, filesystem.Mountpoint, nil
 }
 
-// CreateEmpty creates blank build
-func (d *zfsDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
-	_, err := zfs.CreateFilesystem(d.config.Root+"/"+string(buildID), map[string]string{
-		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
-			BuildID:   buildID,
-			Name:      imageName,
-			CreatedAt: time.Now(),
-		}))),
-		"canmount": "off",
-	})
-	return err
-}
-
 // Clone clones source build to destination build
-func (d *zfsDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) error {
+func (d *zfsDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (FinalizeFn, string, error) {
 	snapshots, err := zfs.Snapshots(d.config.Root + "/" + string(srcBuildID) + "@image")
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	snapshot := snapshots[0]
-	_, err = snapshot.Clone(d.config.Root+"/"+string(dstBuildID), map[string]string{
+	filesystem, err := snapshot.Clone(d.config.Root+"/"+string(dstBuildID), map[string]string{
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,
 			Name:      dstImageName,
 			CreatedAt: time.Now(),
 		}))),
-		"canmount": "off",
 	})
-	return err
+	if err != nil {
+		return nil, "", err
+	}
+
+	return func() error {
+		if _, err := filesystem.Unmount(false); err != nil {
+			return err
+		}
+		if err := filesystem.SetProperty("canmount", "off"); err != nil {
+			return err
+		}
+		_, err := filesystem.Snapshot("image", false)
+		return err
+	}, filesystem.Mountpoint, nil
 }
 
 // Manifest returns manifest of build

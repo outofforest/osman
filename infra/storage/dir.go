@@ -130,42 +130,42 @@ func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
 	return types.BuildID(filepath.Base(buildDir)), nil
 }
 
-// Mount mounts build in filesystem
-func (d *dirDriver) Mount(buildID types.BuildID) (UnmountFn, string, error) {
-	path, err := filepath.Abs(filepath.Join(d.config.Root, subDirLinks, string(buildID), string(buildID), subDirBuild))
-	if err != nil {
-		return nil, "", err
-	}
-	return func() error {
-		return nil
-	}, path, nil
-}
-
 // CreateEmpty creates blank build
-func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) error {
+func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
 	buildDir := filepath.Join(subDirBuilds, string(buildID))
 	catalogLink := filepath.Join(subDirLinks, string(buildID))
 	catalogDir := filepath.Join(subDirCatalog, imageName)
 	buildLink := filepath.Join(catalogDir, string(buildID))
 
 	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.Root, catalogLink)); err != nil {
-		return err
+		return nil, "", err
 	}
 	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.Root, buildLink)); err != nil {
-		return err
+		return nil, "", err
 	}
-	return os.MkdirAll(filepath.Join(d.config.Root, buildDir, subDirBuild), 0o700)
+	if err := os.MkdirAll(filepath.Join(d.config.Root, buildDir, subDirBuild), 0o700); err != nil {
+		return nil, "", err
+	}
+
+	path, err := filepath.Abs(filepath.Join(d.config.Root, subDirLinks, string(buildID), string(buildID), subDirBuild))
+	if err != nil {
+		return nil, "", err
+	}
+
+	return func() error {
+		return nil
+	}, path, nil
 }
 
 // Clone clones source build to destination build
-func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (retErr error) {
+func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (finalizeFn FinalizeFn, mountPath string, retErr error) {
 	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.Root, subDirLinks, string(srcBuildID), string(srcBuildID)))
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	srcBuildDir, err = filepath.Rel(d.config.Root, srcBuildDir)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	buildDir := filepath.Join(srcBuildDir, subDirChildren, string(dstBuildID))
 	catalogLink := filepath.Join(subDirLinks, string(dstBuildID))
@@ -173,19 +173,19 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	buildLink := filepath.Join(catalogDir, string(dstBuildID))
 
 	if err := d.symlink(filepath.Join("..", catalogDir), filepath.Join(d.config.Root, catalogLink)); err != nil {
-		return err
+		return nil, "", err
 	}
 	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.Root, buildLink)); err != nil {
-		return err
+		return nil, "", err
 	}
 	dst := filepath.Join(buildDir, subDirBuild, "root")
 	if err := os.MkdirAll(filepath.Join(d.config.Root, dst), 0o700); err != nil {
-		return err
+		return nil, "", err
 	}
 
 	isolator, clean, err := isolator.Start(isolator.Config{Dir: d.config.Root, Executor: wire.Config{Chroot: true}})
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	defer func() {
 		if err := clean(); retErr == nil {
@@ -197,20 +197,28 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 		Src: filepath.Join(srcBuildDir, subDirBuild, "root"),
 		Dst: dst,
 	}); err != nil {
-		return err
+		return nil, "", err
 	}
 	msg, err := isolator.Receive()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	result, ok := msg.(wire.Result)
 	if !ok {
-		return fmt.Errorf("expected Result, got: %T", msg)
+		return nil, "", fmt.Errorf("expected Result, got: %T", msg)
 	}
 	if result.Error != "" {
-		return errors.New(result.Error)
+		return nil, "", errors.New(result.Error)
 	}
-	return nil
+
+	path, err := filepath.Abs(filepath.Join(d.config.Root, subDirLinks, string(dstBuildID), string(dstBuildID), subDirBuild))
+	if err != nil {
+		return nil, "", err
+	}
+
+	return func() error {
+		return nil
+	}, path, nil
 }
 
 // Manifest returns manifest of build
