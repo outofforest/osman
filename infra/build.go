@@ -65,8 +65,9 @@ func (b *Builder) initialize(buildKey types.BuildKey, path string) (retErr error
 	if buildKey.Name == "scratch" {
 		return nil
 	}
+	// permissions on root dir has to be set to 755 to allow read access for everyone so linux boots correctly
 	root := filepath.Join(path, "root")
-	if err := os.Mkdir(root, 0o700); err != nil {
+	if err := os.Mkdir(root, 0o755); err != nil {
 		return err
 	}
 	return b.initializer.Init(root, buildKey)
