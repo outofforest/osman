@@ -31,9 +31,6 @@ type Driver interface {
 	// Clone clones build to destination build
 	Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (FinalizeFn, string, error)
 
-	// Manifest returns manifest of build
-	Manifest(buildID types.BuildID) (types.ImageManifest, error)
-
 	// StoreManifest stores manifest of build
 	StoreManifest(manifest types.ImageManifest) error
 

@@ -18,7 +18,7 @@ import (
 	"github.com/wojciech-malota-wojcik/isolator/client/wire"
 )
 
-type cloneFromFn func(srcBuildKey types.BuildKey) (types.ImageManifest, error)
+type cloneFromFn func(srcBuildKey types.BuildKey) (types.BuildInfo, error)
 
 // NewBuilder creates new image builder
 func NewBuilder(config config.Build, initializer base.Initializer, repo *Repository, storage storage.Driver, parser parser.Parser) *Builder {
@@ -145,12 +145,12 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		}
 	} else {
 		var build *imageBuild
-		build = newImageBuild(func(srcBuildKey types.BuildKey) (types.ImageManifest, error) {
+		build = newImageBuild(func(srcBuildKey types.BuildKey) (types.BuildInfo, error) {
 			if !types.IsNameValid(srcBuildKey.Name) {
-				return types.ImageManifest{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
+				return types.BuildInfo{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
 			}
 			if !srcBuildKey.Tag.IsValid() {
-				return types.ImageManifest{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
+				return types.BuildInfo{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
 			}
 
 			// Try to clone existing image
@@ -168,7 +168,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 					err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
 				}
 			default:
-				return types.ImageManifest{}, err
+				return types.BuildInfo{}, err
 			}
 
 			switch {
@@ -181,28 +181,28 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 					err = b.build(ctx, stack, description.Describe(srcBuildKey.Name, types.Tags{srcBuildKey.Tag}))
 				}
 			default:
-				return types.ImageManifest{}, err
+				return types.BuildInfo{}, err
 			}
 
 			if err != nil {
-				return types.ImageManifest{}, err
+				return types.BuildInfo{}, err
 			}
 
 			if !srcBuildID.IsValid() {
 				srcBuildID, err = b.storage.BuildID(srcBuildKey)
 				if err != nil {
-					return types.ImageManifest{}, err
+					return types.BuildInfo{}, err
 				}
 			}
 
 			imgFinalize, path, err = b.storage.Clone(srcBuildID, img.Name(), buildID)
 			if err != nil {
-				return types.ImageManifest{}, err
+				return types.BuildInfo{}, err
 			}
 
-			manifest, err := b.storage.Manifest(srcBuildID)
+			buildInfo, err := b.storage.Info(srcBuildID)
 			if err != nil {
-				return types.ImageManifest{}, err
+				return types.BuildInfo{}, err
 			}
 
 			build.isolator, terminateIsolator, err = isolator.Start(isolator.Config{
@@ -218,9 +218,9 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				},
 			})
 			if err != nil {
-				return types.ImageManifest{}, err
+				return types.BuildInfo{}, err
 			}
-			return manifest, nil
+			return buildInfo, nil
 		})
 
 		for _, cmd := range img.Commands() {
@@ -271,12 +271,12 @@ func (b *imageBuild) From(cmd *description.FromCommand) error {
 	if b.fromDone {
 		return errors.New("directive FROM may be specified only once")
 	}
-	manifest, err := b.cloneFn(cmd.BuildKey)
+	buildInfo, err := b.cloneFn(cmd.BuildKey)
 	if err != nil {
 		return err
 	}
-	b.manifest.BasedOn = manifest.BuildID
-	b.manifest.Params = manifest.Params
+	b.manifest.BasedOn = buildInfo.BuildID
+	b.manifest.Params = buildInfo.Params
 	b.fromDone = true
 	return nil
 }

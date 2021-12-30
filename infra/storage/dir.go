@@ -79,8 +79,12 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 		return types.BuildInfo{}, err
 	}
 
-	manifest, err := d.Manifest(buildID)
+	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.Root, subDirManifests, string(buildID)))
 	if err != nil {
+		return types.BuildInfo{}, err
+	}
+	var manifest types.ImageManifest
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return types.BuildInfo{}, err
 	}
 
@@ -152,6 +156,12 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) (Finali
 		return nil, "", err
 	}
 
+	if err := d.StoreManifest(types.ImageManifest{
+		BuildID: buildID,
+	}); err != nil {
+		return nil, "", err
+	}
+
 	return func() error {
 		return nil
 	}, path, nil
@@ -216,25 +226,16 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 		return nil, "", err
 	}
 
+	if err := d.StoreManifest(types.ImageManifest{
+		BuildID: dstBuildID,
+		BasedOn: srcBuildID,
+	}); err != nil {
+		return nil, "", err
+	}
+
 	return func() error {
 		return nil
 	}, path, nil
-}
-
-// Manifest returns manifest of build
-func (d *dirDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error) {
-	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.Root, subDirManifests, string(buildID)))
-	if os.IsNotExist(err) {
-		return types.ImageManifest{BuildID: buildID}, nil
-	}
-	if err != nil {
-		return types.ImageManifest{}, err
-	}
-	var manifest types.ImageManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
-		return types.ImageManifest{}, err
-	}
-	return manifest, err
 }
 
 // StoreManifest stores manifest of build

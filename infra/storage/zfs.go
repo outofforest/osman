@@ -145,19 +145,6 @@ func (d *zfsDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	}, filesystem.Mountpoint, nil
 }
 
-// Manifest returns manifest of build
-func (d *zfsDriver) Manifest(buildID types.BuildID) (types.ImageManifest, error) {
-	info, err := d.Info(buildID)
-	if err != nil {
-		return types.ImageManifest{}, err
-	}
-	return types.ImageManifest{
-		BuildID: info.BuildID,
-		BasedOn: info.BasedOn,
-		Params:  info.Params,
-	}, nil
-}
-
 // StoreManifest stores manifest of build
 func (d *zfsDriver) StoreManifest(manifest types.ImageManifest) error {
 	info, err := d.Info(manifest.BuildID)
