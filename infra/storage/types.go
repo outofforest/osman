@@ -11,8 +11,8 @@ import (
 // ErrImageHasChildren is returned if image being deleted has children
 var ErrImageHasChildren = errors.New("image has children")
 
-// UnmountFn unmounts mounted image
-type UnmountFn = func() error
+// FinalizeFn unmounts mounted image
+type FinalizeFn = func() error
 
 // Driver represents storage driver
 type Driver interface {
@@ -25,14 +25,11 @@ type Driver interface {
 	// BuildID returns build ID for build given by name and tag
 	BuildID(buildKey types.BuildKey) (types.BuildID, error)
 
-	// Mount mounts the build in filesystem
-	Mount(buildID types.BuildID) (UnmountFn, string, error)
-
 	// CreateEmpty creates blank build
-	CreateEmpty(imageName string, buildID types.BuildID) error
+	CreateEmpty(imageName string, buildID types.BuildID) (FinalizeFn, string, error)
 
 	// Clone clones build to destination build
-	Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) error
+	Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (FinalizeFn, string, error)
 
 	// Manifest returns manifest of build
 	Manifest(buildID types.BuildID) (types.ImageManifest, error)
