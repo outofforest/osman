@@ -1,4 +1,4 @@
-module github.com/wojciech-malota-wojcik/imagebuilder
+module github.com/outofforest/osman
 
 go 1.16
 

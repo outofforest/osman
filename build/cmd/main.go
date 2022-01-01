@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	me "github.com/outofforest/osman/build"
 	"github.com/ridge/must"
 	"github.com/wojciech-malota-wojcik/build"
-	me "github.com/wojciech-malota-wojcik/imagebuilder/build"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 	"github.com/wojciech-malota-wojcik/run"
 )

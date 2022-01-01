@@ -3,8 +3,8 @@ package storage
 import (
 	"errors"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 

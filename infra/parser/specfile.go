@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
-	"github.com/wojciech-malota-wojcik/imagebuilder/specfile/parser"
+	"github.com/outofforest/osman/infra/description"
+	"github.com/outofforest/osman/infra/types"
+	"github.com/outofforest/osman/specfile/parser"
 )
 
 // NewSpecFileParser creates new specfile parser

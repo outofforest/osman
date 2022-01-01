@@ -1,8 +1,8 @@
 package commands
 
 import (
+	"github.com/outofforest/osman/config"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 	"github.com/wojciech-malota-wojcik/logger"
 )

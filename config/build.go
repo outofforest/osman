@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/types"
 )
 
 // NewBuildFactory returns new build config factory

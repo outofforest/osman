@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/types"
 	"github.com/wojciech-malota-wojcik/isolator"
 	"github.com/wojciech-malota-wojcik/isolator/client/wire"
 )

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/outofforest/go-zfs/v2"
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra/types"
 	"github.com/ridge/must"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
 const propertyName = "co.exw:info"

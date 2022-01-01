@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/description"
+	"github.com/outofforest/osman/infra/types"
 )
 
 // NewMount creates mount config

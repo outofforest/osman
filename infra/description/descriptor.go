@@ -1,7 +1,7 @@
 package description
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/types"
 )
 
 // Describe creates descriptor for image

@@ -1,10 +1,10 @@
 package commands
 
 import (
+	"github.com/outofforest/osman"
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra/description"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/imagebuilder"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
 )
 
 // NewBuildCommand creates new build command
@@ -13,7 +13,7 @@ func NewBuildCommand(buildF *config.BuildFactory, cmdF *CmdFactory) *cobra.Comma
 		Short: "Builds images from spec files",
 		Args:  cobra.MinimumNArgs(1),
 		Use:   "build [flags] ...specfile",
-		RunE:  cmdF.Cmd(imagebuilder.Build),
+		RunE:  cmdF.Cmd(osman.Build),
 	}
 	cmd.Flags().StringSliceVar(&buildF.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
 	cmd.Flags().StringSliceVar(&buildF.Tags, "tag", []string{string(description.DefaultTag)}, "Tags assigned to created build")

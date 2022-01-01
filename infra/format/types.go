@@ -1,7 +1,7 @@
 package format
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
+	"github.com/outofforest/osman/config"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 

@@ -5,11 +5,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/outofforest/osman"
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra/format"
+	"github.com/outofforest/osman/infra/types"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/imagebuilder"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
@@ -21,7 +21,7 @@ func NewListCommand(c *ioc.Container, filterF *config.FilterFactory, formatF *co
 		RunE: cmdF.Cmd(func(c *ioc.Container, formatter format.Formatter) error {
 			var builds []types.BuildInfo
 			var err error
-			c.Call(imagebuilder.List, &builds, &err)
+			c.Call(osman.List, &builds, &err)
 			if err != nil {
 				return err
 			}
