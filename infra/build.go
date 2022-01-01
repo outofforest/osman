@@ -94,7 +94,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		keys = append(keys, key)
 	}
 
-	buildID := types.NewBuildID()
+	buildID := types.NewBuildID(types.BuildTypeImage)
 
 	var imgFinalize storage.FinalizeFn
 	var path string
@@ -174,8 +174,8 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			switch {
 			case err == nil:
 			case errors.Is(err, types.ErrImageDoesNotExist):
-				// If spec file does not exist, try building from repository
 				if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
+					// If spec file does not exist, try building from repository
 					err = b.build(ctx, stack, baseImage)
 				} else {
 					err = b.build(ctx, stack, description.Describe(srcBuildKey.Name, types.Tags{srcBuildKey.Tag}))
@@ -193,6 +193,9 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				if err != nil {
 					return types.BuildInfo{}, err
 				}
+			}
+			if !srcBuildID.Type().Properties().Cloneable {
+				return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", srcBuildKey)
 			}
 
 			imgFinalize, path, err = b.storage.Clone(srcBuildID, img.Name(), buildID)

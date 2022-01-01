@@ -3,6 +3,7 @@ package imagebuilder
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -14,34 +15,55 @@ import (
 )
 
 // Build builds image
-func Build(ctx context.Context, config config.Build, builder *infra.Builder) error {
-	for i, specFile := range config.SpecFiles {
+func Build(ctx context.Context, build config.Build, builder *infra.Builder) error {
+	for i, specFile := range build.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
-		if err := builder.BuildFromFile(ctx, specFile, config.Names[i], config.Tags...); err != nil {
+		if err := builder.BuildFromFile(ctx, specFile, build.Names[i], build.Tags...); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
-	if untagged && len(info.Tags) > 0 {
-		return false
+// Mount mounts image
+func Mount(mount config.Mount, s storage.Driver) error {
+	if !types.IsNameValid(mount.Name) {
+		return fmt.Errorf("name %s is invalid", mount.Name)
 	}
-	if buildIDs != nil && buildIDs[info.BuildID] {
-		return true
+
+	list, err := List(config.Filter{BuildKeys: []types.BuildKey{types.NewBuildKey(mount.Name, "")}}, s)
+	if err != nil {
+		return err
 	}
-	if buildKeys != nil {
-		if buildKeys[types.NewBuildKey(info.Name, "")] {
-			return true
+	if len(list) > 0 {
+		return fmt.Errorf("build %s already exists", mount.Name)
+	}
+
+	if !mount.BuildID.IsValid() {
+		var err error
+		mount.BuildID, err = s.BuildID(mount.BuildKey)
+		if err != nil {
+			return err
 		}
-		for _, tag := range info.Tags {
-			if buildKeys[types.NewBuildKey(info.Name, tag)] || buildKeys[types.NewBuildKey("", tag)] {
-				return true
-			}
-		}
 	}
-	return buildIDs == nil && buildKeys == nil
+	if !mount.BuildID.Type().Properties().Cloneable {
+		return fmt.Errorf("build %s is not cloneable", mount.BuildID)
+	}
+
+	srcInfo, err := s.Info(mount.BuildID)
+	if err != nil {
+		return err
+	}
+
+	buildID := types.NewBuildID(types.BuildTypeMount)
+	if _, _, err := s.Clone(mount.BuildID, mount.Name, buildID); err != nil {
+		return err
+	}
+	return s.StoreManifest(types.ImageManifest{
+		BuildID: buildID,
+		BasedOn: srcInfo.BuildID,
+		Params:  srcInfo.Params,
+	})
 }
 
 // List lists builds
@@ -74,6 +96,9 @@ func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) 
 
 		if !listBuild(info, buildIDs, buildKeys, filtering.Untagged) {
 			continue
+		}
+		if info.Mounted != "" {
+			info.Mounted = filepath.Join(info.Mounted, "root")
 		}
 		list = append(list, info)
 	}
@@ -142,4 +167,24 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 		results = append(results, Result{BuildID: buildID, Result: s.Drop(buildID)})
 	}
 	return results, nil
+}
+
+func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
+	if untagged && len(info.Tags) > 0 {
+		return false
+	}
+	if buildIDs != nil && buildIDs[info.BuildID] {
+		return true
+	}
+	if buildKeys != nil {
+		if buildKeys[types.NewBuildKey(info.Name, "")] {
+			return true
+		}
+		for _, tag := range info.Tags {
+			if buildKeys[types.NewBuildKey(info.Name, tag)] || buildKeys[types.NewBuildKey("", tag)] {
+				return true
+			}
+		}
+	}
+	return buildIDs == nil && buildKeys == nil
 }

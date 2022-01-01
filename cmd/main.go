@@ -32,6 +32,7 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(config.NewStorage)
 	c.Singleton(config.NewFormat)
 	c.Singleton(config.NewBuild)
+	c.Singleton(config.NewMount)
 	c.Singleton(config.NewDrop)
 
 	c.Singleton(storage.Resolve)
@@ -47,6 +48,7 @@ func iocBuilder(c *ioc.Container) {
 
 	c.Singleton(commands.NewRootCommand)
 	c.SingletonNamed("build", commands.NewBuildCommand)
+	c.SingletonNamed("mount", commands.NewMountCommand)
 	c.SingletonNamed("list", commands.NewListCommand)
 	c.SingletonNamed("drop", commands.NewDropCommand)
 }
