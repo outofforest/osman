@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+OUT="./tmp-osman"
+
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit
+
+if [ ! -f "$OUT" ]
+then
+  go build -o "$OUT" ../build/cmd
+fi
+
+exec "$OUT" "$@"
