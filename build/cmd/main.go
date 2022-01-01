@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/outofforest/build"
+	"github.com/outofforest/ioc/v2"
 	me "github.com/outofforest/osman/build"
+	"github.com/outofforest/run"
 	"github.com/ridge/must"
-	"github.com/wojciech-malota-wojcik/build"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
-	"github.com/wojciech-malota-wojcik/run"
 )
 
 func main() {

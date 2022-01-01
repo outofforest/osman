@@ -1,6 +1,6 @@
 package build
 
-import "github.com/wojciech-malota-wojcik/buildgo"
+import "github.com/outofforest/buildgo"
 
 // Commands is a definition of commands available in build system
 var Commands = map[string]interface{}{

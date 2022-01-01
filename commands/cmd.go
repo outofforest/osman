@@ -1,10 +1,10 @@
 package commands
 
 import (
+	"github.com/outofforest/ioc/v2"
+	"github.com/outofforest/logger"
 	"github.com/outofforest/osman/config"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
-	"github.com/wojciech-malota-wojcik/logger"
 )
 
 // NewCmdFactory returns new CmdFactory
