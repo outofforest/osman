@@ -10,10 +10,10 @@ import (
 )
 
 func buildApp(ctx context.Context) error {
-	return buildgo.GoBuildPkg(ctx, "cmd", "bin/imagebuilder-app", false)
+	return buildgo.GoBuildPkg(ctx, "cmd", "bin/osman-app", false)
 }
 
 func runApp(ctx context.Context, deps build.DepsFunc) error {
 	deps(buildApp)
-	return libexec.Exec(ctx, exec.Command("./bin/imagebuilder-app"))
+	return libexec.Exec(ctx, exec.Command("./bin/osman-app"))
 }

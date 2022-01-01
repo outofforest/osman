@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/outofforest/osman"
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra/format"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/imagebuilder"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
@@ -18,9 +18,9 @@ func NewDropCommand(c *ioc.Container, filterF *config.FilterFactory, dropF *conf
 		Short: "Drops builds",
 		Use:   "drop [flags] [... buildID | [name][:tag]]",
 		RunE: cmdF.Cmd(func(c *ioc.Container, formatter format.Formatter) error {
-			var results []imagebuilder.Result
+			var results []osman.Result
 			var err error
-			c.Call(imagebuilder.Drop, &results, &err)
+			c.Call(osman.Drop, &results, &err)
 			if err != nil {
 				return err
 			}

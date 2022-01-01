@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/types"
 )
 
 // NewFilterFactory returns new filter config factory

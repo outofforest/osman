@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-OUT="./tmp-imagebuilder"
+OUT="./tmp-osman"
 
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit
 

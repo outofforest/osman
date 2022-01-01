@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 
+	"github.com/outofforest/osman/commands"
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra"
+	"github.com/outofforest/osman/infra/base"
+	"github.com/outofforest/osman/infra/format"
+	"github.com/outofforest/osman/infra/parser"
+	"github.com/outofforest/osman/infra/storage"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/imagebuilder/commands"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/base"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/format"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/parser"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
 	"github.com/wojciech-malota-wojcik/ioc/v2"
 	"github.com/wojciech-malota-wojcik/run"
 )

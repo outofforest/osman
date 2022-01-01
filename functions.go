@@ -1,4 +1,4 @@
-package imagebuilder
+package osman
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra"
+	"github.com/outofforest/osman/infra/storage"
+	"github.com/outofforest/osman/infra/types"
 	"github.com/ridge/must"
-	"github.com/wojciech-malota-wojcik/imagebuilder/config"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/storage"
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
 )
 
 // Build builds image

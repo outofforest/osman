@@ -1,7 +1,7 @@
 package description
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/types"
 )
 
 // From returns handler for FROM command

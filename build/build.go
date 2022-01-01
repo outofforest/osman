@@ -7,5 +7,5 @@ import (
 )
 
 func buildMe(ctx context.Context) error {
-	return buildgo.GoBuildPkg(ctx, "build/cmd", "bin/tmp-imagebuilder", true)
+	return buildgo.GoBuildPkg(ctx, "build/cmd", "bin/tmp-osman", true)
 }

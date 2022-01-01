@@ -1,7 +1,7 @@
 package base
 
 import (
-	"github.com/wojciech-malota-wojcik/imagebuilder/infra/types"
+	"github.com/outofforest/osman/infra/types"
 )
 
 // Initializer initializes base image

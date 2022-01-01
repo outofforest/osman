@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/wojciech-malota-wojcik/imagebuilder/infra/description"
+import "github.com/outofforest/osman/infra/description"
 
 // Parser parses image description from file
 type Parser interface {
