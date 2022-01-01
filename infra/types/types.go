@@ -16,7 +16,7 @@ import (
 var ErrImageDoesNotExist = errors.New("image does not exist")
 
 const alphabet = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const buildIDPrefix = "bid"
+const buildIDPrefixLength = 3
 const buildIDLength = 16
 const checksumLength = 4
 
@@ -40,13 +40,17 @@ func checksum(data string) string {
 }
 
 // NewBuildID returns new random build ID
-func NewBuildID() BuildID {
+func NewBuildID(buildType BuildType) BuildID {
+	if !buildType.IsValid() {
+		panic(fmt.Errorf("invalid build type: %s", buildType))
+	}
 	buf := make([]byte, buildIDLength)
 	if _, err := rand.Read(buf); err != nil {
 		panic(err)
 	}
 	encode(buf)
-	return BuildID(buildIDPrefix + string(buf) + checksum(string(buf)))
+	buildIDCore := string(buildType) + string(buf)
+	return BuildID(buildIDCore + checksum(buildIDCore))
 }
 
 // ParseBuildID parses string into build ID and returns error if string is not a valid one
@@ -58,18 +62,69 @@ func ParseBuildID(strBuildID string) (BuildID, error) {
 	return buildID, nil
 }
 
+// BuildType is the type of build
+type BuildType string
+
+// IsValid verifies if build type is valid
+func (bt BuildType) IsValid() bool {
+	_, exists := buildTypes[bt]
+	return exists
+}
+
+// Properties returns properties of build type
+func (bt BuildType) Properties() BuildTypeProperties {
+	return buildTypes[bt]
+}
+
+// BuildTypeProperties contains properties of build type
+type BuildTypeProperties struct {
+	Cloneable bool
+	Mountable bool
+}
+
+const (
+	// BuildTypeImage is the image build type
+	BuildTypeImage BuildType = "iid"
+
+	// BuildTypeMount is the mount build type
+	BuildTypeMount BuildType = "mid"
+)
+
+var buildTypes = map[BuildType]BuildTypeProperties{
+	BuildTypeImage: {
+		Cloneable: true,
+	},
+	BuildTypeMount: {
+		Mountable: true,
+	},
+}
+
 // BuildID is unique ID of build
 type BuildID string
 
+// Type returns type of build encoded inside build ID
+func (bid BuildID) Type() BuildType {
+	return BuildType(bid[:buildIDPrefixLength])
+}
+
 // IsValid verifies if format of build ID is valid
 func (bid BuildID) IsValid() bool {
-	if len(bid) != len(buildIDPrefix)+buildIDLength+checksumLength {
+	dataLen := buildIDPrefixLength + buildIDLength
+	if len(bid) != dataLen+checksumLength {
 		return false
 	}
-	if !strings.HasPrefix(string(bid), buildIDPrefix) {
+	if !bid.Type().IsValid() {
 		return false
 	}
-	return checksum(string(bid[len(buildIDPrefix):len(buildIDPrefix)+buildIDLength])) == string(bid[len(bid)-checksumLength:])
+	return checksum(string(bid[:dataLen])) == string(bid[dataLen:])
+}
+
+// IsValidType verifies if format of build ID is valid and type matches
+func (bid BuildID) IsValidType(buildType BuildType) bool {
+	if !bid.IsValid() {
+		return false
+	}
+	return bid.Type() == buildType
 }
 
 var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
@@ -96,8 +151,10 @@ func (t Tags) String() string {
 
 // IsNameValid returns true if name is valid
 func IsNameValid(name string) bool {
-	if strings.HasPrefix(name, buildIDPrefix) {
-		return false
+	for t := range buildTypes {
+		if strings.HasPrefix(name, string(t)) {
+			return false
+		}
 	}
 	return validRegExp.MatchString(name)
 }
@@ -169,4 +226,5 @@ type BuildInfo struct {
 	Name      string
 	Tags      Tags
 	Params    Params
+	Mounted   string
 }

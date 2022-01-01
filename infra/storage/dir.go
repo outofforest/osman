@@ -88,6 +88,11 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 		return types.BuildInfo{}, err
 	}
 
+	mounted := ""
+	if buildID.Type().Properties().Mountable {
+		mounted = filepath.Join(catalogDir, string(buildID))
+	}
+
 	res := types.BuildInfo{
 		BuildID:   buildID,
 		BasedOn:   manifest.BasedOn,
@@ -95,6 +100,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 		Name:      filepath.Base(catalogDir),
 		Tags:      types.Tags{},
 		Params:    manifest.Params,
+		Mounted:   mounted,
 	}
 
 	dir, err := os.Open(catalogDir)

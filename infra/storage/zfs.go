@@ -66,6 +66,12 @@ func (d *zfsDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 		return types.BuildInfo{}, err
 	}
 
+	mounted := ""
+	if buildID.Type().Properties().Mountable {
+		mounted = filesystem.Mountpoint
+	}
+	buildInfo.Mounted = mounted
+
 	return buildInfo, nil
 }
 
@@ -134,14 +140,21 @@ func (d *zfsDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 	}
 
 	return func() error {
-		if _, err := filesystem.Unmount(false); err != nil {
-			return err
+		properties := dstBuildID.Type().Properties()
+		if !properties.Mountable {
+			if _, err := filesystem.Unmount(false); err != nil {
+				return err
+			}
+			if err := filesystem.SetProperty("canmount", "off"); err != nil {
+				return err
+			}
 		}
-		if err := filesystem.SetProperty("canmount", "off"); err != nil {
-			return err
+		if properties.Cloneable {
+			if _, err := filesystem.Snapshot("image", false); err != nil {
+				return err
+			}
 		}
-		_, err := filesystem.Snapshot("image", false)
-		return err
+		return nil
 	}, filesystem.Mountpoint, nil
 }
 
