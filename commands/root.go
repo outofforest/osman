@@ -3,10 +3,10 @@ package commands
 import (
 	"strings"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/storage"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // NewRootCommand returns new root command

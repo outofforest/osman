@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/commands"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
@@ -10,9 +11,8 @@ import (
 	"github.com/outofforest/osman/infra/format"
 	"github.com/outofforest/osman/infra/parser"
 	"github.com/outofforest/osman/infra/storage"
+	"github.com/outofforest/run"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
-	"github.com/wojciech-malota-wojcik/run"
 )
 
 func iocBuilder(c *ioc.Container) {

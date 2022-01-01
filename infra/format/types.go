@@ -1,8 +1,8 @@
 package format
 
 import (
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/config"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // Formatter formats slice into string

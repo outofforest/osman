@@ -7,15 +7,15 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/outofforest/isolator"
+	"github.com/outofforest/isolator/client"
+	"github.com/outofforest/isolator/client/wire"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/base"
 	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/parser"
 	"github.com/outofforest/osman/infra/storage"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/wojciech-malota-wojcik/isolator"
-	"github.com/wojciech-malota-wojcik/isolator/client"
-	"github.com/wojciech-malota-wojcik/isolator/client/wire"
 )
 
 type cloneFromFn func(srcBuildKey types.BuildKey) (types.BuildInfo, error)

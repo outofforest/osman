@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 	"github.com/spf13/cobra"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // NewDropCommand returns new drop command

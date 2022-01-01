@@ -4,9 +4,9 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/wojciech-malota-wojcik/build"
-	"github.com/wojciech-malota-wojcik/buildgo"
-	"github.com/wojciech-malota-wojcik/libexec"
+	"github.com/outofforest/build"
+	"github.com/outofforest/buildgo"
+	"github.com/outofforest/libexec"
 )
 
 func buildApp(ctx context.Context) error {

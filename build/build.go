@@ -3,7 +3,7 @@ package build
 import (
 	"context"
 
-	"github.com/wojciech-malota-wojcik/buildgo"
+	"github.com/outofforest/buildgo"
 )
 
 func buildMe(ctx context.Context) error {

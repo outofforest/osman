@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // NewResolvingParser returns new auto resolving parser

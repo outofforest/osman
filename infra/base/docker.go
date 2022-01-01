@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/outofforest/isolator"
+	"github.com/outofforest/isolator/client/wire"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/wojciech-malota-wojcik/isolator"
-	"github.com/wojciech-malota-wojcik/isolator/client/wire"
 )
 
 // NewDockerInitializer creates new initializer getting base images from docker registry

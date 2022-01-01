@@ -3,9 +3,9 @@ package storage
 import (
 	"errors"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/wojciech-malota-wojcik/ioc/v2"
 )
 
 // ErrImageHasChildren is returned if image being deleted has children
