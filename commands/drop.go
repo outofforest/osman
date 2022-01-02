@@ -3,7 +3,6 @@ package commands
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
@@ -13,11 +12,23 @@ import (
 )
 
 // NewDropCommand returns new drop command
-func NewDropCommand(c *ioc.Container, filterF *config.FilterFactory, dropF *config.DropFactory, formatF *config.FormatFactory, cmdF *CmdFactory) *cobra.Command {
+func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
+	var loggingF *config.LoggingFactory
+	var storageF *config.StorageFactory
+	var filterF *config.FilterFactory
+	var formatF *config.FormatFactory
+	dropF := &config.DropFactory{}
+
 	cmd := &cobra.Command{
 		Short: "Drops builds",
 		Use:   "drop [flags] [... buildID | [name][:tag]]",
-		RunE: cmdF.Cmd(func(c *ioc.Container, formatter format.Formatter) error {
+		RunE: cmdF.Cmd(func(c *ioc.Container) {
+			c.Singleton(loggingF.Config)
+			c.Singleton(storageF.Config)
+			c.Singleton(filterF.Config)
+			c.Singleton(formatF.Config)
+			c.Singleton(dropF.Config)
+		}, func(c *ioc.Container, formatter format.Formatter) error {
 			var results []osman.Result
 			var err error
 			c.Call(osman.Drop, &results, &err)
@@ -35,8 +46,10 @@ func NewDropCommand(c *ioc.Container, filterF *config.FilterFactory, dropF *conf
 			return err
 		}),
 	}
-	cmd.Flags().BoolVar(&filterF.Untagged, "untagged", false, "If set, only untagged builds are deleted")
+	loggingF = cmdF.AddLoggingFlags(cmd)
+	storageF = cmdF.AddStorageFlags(cmd)
+	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
+	formatF = cmdF.AddFormatFlags(cmd)
 	cmd.Flags().BoolVar(&dropF.All, "all", false, "It is required to set this flag to drop builds if no filters are provided")
-	cmd.Flags().StringVar(&formatF.Formatter, "format", "table", "Name of formatter used to format the output: "+strings.Join(c.Names((*format.Formatter)(nil)), " | "))
 	return cmd
 }

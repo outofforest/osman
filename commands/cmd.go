@@ -1,9 +1,13 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/logger"
 	"github.com/outofforest/osman/config"
+	"github.com/outofforest/osman/infra/format"
+	"github.com/outofforest/osman/infra/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -20,18 +24,59 @@ type CmdFactory struct {
 }
 
 // Cmd returns function compatible with RunE
-func (f *CmdFactory) Cmd(cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
+func (f *CmdFactory) Cmd(setupFunc interface{}, cmdFunc interface{}) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		f.c.Singleton(func() config.Args {
 			return args
 		})
-		var err error
-		f.c.Resolve(func(c *ioc.Container, configRoot config.Root) {
-			if !configRoot.VerboseLogging {
+		if setupFunc != nil {
+			f.c.Call(setupFunc)
+		}
+		f.c.Resolve(func(loggingCfg config.Logging) {
+			if !loggingCfg.Verbose {
 				logger.VerboseOff()
 			}
-			f.c.Call(cmdFunc, &err)
 		})
+		var err error
+		f.c.Call(cmdFunc, &err)
 		return err
 	}
+}
+
+// AddLoggingFlags adds logging flags to command
+func (f *CmdFactory) AddLoggingFlags(cmd *cobra.Command) *config.LoggingFactory {
+	loggingF := &config.LoggingFactory{}
+
+	cmd.Flags().BoolVarP(&loggingF.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
+
+	return loggingF
+}
+
+// AddStorageFlags adds storage flags to command
+func (f *CmdFactory) AddStorageFlags(cmd *cobra.Command) *config.StorageFactory {
+	storageF := &config.StorageFactory{}
+
+	cmd.Flags().StringVar(&storageF.Root, "storage-root", "tank/builds", "Location where built images are stored")
+	cmd.Flags().StringVar(&storageF.Driver, "storage-driver", "zfs", "Storage driver to use: "+strings.Join(f.c.Names((*storage.Driver)(nil)), " | "))
+
+	return storageF
+}
+
+// AddFilterFlags adds filtering flags to command
+func (f *CmdFactory) AddFilterFlags(cmd *cobra.Command, defaultTypes []string) *config.FilterFactory {
+	filterF := &config.FilterFactory{}
+
+	cmd.Flags().StringSliceVar(&filterF.Types, "type", defaultTypes, "Consider only builds of specified types: "+strings.Join(config.BuildTypes(), " | "))
+	cmd.Flags().BoolVar(&filterF.Untagged, "untagged", false, "If set, only untagged builds are considered")
+
+	return filterF
+}
+
+// AddFormatFlags adds formatting flags to command
+func (f *CmdFactory) AddFormatFlags(cmd *cobra.Command) *config.FormatFactory {
+	formatF := &config.FormatFactory{}
+
+	cmd.Flags().StringVar(&formatF.Formatter, "format", "table", "Name of formatter used to format the output: "+strings.Join(f.c.Names((*format.Formatter)(nil)), " | "))
+
+	return formatF
 }

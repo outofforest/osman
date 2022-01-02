@@ -1,11 +1,8 @@
 package main
 
 import (
-	"context"
-
 	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/commands"
-	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/base"
 	"github.com/outofforest/osman/infra/format"
@@ -20,20 +17,6 @@ func iocBuilder(c *ioc.Container) {
 	c.Singleton(base.NewDockerInitializer)
 	c.Singleton(infra.NewRepository)
 	c.Transient(infra.NewBuilder)
-
-	c.Singleton(config.NewRootFactory)
-	c.Singleton(config.NewFilterFactory)
-	c.Singleton(config.NewStorageFactory)
-	c.Singleton(config.NewFormatFactory)
-	c.Singleton(config.NewBuildFactory)
-	c.Singleton(config.NewDropFactory)
-	c.Singleton(config.NewRoot)
-	c.Singleton(config.NewFilter)
-	c.Singleton(config.NewStorage)
-	c.Singleton(config.NewFormat)
-	c.Singleton(config.NewBuild)
-	c.Singleton(config.NewMount)
-	c.Singleton(config.NewDrop)
 
 	c.Singleton(storage.Resolve)
 	c.SingletonNamed("dir", storage.NewDirDriver)
@@ -54,7 +37,7 @@ func iocBuilder(c *ioc.Container) {
 }
 
 func main() {
-	run.Tool("imagebuilder", iocBuilder, func(ctx context.Context, rootCmd *cobra.Command) error {
+	run.Tool("imagebuilder", iocBuilder, func(rootCmd *cobra.Command) error {
 		return rootCmd.Execute()
 	})
 }

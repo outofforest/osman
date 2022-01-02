@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
@@ -14,11 +13,21 @@ import (
 )
 
 // NewListCommand returns new list command
-func NewListCommand(c *ioc.Container, filterF *config.FilterFactory, formatF *config.FormatFactory, cmdF *CmdFactory) *cobra.Command {
+func NewListCommand(cmdF *CmdFactory) *cobra.Command {
+	var loggingF *config.LoggingFactory
+	var storageF *config.StorageFactory
+	var filterF *config.FilterFactory
+	var formatF *config.FormatFactory
+
 	cmd := &cobra.Command{
 		Short: "Lists information about available builds",
 		Use:   "list [flags] [... buildID | [name][:tag]]",
-		RunE: cmdF.Cmd(func(c *ioc.Container, formatter format.Formatter) error {
+		RunE: cmdF.Cmd(func(c *ioc.Container) {
+			c.Singleton(loggingF.Config)
+			c.Singleton(storageF.Config)
+			c.Singleton(filterF.Config)
+			c.Singleton(formatF.Config)
+		}, func(c *ioc.Container, formatter format.Formatter) error {
 			var builds []types.BuildInfo
 			var err error
 			c.Call(osman.List, &builds, &err)
@@ -32,7 +41,10 @@ func NewListCommand(c *ioc.Container, filterF *config.FilterFactory, formatF *co
 			return nil
 		}),
 	}
-	cmd.Flags().BoolVar(&filterF.Untagged, "untagged", false, "If set, only untagged builds are listed")
-	cmd.Flags().StringVar(&formatF.Formatter, "format", "table", "Name of formatter used to format the output: "+strings.Join(c.Names((*format.Formatter)(nil)), " | "))
+
+	loggingF = cmdF.AddLoggingFlags(cmd)
+	storageF = cmdF.AddStorageFlags(cmd)
+	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage, config.BuildTypeMount})
+	formatF = cmdF.AddFormatFlags(cmd)
 	return cmd
 }

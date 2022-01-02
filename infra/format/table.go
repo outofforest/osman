@@ -15,10 +15,13 @@ type tableFormatter struct {
 }
 
 // Format formats slice into table string
-func (f *tableFormatter) Format(slice interface{}) string {
-	sliceValue := reflect.ValueOf(slice)
-	sliceType := sliceValue.Type()
-	elementType := sliceType.Elem()
+func (f *tableFormatter) Format(objOrSlice interface{}) string {
+	objOrSliceValue := reflect.ValueOf(objOrSlice)
+	objOrSliceType := objOrSliceValue.Type()
+	elementType := objOrSliceType
+	if objOrSliceType.Kind() == reflect.Slice {
+		elementType = objOrSliceType.Elem()
+	}
 
 	fields := make([]reflect.StructField, 0, elementType.NumField())
 	for i := 0; i < elementType.NumField(); i++ {
@@ -39,9 +42,16 @@ func (f *tableFormatter) Format(slice interface{}) string {
 		}
 	}
 	table := [][]string{header}
-	for i := 0; i < sliceValue.Len(); i++ {
+	objOrSliceLen := 1
+	if objOrSliceType.Kind() == reflect.Slice {
+		objOrSliceLen = objOrSliceValue.Len()
+	}
+	for i := 0; i < objOrSliceLen; i++ {
 		row := make([]string, 0, len(fields))
-		elem := sliceValue.Index(i)
+		elem := objOrSliceValue
+		if objOrSliceType.Kind() == reflect.Slice {
+			elem = objOrSliceValue.Index(i)
+		}
 		for j, field := range fields {
 			field := elem.FieldByName(field.Name)
 			value := field.Interface()

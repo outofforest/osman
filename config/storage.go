@@ -1,10 +1,5 @@
 package config
 
-// NewStorageFactory returns new storage config factory
-func NewStorageFactory() *StorageFactory {
-	return &StorageFactory{}
-}
-
 // StorageFactory collects data for storage config
 type StorageFactory struct {
 	// Root is the root location for images
@@ -14,8 +9,8 @@ type StorageFactory struct {
 	Driver string
 }
 
-// NewStorage returns new storage config
-func NewStorage(f *StorageFactory) Storage {
+// Config returns new storage config
+func (f *StorageFactory) Config() Storage {
 	return Storage{
 		Root:   f.Root,
 		Driver: f.Driver,
