@@ -39,17 +39,22 @@ func checksum(data string) string {
 	return string(buf)
 }
 
+// RandomString generates random string of fixed length
+func RandomString(length int) string {
+	buf := make([]byte, length)
+	if _, err := rand.Read(buf); err != nil {
+		panic(err)
+	}
+	encode(buf)
+	return string(buf)
+}
+
 // NewBuildID returns new random build ID
 func NewBuildID(buildType BuildType) BuildID {
 	if !buildType.IsValid() {
 		panic(fmt.Errorf("invalid build type: %s", buildType))
 	}
-	buf := make([]byte, buildIDLength)
-	if _, err := rand.Read(buf); err != nil {
-		panic(err)
-	}
-	encode(buf)
-	buildIDCore := string(buildType) + string(buf)
+	buildIDCore := string(buildType) + RandomString(buildIDLength)
 	return BuildID(buildIDCore + checksum(buildIDCore))
 }
 
