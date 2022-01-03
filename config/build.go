@@ -7,11 +7,6 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewBuildFactory returns new build config factory
-func NewBuildFactory() *BuildFactory {
-	return &BuildFactory{}
-}
-
 // BuildFactory collects data for build config
 type BuildFactory struct {
 	// Names is the list of names for corresponding specfiles
@@ -24,8 +19,8 @@ type BuildFactory struct {
 	Rebuild bool
 }
 
-// NewBuild creates build config
-func NewBuild(f *BuildFactory, args Args) Build {
+// Config creates build config
+func (f BuildFactory) Config(args Args) Build {
 	config := Build{
 		SpecFiles: args,
 		Names:     f.Names,

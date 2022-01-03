@@ -15,59 +15,82 @@ import (
 )
 
 // Build builds image
-func Build(ctx context.Context, build config.Build, builder *infra.Builder) error {
+func Build(ctx context.Context, build config.Build, s storage.Driver, builder *infra.Builder) ([]types.BuildInfo, error) {
+	builds := make([]types.BuildInfo, 0, len(build.SpecFiles))
 	for i, specFile := range build.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
-		if err := builder.BuildFromFile(ctx, specFile, build.Names[i], build.Tags...); err != nil {
-			return err
+		buildID, err := builder.BuildFromFile(ctx, specFile, build.Names[i], build.Tags...)
+		if err != nil {
+			return nil, err
 		}
+		info, err := s.Info(buildID)
+		if err != nil {
+			return nil, err
+		}
+		builds = append(builds, info)
 	}
-	return nil
+	return builds, nil
 }
 
 // Mount mounts image
-func Mount(mount config.Mount, s storage.Driver) error {
+func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 	if !types.IsNameValid(mount.Name) {
-		return fmt.Errorf("name %s is invalid", mount.Name)
+		return types.BuildInfo{}, fmt.Errorf("name %s is invalid", mount.Name)
 	}
 
-	list, err := List(config.Filter{BuildKeys: []types.BuildKey{types.NewBuildKey(mount.Name, "")}}, s)
+	list, err := List(config.Filter{
+		Types: []types.BuildType{
+			types.BuildTypeMount,
+		},
+		BuildKeys: []types.BuildKey{
+			types.NewBuildKey(mount.Name, ""),
+		},
+	}, s)
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 	if len(list) > 0 {
-		return fmt.Errorf("build %s already exists", mount.Name)
+		return types.BuildInfo{}, fmt.Errorf("build %s already exists", mount.Name)
 	}
 
 	if !mount.BuildID.IsValid() {
 		var err error
 		mount.BuildID, err = s.BuildID(mount.BuildKey)
 		if err != nil {
-			return err
+			return types.BuildInfo{}, err
 		}
 	}
 	if !mount.BuildID.Type().Properties().Cloneable {
-		return fmt.Errorf("build %s is not cloneable", mount.BuildID)
+		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.BuildID)
 	}
 
 	srcInfo, err := s.Info(mount.BuildID)
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 
 	buildID := types.NewBuildID(types.BuildTypeMount)
 	if _, _, err := s.Clone(mount.BuildID, mount.Name, buildID); err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
-	return s.StoreManifest(types.ImageManifest{
+	if err := s.StoreManifest(types.ImageManifest{
 		BuildID: buildID,
 		BasedOn: srcInfo.BuildID,
 		Params:  srcInfo.Params,
-	})
+	}); err != nil {
+		return types.BuildInfo{}, err
+	}
+
+	return s.Info(buildID)
 }
 
 // List lists builds
 func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
+	buildTypes := map[types.BuildType]bool{}
+	for _, buildType := range filtering.Types {
+		buildTypes[buildType] = true
+	}
+
 	var buildIDs map[types.BuildID]bool
 	if len(filtering.BuildIDs) > 0 {
 		buildIDs = map[types.BuildID]bool{}
@@ -94,7 +117,7 @@ func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) 
 			return nil, err
 		}
 
-		if !listBuild(info, buildIDs, buildKeys, filtering.Untagged) {
+		if !listBuild(info, buildTypes, buildIDs, buildKeys, filtering.Untagged) {
 			continue
 		}
 		if info.Mounted != "" {
@@ -142,6 +165,10 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 		}
 	}
 
+	if len(toDelete) == 0 {
+		return nil, fmt.Errorf("no builds were selected to delete")
+	}
+
 	enqueued := map[types.BuildID]bool{}
 	deleteSequence := make([]types.BuildID, 0, len(builds))
 	var sort func(buildID types.BuildID)
@@ -169,7 +196,10 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 	return results, nil
 }
 
-func listBuild(info types.BuildInfo, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
+func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
+	if !buildTypes[info.BuildID.Type()] {
+		return false
+	}
 	if untagged && len(info.Tags) > 0 {
 		return false
 	}

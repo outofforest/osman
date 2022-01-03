@@ -1,18 +1,13 @@
 package config
 
-// NewFormatFactory returns new format config factory
-func NewFormatFactory() *FormatFactory {
-	return &FormatFactory{}
-}
-
 // FormatFactory collects data for format config
 type FormatFactory struct {
 	// Formatter is the name of formatter to use to convert list into string
 	Formatter string
 }
 
-// NewFormat returns new format config
-func NewFormat(f *FormatFactory, args Args) Format {
+// Config returns new format config
+func (f *FormatFactory) Config() Format {
 	return Format{
 		Formatter: f.Formatter,
 	}
