@@ -41,6 +41,26 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 
 // Mount mounts image
 func Mount(mount config.Mount, s storage.Driver) error {
+	if !mount.BuildID.IsValid() {
+		var err error
+		mount.BuildID, err = s.BuildID(mount.BuildKey)
+		if err != nil {
+			return err
+		}
+	}
+	if !mount.BuildID.Type().Properties().Cloneable {
+		return fmt.Errorf("build %s is not cloneable", mount.BuildID)
+	}
+
+	image, err := s.Info(mount.BuildID)
+	if err != nil {
+		return err
+	}
+
+	if mount.VMFile == "" {
+		mount.VMFile = filepath.Join(mount.XMLDir, image.Name+".xml")
+	}
+
 	doc := etree.NewDocument()
 	if err := doc.ReadFromFile(mount.VMFile); err != nil {
 		return err
@@ -51,7 +71,22 @@ func Mount(mount config.Mount, s storage.Driver) error {
 		return err
 	}
 
-	info, err := cloneForMount(mount, name, s)
+	list, err := List(config.Filter{
+		Types: []types.BuildType{
+			types.BuildTypeMount,
+		},
+		BuildKeys: []types.BuildKey{
+			types.NewBuildKey(name, ""),
+		},
+	}, s)
+	if err != nil {
+		return err
+	}
+	if len(list) > 0 {
+		return fmt.Errorf("build %s already exists", name)
+	}
+
+	info, err := cloneForMount(image, name, s)
 	if err != nil {
 		return err
 	}
@@ -76,46 +111,15 @@ func vmName(doc *etree.Document) (string, error) {
 	return name + "-" + types.RandomString(5), nil
 }
 
-func cloneForMount(mount config.Mount, name string, s storage.Driver) (types.BuildInfo, error) {
-	list, err := List(config.Filter{
-		Types: []types.BuildType{
-			types.BuildTypeMount,
-		},
-		BuildKeys: []types.BuildKey{
-			types.NewBuildKey(name, ""),
-		},
-	}, s)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	if len(list) > 0 {
-		return types.BuildInfo{}, fmt.Errorf("build %s already exists", name)
-	}
-
-	if !mount.BuildID.IsValid() {
-		var err error
-		mount.BuildID, err = s.BuildID(mount.BuildKey)
-		if err != nil {
-			return types.BuildInfo{}, err
-		}
-	}
-	if !mount.BuildID.Type().Properties().Cloneable {
-		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.BuildID)
-	}
-
-	srcInfo, err := s.Info(mount.BuildID)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-
+func cloneForMount(image types.BuildInfo, name string, s storage.Driver) (types.BuildInfo, error) {
 	buildID := types.NewBuildID(types.BuildTypeMount)
-	if _, _, err := s.Clone(mount.BuildID, name, buildID); err != nil {
+	if _, _, err := s.Clone(image.BuildID, name, buildID); err != nil {
 		return types.BuildInfo{}, err
 	}
 	if err := s.StoreManifest(types.ImageManifest{
 		BuildID: buildID,
-		BasedOn: srcInfo.BuildID,
-		Params:  srcInfo.Params,
+		BasedOn: image.BuildID,
+		Params:  image.Params,
 	}); err != nil {
 		return types.BuildInfo{}, err
 	}
