@@ -7,10 +7,17 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewMount creates mount config
-func NewMount(args Args) Mount {
+// MountFactory collects data for mount config
+type MountFactory struct {
+	// LibvirtAddr is the address libvirt listens on
+	LibvirtAddr string
+}
+
+// Config returns new mount config
+func (f *MountFactory) Config(args Args) Mount {
 	config := Mount{
-		Name: args[1],
+		VMFile:      args[1],
+		LibvirtAddr: f.LibvirtAddr,
 	}
 
 	buildID, err := types.ParseBuildID(args[0])
@@ -37,6 +44,9 @@ type Mount struct {
 	// BuildKey is the build key of image to mount
 	BuildKey types.BuildKey
 
-	// Name is the name of mounted image to create
-	Name string
+	// VMFile is the path to file containing vm definition
+	VMFile string
+
+	// LibvirtAddr is the address libvirt listens on
+	LibvirtAddr string
 }

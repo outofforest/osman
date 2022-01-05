@@ -37,7 +37,7 @@ func iocBuilder(c *ioc.Container) {
 }
 
 func main() {
-	run.Tool("imagebuilder", iocBuilder, func(rootCmd *cobra.Command) error {
+	run.Tool("osman", iocBuilder, func(rootCmd *cobra.Command) error {
 		return rootCmd.Execute()
 	})
 }
