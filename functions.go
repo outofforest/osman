@@ -45,18 +45,18 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		panic(fmt.Errorf("non-mountable image type received: %s", mount.Type))
 	}
 
-	if !mount.BuildID.IsValid() {
+	if !mount.ImageBuildID.IsValid() {
 		var err error
-		mount.BuildID, err = s.BuildID(mount.BuildKey)
+		mount.ImageBuildID, err = s.BuildID(mount.ImageBuildKey)
 		if err != nil {
 			return types.BuildInfo{}, err
 		}
 	}
-	if !mount.BuildID.Type().Properties().Cloneable {
-		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.BuildID)
+	if !mount.ImageBuildID.Type().Properties().Cloneable {
+		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.ImageBuildID)
 	}
 
-	image, err := s.Info(mount.BuildID)
+	image, err := s.Info(mount.ImageBuildID)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -71,30 +71,46 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		if err := doc.ReadFromFile(mount.VMFile); err != nil {
 			return types.BuildInfo{}, err
 		}
-		if mount.Name == "" || strings.HasPrefix(mount.Name, ":") {
-			mount.Name = vmName(doc) + mount.Name
+		if mount.MountKey.Name == "" {
+			mount.MountKey.Name = vmName(doc)
 		}
 	}
 
-	if mount.Name == "" || strings.HasPrefix(mount.Name, ":") {
-		mount.Name = image.Name + mount.Name
+	if mount.MountKey.Name == "" {
+		mount.MountKey.Name = image.Name
 	}
 
-	buildKey, err := types.ParseBuildKey(mount.Name)
+	if mount.MountKey.Tag == "" {
+		mount.MountKey.Tag = types.Tag(types.RandomString(5))
+	}
+
+	if !mount.MountKey.IsValid() {
+		return types.BuildInfo{}, fmt.Errorf("mount key %s is invalid", mount.MountKey)
+	}
+
+	list, err := List(config.Filter{
+		Types: []types.BuildType{
+			types.BuildTypeMount,
+			types.BuildTypeVM,
+		},
+		BuildKeys: []types.BuildKey{
+			mount.MountKey,
+		},
+	}, s)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
-	if buildKey.Tag == "" {
-		buildKey.Tag = types.Tag(types.RandomString(5))
+	if len(list) > 0 {
+		return types.BuildInfo{}, fmt.Errorf("build %s already exists", mount.MountKey)
 	}
 
-	info, err := cloneForMount(image, buildKey, mount.Type, s)
+	info, err := cloneForMount(image, mount.MountKey, mount.Type, s)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
 
 	if doc != nil {
-		prepareVM(doc, info, buildKey)
+		prepareVM(doc, info, mount.MountKey)
 		xmlDef, err := doc.WriteToString()
 		if err != nil {
 			return types.BuildInfo{}, err

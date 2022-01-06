@@ -12,6 +12,9 @@ type MountFactory struct {
 	// Name for mounted image
 	Name string
 
+	// Tag of mounted image
+	Tag string
+
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
 
@@ -25,7 +28,7 @@ type MountFactory struct {
 // Config returns new mount config
 func (f *MountFactory) Config(args Args) Mount {
 	config := Mount{
-		Name:        f.Name,
+		MountKey:    types.NewBuildKey(f.Name, types.Tag(f.Tag)),
 		XMLDir:      f.XMLDir,
 		LibvirtAddr: f.LibvirtAddr,
 		Type:        types.BuildTypeMount,
@@ -39,7 +42,7 @@ func (f *MountFactory) Config(args Args) Mount {
 
 	buildID, err := types.ParseBuildID(args[0])
 	if err == nil {
-		config.BuildID = buildID
+		config.ImageBuildID = buildID
 		return config
 	}
 	buildKey, err := types.ParseBuildKey(args[0])
@@ -49,20 +52,20 @@ func (f *MountFactory) Config(args Args) Mount {
 	if buildKey.Tag == "" {
 		buildKey.Tag = description.DefaultTag
 	}
-	config.BuildKey = buildKey
+	config.ImageBuildKey = buildKey
 	return config
 }
 
 // Mount stores configuration for mount command
 type Mount struct {
-	// Name for mounted image
-	Name string
+	// ImageBuildID is the build ID of image to mount
+	ImageBuildID types.BuildID
 
-	// BuildID is the build ID of image to mount
-	BuildID types.BuildID
+	// ImageBuildKey is the build key of image to mount
+	ImageBuildKey types.BuildKey
 
-	// BuildKey is the build key of image to mount
-	BuildKey types.BuildKey
+	// MountKey is the build key of mounted image
+	MountKey types.BuildKey
 
 	// Type is the type of mount
 	Type types.BuildType

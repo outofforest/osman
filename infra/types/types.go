@@ -218,6 +218,11 @@ func (bk BuildKey) String() string {
 	return fmt.Sprintf("%s:%s", bk.Name, bk.Tag)
 }
 
+// IsValid returns true if build key is valid
+func (bk BuildKey) IsValid() bool {
+	return IsNameValid(bk.Name) && bk.Tag.IsValid()
+}
+
 // Params is a list of params configured on image
 type Params []string
 
