@@ -13,11 +13,15 @@ const (
 
 	// BuildTypeMount represents mount build
 	BuildTypeMount = "mount"
+
+	// BuildTypeVM represents vm build
+	BuildTypeVM = "vm"
 )
 
 var typeMapping = map[string]types.BuildType{
 	BuildTypeImage: types.BuildTypeImage,
 	BuildTypeMount: types.BuildTypeMount,
+	BuildTypeVM:    types.BuildTypeVM,
 }
 
 // BuildTypes returns valid build types

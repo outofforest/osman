@@ -83,8 +83,14 @@ func (bt BuildType) Properties() BuildTypeProperties {
 
 // BuildTypeProperties contains properties of build type
 type BuildTypeProperties struct {
+	// Cloneable means image may be cloned
 	Cloneable bool
+
+	// Mountable means image stays mounted
 	Mountable bool
+
+	// VM means vm in libvirt is defined for this image
+	VM bool
 }
 
 const (
@@ -93,6 +99,9 @@ const (
 
 	// BuildTypeMount is the mount build type
 	BuildTypeMount BuildType = "mid"
+
+	// BuildTypeVM is the vm build type
+	BuildTypeVM BuildType = "vid"
 )
 
 var buildTypes = map[BuildType]BuildTypeProperties{
@@ -101,6 +110,10 @@ var buildTypes = map[BuildType]BuildTypeProperties{
 	},
 	BuildTypeMount: {
 		Mountable: true,
+	},
+	BuildTypeVM: {
+		Mountable: true,
+		VM:        true,
 	},
 }
 
