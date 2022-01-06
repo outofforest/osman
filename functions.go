@@ -40,6 +40,11 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 
 // Mount mounts image
 func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
+	properties := mount.Type.Properties()
+	if !properties.Mountable {
+		panic(fmt.Errorf("non-mountable image type received: %s", mount.Type))
+	}
+
 	if !mount.BuildID.IsValid() {
 		var err error
 		mount.BuildID, err = s.BuildID(mount.BuildKey)
@@ -60,62 +65,58 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		mount.VMFile = filepath.Join(mount.XMLDir, image.Name+".xml")
 	}
 
-	doc := etree.NewDocument()
-	if err := doc.ReadFromFile(mount.VMFile); err != nil {
-		return types.BuildInfo{}, err
+	var doc *etree.Document
+	if properties.VM {
+		doc = etree.NewDocument()
+		if err := doc.ReadFromFile(mount.VMFile); err != nil {
+			return types.BuildInfo{}, err
+		}
+		if mount.Name == "" || strings.HasPrefix(mount.Name, ":") {
+			mount.Name = vmName(doc) + mount.Name
+		}
 	}
 
-	name, err := vmName(doc)
+	if mount.Name == "" || strings.HasPrefix(mount.Name, ":") {
+		mount.Name = image.Name + mount.Name
+	}
+
+	buildKey, err := types.ParseBuildKey(mount.Name)
+	if err != nil {
+		return types.BuildInfo{}, err
+	}
+	if buildKey.Tag == "" {
+		buildKey.Tag = types.Tag(types.RandomString(5))
+	}
+
+	info, err := cloneForMount(image, buildKey, mount.Type, s)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
 
-	list, err := List(config.Filter{
-		Types: []types.BuildType{
-			types.BuildTypeMount,
-		},
-		BuildKeys: []types.BuildKey{
-			types.NewBuildKey(name, ""),
-		},
-	}, s)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	if len(list) > 0 {
-		return types.BuildInfo{}, fmt.Errorf("build %s already exists", name)
-	}
-
-	info, err := cloneForMount(image, name, s)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-
-	prepareVM(doc, info, name)
-	xmlDef, err := doc.WriteToString()
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	if err := deployVM(xmlDef, mount.LibvirtAddr); err != nil {
-		return types.BuildInfo{}, err
+	if doc != nil {
+		prepareVM(doc, info, buildKey)
+		xmlDef, err := doc.WriteToString()
+		if err != nil {
+			return types.BuildInfo{}, err
+		}
+		if err := deployVM(xmlDef, mount.LibvirtAddr); err != nil {
+			return types.BuildInfo{}, err
+		}
 	}
 	return info, nil
 }
 
-func vmName(doc *etree.Document) (string, error) {
+func vmName(doc *etree.Document) string {
 	nameTag := doc.FindElement("//name")
 	if nameTag == nil {
-		return "", errors.New("name tag is not present")
+		return ""
 	}
-	name := nameTag.Text()
-	if name == "" {
-		return "", errors.New("name is empty")
-	}
-	return name + "-" + types.RandomString(5), nil
+	return nameTag.Text()
 }
 
-func cloneForMount(image types.BuildInfo, name string, s storage.Driver) (types.BuildInfo, error) {
-	buildID := types.NewBuildID(types.BuildTypeMount)
-	if _, _, err := s.Clone(image.BuildID, name, buildID); err != nil {
+func cloneForMount(image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (types.BuildInfo, error) {
+	buildID := types.NewBuildID(imageType)
+	if _, _, err := s.Clone(image.BuildID, buildKey.Name, buildID); err != nil {
 		return types.BuildInfo{}, err
 	}
 	if err := s.StoreManifest(types.ImageManifest{
@@ -126,15 +127,19 @@ func cloneForMount(image types.BuildInfo, name string, s storage.Driver) (types.
 		return types.BuildInfo{}, err
 	}
 
+	if err := s.Tag(buildID, buildKey.Tag); err != nil {
+		return types.BuildInfo{}, err
+	}
+
 	return s.Info(buildID)
 }
 
-func prepareVM(doc *etree.Document, info types.BuildInfo, name string) {
+func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKey) {
 	nameTag := doc.FindElement("//name")
 	for _, ch := range nameTag.Child {
 		nameTag.RemoveChild(ch)
 	}
-	nameTag.CreateText(name)
+	nameTag.CreateText(buildKey.String())
 
 	devicesTag := doc.FindElement("//devices")
 	filesystemTag := devicesTag.CreateElement("filesystem")

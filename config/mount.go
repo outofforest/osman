@@ -9,8 +9,14 @@ import (
 
 // MountFactory collects data for mount config
 type MountFactory struct {
+	// Name for mounted image
+	Name string
+
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
+
+	// VMFile is the file containing VM definition
+	VMFile string
 
 	// LibvirtAddr is the address libvirt listens on
 	LibvirtAddr string
@@ -19,11 +25,16 @@ type MountFactory struct {
 // Config returns new mount config
 func (f *MountFactory) Config(args Args) Mount {
 	config := Mount{
+		Name:        f.Name,
 		XMLDir:      f.XMLDir,
 		LibvirtAddr: f.LibvirtAddr,
+		Type:        types.BuildTypeMount,
 	}
-	if len(args) >= 2 {
-		config.VMFile = args[1]
+	if f.VMFile != "" {
+		config.Type = types.BuildTypeVM
+		if f.VMFile != "auto" {
+			config.VMFile = f.VMFile
+		}
 	}
 
 	buildID, err := types.ParseBuildID(args[0])
@@ -44,16 +55,22 @@ func (f *MountFactory) Config(args Args) Mount {
 
 // Mount stores configuration for mount command
 type Mount struct {
+	// Name for mounted image
+	Name string
+
 	// BuildID is the build ID of image to mount
 	BuildID types.BuildID
 
 	// BuildKey is the build key of image to mount
 	BuildKey types.BuildKey
 
+	// Type is the type of mount
+	Type types.BuildType
+
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
 
-	// VMFile is the path to file containing vm definition
+	// VMFile is the file containing VM definition
 	VMFile string
 
 	// LibvirtAddr is the address libvirt listens on

@@ -20,8 +20,8 @@ func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Short: "Mounts VM in Libvirt",
-		Args:  cobra.RangeArgs(1, 2),
-		Use:   "mount [flags] image [vm-file]",
+		Args:  cobra.ExactArgs(1),
+		Use:   "mount [flags] image",
 		RunE: cmdF.Cmd(func(c *ioc.Container) {
 			c.Singleton(loggingF.Config)
 			c.Singleton(storageF.Config)
@@ -43,5 +43,8 @@ func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 	formatF = cmdF.AddFormatFlags(cmd)
 	cmd.Flags().StringVar(&mountF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock", "Address libvirt listens on")
 	cmd.Flags().StringVar(&mountF.XMLDir, "xml-dir", "/tank/master/vms", "Directory where VM definition is taken from if vm-file argument is not provided")
+	cmd.Flags().StringVar(&mountF.Name, "name", "", "Name for mounted image, if empty and --vm is provided, name is derived from definition file")
+	cmd.Flags().StringVar(&mountF.VMFile, "vm", "", "Defines VM for mounted image in Libvirt using provided file. If flag is provided without value or value is `auto` then file is derived as <xml-dir>/<image-name>.xml")
+	cmd.Flags().Lookup("vm").NoOptDefVal = "auto"
 	return cmd
 }
