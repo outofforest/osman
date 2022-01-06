@@ -106,6 +106,145 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 	return info, nil
 }
 
+// List lists builds
+func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
+	buildTypes := map[types.BuildType]bool{}
+	for _, buildType := range filtering.Types {
+		buildTypes[buildType] = true
+	}
+
+	var buildIDs map[types.BuildID]bool
+	if len(filtering.BuildIDs) > 0 {
+		buildIDs = map[types.BuildID]bool{}
+		for _, buildID := range filtering.BuildIDs {
+			buildIDs[buildID] = true
+		}
+	}
+	var buildKeys map[types.BuildKey]bool
+	if len(filtering.BuildKeys) > 0 {
+		buildKeys = map[types.BuildKey]bool{}
+		for _, buildKey := range filtering.BuildKeys {
+			buildKeys[buildKey] = true
+		}
+	}
+
+	builds, err := s.Builds()
+	if err != nil {
+		return nil, err
+	}
+	list := make([]types.BuildInfo, 0, len(builds))
+	for _, buildID := range builds {
+		info, err := s.Info(buildID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !listBuild(info, buildTypes, buildIDs, buildKeys, filtering.Untagged) {
+			continue
+		}
+		list = append(list, info)
+	}
+	return list, nil
+}
+
+// Result contains error realted to build ID
+type Result struct {
+	BuildID types.BuildID
+	Result  error
+}
+
+// Drop drops builds
+func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
+	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
+		return nil, errors.New("neither filters are provided nor All is set")
+	}
+
+	builds, err := List(filtering, s)
+	if err != nil {
+		return nil, err
+	}
+
+	toDelete := map[types.BuildID]types.BuildInfo{}
+	tree := map[types.BuildID]types.BuildID{}
+	for _, build := range builds {
+		toDelete[build.BuildID] = build
+		for {
+			if _, exists := tree[build.BuildID]; exists {
+				break
+			}
+			tree[build.BuildID] = build.BasedOn
+			if build.BasedOn == "" {
+				break
+			}
+			var err error
+			build, err = s.Info(build.BuildID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if len(toDelete) == 0 {
+		return nil, fmt.Errorf("no builds were selected to delete")
+	}
+
+	enqueued := map[types.BuildID]bool{}
+	deleteSequence := make([]types.BuildInfo, 0, len(builds))
+	var sort func(buildID types.BuildID)
+	sort = func(buildID types.BuildID) {
+		if enqueued[buildID] {
+			return
+		}
+		if baseBuildID := tree[buildID]; baseBuildID != "" {
+			sort(baseBuildID)
+		}
+		if build, exists := toDelete[buildID]; exists {
+			enqueued[buildID] = true
+			deleteSequence = append(deleteSequence, build)
+		}
+	}
+	for _, build := range builds {
+		sort(build.BuildID)
+	}
+
+	results := make([]Result, 0, len(deleteSequence))
+	for i := len(deleteSequence) - 1; i >= 0; i-- {
+		build := deleteSequence[i]
+		res := Result{BuildID: build.BuildID}
+		if build.BuildID.Type().Properties().VM {
+			res.Result = undeployVM(types.BuildKey{Name: build.Name, Tag: build.Tags[0]}, drop.LibvirtAddr)
+		}
+		if res.Result == nil {
+			res.Result = s.Drop(build.BuildID)
+		}
+		results = append(results, res)
+	}
+	return results, nil
+}
+
+func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
+	if !buildTypes[info.BuildID.Type()] {
+		return false
+	}
+	if untagged && len(info.Tags) > 0 {
+		return false
+	}
+	if buildIDs != nil && buildIDs[info.BuildID] {
+		return true
+	}
+	if buildKeys != nil {
+		if buildKeys[types.NewBuildKey(info.Name, "")] {
+			return true
+		}
+		for _, tag := range info.Tags {
+			if buildKeys[types.NewBuildKey(info.Name, tag)] || buildKeys[types.NewBuildKey("", tag)] {
+				return true
+			}
+		}
+	}
+	return buildIDs == nil && buildKeys == nil
+}
+
 func vmName(doc *etree.Document) string {
 	nameTag := doc.FindElement("//name")
 	if nameTag == nil {
@@ -180,19 +319,27 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 	cmdlineTag.CreateText(strings.Join(append([]string{"root=virtiofs:root"}, info.Params...), " "))
 }
 
-func deployVM(vmDef string, libvirtAddr string) error {
-	addrParts := strings.SplitN(libvirtAddr, "://", 2)
+func libvirtConn(addr string) (*libvirt.Libvirt, error) {
+	addrParts := strings.SplitN(addr, "://", 2)
 	if len(addrParts) != 2 {
-		return fmt.Errorf("address %s has invalid format", libvirtAddr)
+		return nil, fmt.Errorf("address %s has invalid format", addr)
 	}
 
 	conn, err := net.DialTimeout(addrParts[0], addrParts[1], 2*time.Second)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	l := libvirt.NewWithDialer(dialers.NewAlreadyConnected(conn))
 	if err := l.Connect(); err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+func deployVM(vmDef string, libvirtAddr string) error {
+	l, err := libvirtConn(libvirtAddr)
+	if err != nil {
 		return err
 	}
 	defer func() {
@@ -203,134 +350,25 @@ func deployVM(vmDef string, libvirtAddr string) error {
 	return err
 }
 
-// List lists builds
-func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
-	buildTypes := map[types.BuildType]bool{}
-	for _, buildType := range filtering.Types {
-		buildTypes[buildType] = true
-	}
-
-	var buildIDs map[types.BuildID]bool
-	if len(filtering.BuildIDs) > 0 {
-		buildIDs = map[types.BuildID]bool{}
-		for _, buildID := range filtering.BuildIDs {
-			buildIDs[buildID] = true
-		}
-	}
-	var buildKeys map[types.BuildKey]bool
-	if len(filtering.BuildKeys) > 0 {
-		buildKeys = map[types.BuildKey]bool{}
-		for _, buildKey := range filtering.BuildKeys {
-			buildKeys[buildKey] = true
-		}
-	}
-
-	builds, err := s.Builds()
+func undeployVM(buildKey types.BuildKey, libvirtAddr string) error {
+	l, err := libvirtConn(libvirtAddr)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	list := make([]types.BuildInfo, 0, len(builds))
-	for _, buildID := range builds {
-		info, err := s.Info(buildID)
-		if err != nil {
-			return nil, err
-		}
+	defer func() {
+		_ = l.Disconnect()
+	}()
 
-		if !listBuild(info, buildTypes, buildIDs, buildKeys, filtering.Untagged) {
-			continue
-		}
-		list = append(list, info)
+	domain, err := l.DomainLookupByName(buildKey.String())
+	if libvirt.IsNotFound(err) {
+		return nil
 	}
-	return list, nil
-}
-
-// Result contains error realted to build ID
-type Result struct {
-	BuildID types.BuildID
-	Result  error
-}
-
-// Drop drops builds
-func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
-	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
-		return nil, errors.New("neither filters are provided nor All is set")
-	}
-
-	builds, err := List(filtering, s)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	toDelete := map[types.BuildID]bool{}
-	tree := map[types.BuildID]types.BuildID{}
-	for _, build := range builds {
-		toDelete[build.BuildID] = true
-		for {
-			if _, exists := tree[build.BuildID]; exists {
-				break
-			}
-			tree[build.BuildID] = build.BasedOn
-			if build.BasedOn == "" {
-				break
-			}
-			var err error
-			build, err = s.Info(build.BuildID)
-			if err != nil {
-				return nil, err
-			}
-		}
+	if err := l.DomainUndefineFlags(domain, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata); err != nil && !libvirt.IsNotFound(err) {
+		return err
 	}
-
-	if len(toDelete) == 0 {
-		return nil, fmt.Errorf("no builds were selected to delete")
-	}
-
-	enqueued := map[types.BuildID]bool{}
-	deleteSequence := make([]types.BuildID, 0, len(builds))
-	var sort func(buildID types.BuildID)
-	sort = func(buildID types.BuildID) {
-		if enqueued[buildID] {
-			return
-		}
-		if baseBuildID := tree[buildID]; baseBuildID != "" {
-			sort(baseBuildID)
-		}
-		if toDelete[buildID] {
-			enqueued[buildID] = true
-			deleteSequence = append(deleteSequence, buildID)
-		}
-	}
-	for _, build := range builds {
-		sort(build.BuildID)
-	}
-
-	results := make([]Result, 0, len(deleteSequence))
-	for i := len(deleteSequence) - 1; i >= 0; i-- {
-		buildID := deleteSequence[i]
-		results = append(results, Result{BuildID: buildID, Result: s.Drop(buildID)})
-	}
-	return results, nil
-}
-
-func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
-	if !buildTypes[info.BuildID.Type()] {
-		return false
-	}
-	if untagged && len(info.Tags) > 0 {
-		return false
-	}
-	if buildIDs != nil && buildIDs[info.BuildID] {
-		return true
-	}
-	if buildKeys != nil {
-		if buildKeys[types.NewBuildKey(info.Name, "")] {
-			return true
-		}
-		for _, tag := range info.Tags {
-			if buildKeys[types.NewBuildKey(info.Name, tag)] || buildKeys[types.NewBuildKey("", tag)] {
-				return true
-			}
-		}
-	}
-	return buildIDs == nil && buildKeys == nil
+	return nil
 }

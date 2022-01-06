@@ -50,6 +50,7 @@ func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
 	storageF = cmdF.AddStorageFlags(cmd)
 	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
 	formatF = cmdF.AddFormatFlags(cmd)
+	cmd.Flags().StringVar(&dropF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock", "Address libvirt listens on")
 	cmd.Flags().BoolVar(&dropF.All, "all", false, "It is required to set this flag to drop builds if no filters are provided")
 	return cmd
 }

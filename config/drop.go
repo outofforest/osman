@@ -4,12 +4,16 @@ package config
 type DropFactory struct {
 	// If no filter is provided it is required to set this flag to drop builds
 	All bool
+
+	// LibvirtAddr is the address libvirt listens on
+	LibvirtAddr string
 }
 
 // Config returns new drop config
 func (f *DropFactory) Config() Drop {
 	return Drop{
-		All: f.All,
+		All:         f.All,
+		LibvirtAddr: f.LibvirtAddr,
 	}
 }
 
@@ -17,4 +21,7 @@ func (f *DropFactory) Config() Drop {
 type Drop struct {
 	// If no filter is provided it is required to set this flag to drop builds
 	All bool
+
+	// LibvirtAddr is the address libvirt listens on
+	LibvirtAddr string
 }
