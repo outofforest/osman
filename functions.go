@@ -177,9 +177,7 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 
 	kernelTag.CreateText(info.Mounted + "/root/boot/vmlinuz")
 	initrdTag.CreateText(info.Mounted + "/root/boot/initramfs.img")
-	if len(info.Params) > 0 {
-		cmdlineTag.CreateText(strings.Join(info.Params, " "))
-	}
+	cmdlineTag.CreateText(strings.Join(append([]string{"root=virtiofs:root"}, info.Params...), " "))
 }
 
 func deployVM(vmDef string, libvirtAddr string) error {
