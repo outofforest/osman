@@ -10,10 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beevik/etree"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
-
-	"github.com/beevik/etree"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/storage"
@@ -40,21 +39,21 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 }
 
 // Mount mounts image
-func Mount(mount config.Mount, s storage.Driver) error {
+func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 	if !mount.BuildID.IsValid() {
 		var err error
 		mount.BuildID, err = s.BuildID(mount.BuildKey)
 		if err != nil {
-			return err
+			return types.BuildInfo{}, err
 		}
 	}
 	if !mount.BuildID.Type().Properties().Cloneable {
-		return fmt.Errorf("build %s is not cloneable", mount.BuildID)
+		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.BuildID)
 	}
 
 	image, err := s.Info(mount.BuildID)
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 
 	if mount.VMFile == "" {
@@ -63,12 +62,12 @@ func Mount(mount config.Mount, s storage.Driver) error {
 
 	doc := etree.NewDocument()
 	if err := doc.ReadFromFile(mount.VMFile); err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 
 	name, err := vmName(doc)
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 
 	list, err := List(config.Filter{
@@ -80,23 +79,26 @@ func Mount(mount config.Mount, s storage.Driver) error {
 		},
 	}, s)
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 	if len(list) > 0 {
-		return fmt.Errorf("build %s already exists", name)
+		return types.BuildInfo{}, fmt.Errorf("build %s already exists", name)
 	}
 
 	info, err := cloneForMount(image, name, s)
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
 
 	prepareVM(doc, info, name)
 	xmlDef, err := doc.WriteToString()
 	if err != nil {
-		return err
+		return types.BuildInfo{}, err
 	}
-	return deployVM(xmlDef, mount.LibvirtAddr)
+	if err := deployVM(xmlDef, mount.LibvirtAddr); err != nil {
+		return types.BuildInfo{}, err
+	}
+	return info, nil
 }
 
 func vmName(doc *etree.Document) (string, error) {
