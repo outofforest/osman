@@ -79,8 +79,8 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		if err := doc.ReadFromFile(mount.VMFile); err != nil {
 			return types.BuildInfo{}, err
 		}
-		if name := vmName(doc); name != "" {
-			mount.MountKey.Name = name
+		if mount.MountKey.Name == "" {
+			mount.MountKey.Name = vmName(doc)
 		}
 	}
 
@@ -88,20 +88,14 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		return types.BuildInfo{}, fmt.Errorf("mount key %s is invalid", mount.MountKey)
 	}
 
-	list, err := List(config.Filter{
-		Types: []types.BuildType{
-			types.BuildTypeMount,
-			types.BuildTypeVM,
-		},
-		BuildKeys: []types.BuildKey{
-			mount.MountKey,
-		},
-	}, s)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	if len(list) > 0 {
-		return types.BuildInfo{}, fmt.Errorf("build %s already exists", mount.MountKey)
+	if properties.VM {
+		exists, err := vmExists(mount.MountKey, mount.LibvirtAddr)
+		if err != nil {
+			return types.BuildInfo{}, err
+		}
+		if exists {
+			return types.BuildInfo{}, fmt.Errorf("vm %s has been already defined", mount.MountKey)
+		}
 	}
 
 	info, err := cloneForMount(image, mount.MountKey, mount.Type, s)
@@ -109,7 +103,7 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		return types.BuildInfo{}, err
 	}
 
-	if doc != nil {
+	if properties.VM {
 		prepareVM(doc, info, mount.MountKey)
 		xmlDef, err := doc.WriteToString()
 		if err != nil {
@@ -351,6 +345,25 @@ func libvirtConn(addr string) (*libvirt.Libvirt, error) {
 		return nil, err
 	}
 	return l, nil
+}
+
+func vmExists(buildKey types.BuildKey, libvirtAddr string) (bool, error) {
+	l, err := libvirtConn(libvirtAddr)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_ = l.Disconnect()
+	}()
+
+	_, err = l.DomainLookupByName(buildKey.String())
+	if libvirt.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func deployVM(vmDef string, libvirtAddr string) error {
