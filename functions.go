@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/beevik/etree"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
@@ -295,6 +297,19 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 	nameTag.CreateText(buildKey.String())
 
 	domainTag := doc.Root()
+	uuidTag := domainTag.FindElement("//uuid")
+	if uuidTag == nil {
+		uuidTag = domainTag.CreateElement("uuid")
+	}
+	for _, ch := range uuidTag.Child {
+		uuidTag.RemoveChild(ch)
+	}
+	uuid, err := uuid.NewUUID()
+	if err != nil {
+		panic(err)
+	}
+	uuidTag.CreateText(uuid.String())
+
 	metadataTag := domainTag.FindElement("//metadata")
 	if metadataTag == nil {
 		metadataTag = domainTag.CreateElement("metadata")

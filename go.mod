@@ -14,6 +14,7 @@ replace (
 require (
 	github.com/beevik/etree v1.1.0
 	github.com/digitalocean/go-libvirt v0.0.0-20210723161134-761cfeeb5968
+	github.com/google/uuid v1.3.0
 	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/outofforest/build v1.4.0
 	github.com/outofforest/buildgo v0.2.0
