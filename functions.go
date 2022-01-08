@@ -2,6 +2,7 @@ package osman
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"net"
@@ -10,11 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/beevik/etree"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
+	"github.com/google/uuid"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/storage"
@@ -289,6 +289,16 @@ func cloneForMount(image types.BuildInfo, buildKey types.BuildKey, imageType typ
 	return s.Info(buildID)
 }
 
+func mac() string {
+	buf := make([]byte, 5)
+	must.Any(rand.Read(buf))
+	res := "00" // just to ensure that unicast address is generated
+	for _, b := range buf {
+		res += fmt.Sprintf(":%02x", b)
+	}
+	return res
+}
+
 func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKey) {
 	nameTag := doc.FindElement("//name")
 	for _, ch := range nameTag.Child {
@@ -320,6 +330,15 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 	buildIDTag.CreateText(string(info.BuildID))
 
 	devicesTag := doc.FindElement("//devices")
+
+	for _, macTag := range devicesTag.FindElements("interface[@type='network']/mac") {
+		addressAttr := macTag.SelectAttr("address")
+		if addressAttr == nil {
+			addressAttr = macTag.CreateAttr("address", "")
+		}
+		addressAttr.Value = mac()
+	}
+
 	filesystemTag := devicesTag.CreateElement("filesystem")
 	filesystemTag.CreateAttr("type", "mount")
 	filesystemTag.CreateAttr("accessmode", "passthrough")

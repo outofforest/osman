@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/ridge/must"
 )
 
 // ErrImageDoesNotExist is returned if source image does not exist
@@ -42,9 +44,7 @@ func checksum(data string) string {
 // RandomString generates random string of fixed length
 func RandomString(length int) string {
 	buf := make([]byte, length)
-	if _, err := rand.Read(buf); err != nil {
-		panic(err)
-	}
+	must.Any(rand.Read(buf))
 	encode(buf)
 	return string(buf)
 }
