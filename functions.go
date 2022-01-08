@@ -174,10 +174,10 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 		return nil, err
 	}
 
-	toDelete := map[types.BuildID]types.BuildInfo{}
+	toDelete := map[types.BuildID]bool{}
 	tree := map[types.BuildID]types.BuildID{}
 	for _, build := range builds {
-		toDelete[build.BuildID] = build
+		toDelete[build.BuildID] = true
 		for {
 			if _, exists := tree[build.BuildID]; exists {
 				break
@@ -199,7 +199,7 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 	}
 
 	enqueued := map[types.BuildID]bool{}
-	deleteSequence := make([]types.BuildInfo, 0, len(builds))
+	deleteSequence := make([]types.BuildID, 0, len(builds))
 	var sort func(buildID types.BuildID)
 	sort = func(buildID types.BuildID) {
 		if enqueued[buildID] {
@@ -208,9 +208,9 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 		if baseBuildID := tree[buildID]; baseBuildID != "" {
 			sort(baseBuildID)
 		}
-		if build, exists := toDelete[buildID]; exists {
+		if toDelete[buildID] {
 			enqueued[buildID] = true
-			deleteSequence = append(deleteSequence, build)
+			deleteSequence = append(deleteSequence, buildID)
 		}
 	}
 	for _, build := range builds {
@@ -219,13 +219,13 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 
 	results := make([]Result, 0, len(deleteSequence))
 	for i := len(deleteSequence) - 1; i >= 0; i-- {
-		build := deleteSequence[i]
-		res := Result{BuildID: build.BuildID}
-		if build.BuildID.Type().Properties().VM {
-			res.Result = undeployVM(types.BuildKey{Name: build.Name, Tag: build.Tags[0]}, drop.LibvirtAddr)
+		buildID := deleteSequence[i]
+		res := Result{BuildID: buildID}
+		if buildID.Type().Properties().VM {
+			res.Result = undeployVM(buildID, drop.LibvirtAddr)
 		}
 		if res.Result == nil {
-			res.Result = s.Drop(build.BuildID)
+			res.Result = s.Drop(buildID)
 		}
 		results = append(results, res)
 	}
@@ -289,6 +289,16 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 		nameTag.RemoveChild(ch)
 	}
 	nameTag.CreateText(buildKey.String())
+
+	domainTag := doc.Root()
+	metadataTag := domainTag.FindElement("//metadata")
+	if metadataTag == nil {
+		metadataTag = domainTag.CreateElement("metadata")
+	}
+	osmanTag := metadataTag.CreateElement("osman:osman")
+	osmanTag.CreateAttr("xmlns:osman", "http://go.exw.co/osman")
+	buildIDTag := osmanTag.CreateElement("osman:buildid")
+	buildIDTag.CreateText(string(info.BuildID))
 
 	devicesTag := doc.FindElement("//devices")
 	filesystemTag := devicesTag.CreateElement("filesystem")
@@ -379,7 +389,7 @@ func deployVM(vmDef string, libvirtAddr string) error {
 	return err
 }
 
-func undeployVM(buildKey types.BuildKey, libvirtAddr string) error {
+func undeployVM(buildID types.BuildID, libvirtAddr string) error {
 	l, err := libvirtConn(libvirtAddr)
 	if err != nil {
 		return err
@@ -388,16 +398,29 @@ func undeployVM(buildKey types.BuildKey, libvirtAddr string) error {
 		_ = l.Disconnect()
 	}()
 
-	domain, err := l.DomainLookupByName(buildKey.String())
-	if libvirt.IsNotFound(err) {
-		return nil
-	}
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
 	if err != nil {
 		return err
 	}
-
-	if err := l.DomainUndefineFlags(domain, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata); err != nil && !libvirt.IsNotFound(err) {
-		return err
+	for _, d := range domains {
+		xml, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return err
+		}
+		doc := etree.NewDocument()
+		if err := doc.ReadFromString(xml); err != nil {
+			return err
+		}
+		buildIDTag := doc.FindElement("//metadata/osman:osman/osman:buildid")
+		if buildIDTag == nil {
+			continue
+		}
+		if buildID == types.BuildID(buildIDTag.Text()) {
+			if err := l.DomainUndefineFlags(d, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata); err != nil && !libvirt.IsNotFound(err) {
+				return err
+			}
+			return nil
+		}
 	}
 	return nil
 }
