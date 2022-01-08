@@ -61,7 +61,9 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		return types.BuildInfo{}, err
 	}
 
+	var nameFromBuild bool
 	if mount.MountKey.Name == "" {
+		nameFromBuild = true
 		mount.MountKey.Name = image.Name
 	}
 
@@ -79,8 +81,10 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		if err := doc.ReadFromFile(mount.VMFile); err != nil {
 			return types.BuildInfo{}, err
 		}
-		if mount.MountKey.Name == "" {
-			mount.MountKey.Name = vmName(doc)
+		if nameFromBuild {
+			if name := vmName(doc); name != "" {
+				mount.MountKey.Name = name
+			}
 		}
 	}
 
