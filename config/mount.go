@@ -9,12 +9,6 @@ import (
 
 // MountFactory collects data for mount config
 type MountFactory struct {
-	// Name for mounted image
-	Name string
-
-	// Tag of mounted image
-	Tag string
-
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
 
@@ -28,7 +22,6 @@ type MountFactory struct {
 // Config returns new mount config
 func (f *MountFactory) Config(args Args) Mount {
 	config := Mount{
-		MountKey:    types.NewBuildKey(f.Name, types.Tag(f.Tag)),
 		XMLDir:      f.XMLDir,
 		LibvirtAddr: f.LibvirtAddr,
 		Type:        types.BuildTypeMount,
@@ -37,6 +30,13 @@ func (f *MountFactory) Config(args Args) Mount {
 		config.Type = types.BuildTypeVM
 		if f.VMFile != "auto" {
 			config.VMFile = f.VMFile
+		}
+	}
+	if len(args) >= 2 {
+		var err error
+		config.MountKey, err = types.ParseBuildKey(args[1])
+		if err != nil {
+			panic(err)
 		}
 	}
 
