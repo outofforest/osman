@@ -61,8 +61,16 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		return types.BuildInfo{}, err
 	}
 
+	if mount.MountKey.Name == "" {
+		mount.MountKey.Name = image.Name
+	}
+
+	if mount.MountKey.Tag == "" {
+		mount.MountKey.Tag = types.Tag(types.RandomString(5))
+	}
+
 	if mount.VMFile == "" {
-		mount.VMFile = filepath.Join(mount.XMLDir, image.Name+".xml")
+		mount.VMFile = filepath.Join(mount.XMLDir, mount.MountKey.Name+".xml")
 	}
 
 	var doc *etree.Document
@@ -71,17 +79,9 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 		if err := doc.ReadFromFile(mount.VMFile); err != nil {
 			return types.BuildInfo{}, err
 		}
-		if mount.MountKey.Name == "" {
-			mount.MountKey.Name = vmName(doc)
+		if name := vmName(doc); name != "" {
+			mount.MountKey.Name = name
 		}
-	}
-
-	if mount.MountKey.Name == "" {
-		mount.MountKey.Name = image.Name
-	}
-
-	if mount.MountKey.Tag == "" {
-		mount.MountKey.Tag = types.Tag(types.RandomString(5))
 	}
 
 	if !mount.MountKey.IsValid() {
