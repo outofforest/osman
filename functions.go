@@ -41,7 +41,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 }
 
 // Mount mounts image
-func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
+func Mount(mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	properties := mount.Type.Properties()
 	if !properties.Mountable {
 		panic(fmt.Errorf("non-mountable image type received: %s", mount.Type))
@@ -108,6 +108,11 @@ func Mount(mount config.Mount, s storage.Driver) (types.BuildInfo, error) {
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
+	defer func() {
+		if retErr != nil {
+			_ = s.Drop(info.BuildID)
+		}
+	}()
 
 	if properties.VM {
 		prepareVM(doc, info, mount.MountKey)
@@ -269,11 +274,17 @@ func vmName(doc *etree.Document) string {
 	return nameTag.Text()
 }
 
-func cloneForMount(image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (types.BuildInfo, error) {
+func cloneForMount(image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	buildID := types.NewBuildID(imageType)
 	if _, _, err := s.Clone(image.BuildID, buildKey.Name, buildID); err != nil {
 		return types.BuildInfo{}, err
 	}
+	defer func() {
+		if retErr != nil {
+			_ = s.Drop(buildID)
+		}
+	}()
+
 	if err := s.StoreManifest(types.ImageManifest{
 		BuildID: buildID,
 		BasedOn: image.BuildID,
