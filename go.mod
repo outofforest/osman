@@ -18,7 +18,7 @@ require (
 	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/outofforest/build v1.4.0
 	github.com/outofforest/buildgo v0.2.0
-	github.com/outofforest/go-zfs/v2 v2.1.3
+	github.com/outofforest/go-zfs/v2 v2.2.0
 	github.com/outofforest/ioc/v2 v2.5.0
 	github.com/outofforest/isolator v0.4.1
 	github.com/outofforest/libexec v0.2.0
