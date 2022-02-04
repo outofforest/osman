@@ -205,8 +205,8 @@ github.com/outofforest/build v1.4.0 h1:6AT8keV00Ia3DblWruCJT4Z0JS2cQ4gyDumkV+Pb8
 github.com/outofforest/build v1.4.0/go.mod h1:taE3Bd0wdFkGm4XeVCT+cl5AO1l0FrXJi/faX0IiPOk=
 github.com/outofforest/buildgo v0.2.0 h1:v+zLeWIZjMc3FtAg8Jax9y9ejPGy55PwWU2HMrS6D/Q=
 github.com/outofforest/buildgo v0.2.0/go.mod h1:0yIE8fi7GpmBQh3yPlPTnTlhlmhZ8IKUAIQpxwKmahA=
-github.com/outofforest/go-zfs/v2 v2.1.3 h1:wuN9BxDv8HfEiGUp/H30ydavzV9JLTTTWxMq6j7R1KM=
-github.com/outofforest/go-zfs/v2 v2.1.3/go.mod h1:4DU//8Js/jRTsPrt0W9d37Aegz77Uq2PKcqGNwZk/Ng=
+github.com/outofforest/go-zfs/v2 v2.2.0 h1:qN3++w0Y1SJTo3S8facV9tEVdzREL/8sDEtx924mqc0=
+github.com/outofforest/go-zfs/v2 v2.2.0/go.mod h1:4DU//8Js/jRTsPrt0W9d37Aegz77Uq2PKcqGNwZk/Ng=
 github.com/outofforest/ioc/v2 v2.5.0 h1:adaOwJrk8IzlauIfe41SG7PNHK23dBQhrpAR5ho7m3E=
 github.com/outofforest/ioc/v2 v2.5.0/go.mod h1:7dAov+lZ7RbJ2TCy/IiK6+bicPmWZspga0P+exKudNE=
 github.com/outofforest/isolator v0.4.1 h1:62DX3REqVF6EoT5faWstmGgkE83Um9e7wqK8lJ27jEg=
