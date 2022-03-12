@@ -15,13 +15,12 @@ require (
 	github.com/beevik/etree v1.1.0
 	github.com/digitalocean/go-libvirt v0.0.0-20210723161134-761cfeeb5968
 	github.com/google/uuid v1.3.0
-	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/outofforest/build v1.4.0
-	github.com/outofforest/buildgo v0.2.0
-	github.com/outofforest/go-zfs/v2 v2.2.0
+	github.com/outofforest/buildgo v0.2.1
+	github.com/outofforest/go-zfs/v3 v3.0.0
 	github.com/outofforest/ioc/v2 v2.5.0
-	github.com/outofforest/isolator v0.4.1
-	github.com/outofforest/libexec v0.2.0
+	github.com/outofforest/isolator v0.4.2
+	github.com/outofforest/libexec v0.2.1
 	github.com/outofforest/logger v0.2.0
 	github.com/outofforest/run v0.2.2
 	github.com/pkg/errors v0.8.1

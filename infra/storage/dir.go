@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,7 +39,7 @@ type dirDriver struct {
 }
 
 // Builds returns available builds
-func (d *dirDriver) Builds() ([]types.BuildID, error) {
+func (d *dirDriver) Builds(ctx context.Context) ([]types.BuildID, error) {
 	buildLinks := filepath.Join(d.config.Root, subDirLinks)
 	dir, err := os.Open(buildLinks)
 	if err != nil {
@@ -63,7 +64,7 @@ func (d *dirDriver) Builds() ([]types.BuildID, error) {
 }
 
 // Info returns information about build
-func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
+func (d *dirDriver) Info(ctx context.Context, buildID types.BuildID) (types.BuildInfo, error) {
 	catalogLink := filepath.Join(d.config.Root, subDirLinks, string(buildID))
 	stat, err := os.Stat(catalogLink)
 	if err != nil {
@@ -129,7 +130,7 @@ func (d *dirDriver) Info(buildID types.BuildID) (types.BuildInfo, error) {
 }
 
 // BuildID returns build ID for build given by name and tag
-func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
+func (d *dirDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types.BuildID, error) {
 	buildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.Root, subDirCatalog, buildKey.Name, string(buildKey.Tag)))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -141,7 +142,7 @@ func (d *dirDriver) BuildID(buildKey types.BuildKey) (types.BuildID, error) {
 }
 
 // CreateEmpty creates blank build
-func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
+func (d *dirDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
 	buildDir := filepath.Join(subDirBuilds, string(buildID))
 	catalogLink := filepath.Join(subDirLinks, string(buildID))
 	catalogDir := filepath.Join(subDirCatalog, imageName)
@@ -162,7 +163,7 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) (Finali
 		return nil, "", err
 	}
 
-	if err := d.StoreManifest(types.ImageManifest{
+	if err := d.StoreManifest(ctx, types.ImageManifest{
 		BuildID: buildID,
 	}); err != nil {
 		return nil, "", err
@@ -174,7 +175,7 @@ func (d *dirDriver) CreateEmpty(imageName string, buildID types.BuildID) (Finali
 }
 
 // Clone clones source build to destination build
-func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (finalizeFn FinalizeFn, mountPath string, retErr error) {
+func (d *dirDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (finalizeFn FinalizeFn, mountPath string, retErr error) {
 	srcBuildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.Root, subDirLinks, string(srcBuildID), string(srcBuildID)))
 	if err != nil {
 		return nil, "", err
@@ -232,7 +233,7 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 		return nil, "", err
 	}
 
-	if err := d.StoreManifest(types.ImageManifest{
+	if err := d.StoreManifest(ctx, types.ImageManifest{
 		BuildID: dstBuildID,
 		BasedOn: srcBuildID,
 	}); err != nil {
@@ -245,7 +246,7 @@ func (d *dirDriver) Clone(srcBuildID types.BuildID, dstImageName string, dstBuil
 }
 
 // StoreManifest stores manifest of build
-func (d *dirDriver) StoreManifest(manifest types.ImageManifest) error {
+func (d *dirDriver) StoreManifest(ctx context.Context, manifest types.ImageManifest) error {
 	manifestFile := filepath.Join(d.config.Root, subDirManifests, string(manifest.BuildID))
 	if err := os.MkdirAll(filepath.Dir(manifestFile), 0o700); err != nil && !os.IsExist(err) {
 		return err
@@ -258,7 +259,7 @@ func (d *dirDriver) StoreManifest(manifest types.ImageManifest) error {
 }
 
 // Tag tags build with tag
-func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
+func (d *dirDriver) Tag(ctx context.Context, buildID types.BuildID, tag types.Tag) error {
 	tagLink := filepath.Join(d.config.Root, subDirLinks, string(buildID), string(tag))
 	if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
 		return err
@@ -267,7 +268,7 @@ func (d *dirDriver) Tag(buildID types.BuildID, tag types.Tag) error {
 }
 
 // Drop drops image
-func (d *dirDriver) Drop(buildID types.BuildID) (retErr error) {
+func (d *dirDriver) Drop(ctx context.Context, buildID types.BuildID) (retErr error) {
 	rootDir, err := d.rootDir()
 	if err != nil {
 		return err
