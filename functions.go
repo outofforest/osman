@@ -31,7 +31,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 		if err != nil {
 			return nil, err
 		}
-		info, err := s.Info(buildID)
+		info, err := s.Info(ctx, buildID)
 		if err != nil {
 			return nil, err
 		}
@@ -41,7 +41,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 }
 
 // Mount mounts image
-func Mount(mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
+func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	properties := mount.Type.Properties()
 	if !properties.Mountable {
 		panic(fmt.Errorf("non-mountable image type received: %s", mount.Type))
@@ -49,7 +49,7 @@ func Mount(mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retEr
 
 	if !mount.ImageBuildID.IsValid() {
 		var err error
-		mount.ImageBuildID, err = s.BuildID(mount.ImageBuildKey)
+		mount.ImageBuildID, err = s.BuildID(ctx, mount.ImageBuildKey)
 		if err != nil {
 			return types.BuildInfo{}, err
 		}
@@ -58,7 +58,7 @@ func Mount(mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retEr
 		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.ImageBuildID)
 	}
 
-	image, err := s.Info(mount.ImageBuildID)
+	image, err := s.Info(ctx, mount.ImageBuildID)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -104,13 +104,13 @@ func Mount(mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retEr
 		}
 	}
 
-	info, err := cloneForMount(image, mount.MountKey, mount.Type, s)
+	info, err := cloneForMount(ctx, image, mount.MountKey, mount.Type, s)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
 	defer func() {
 		if retErr != nil {
-			_ = s.Drop(info.BuildID)
+			_ = s.Drop(ctx, info.BuildID)
 		}
 	}()
 
@@ -128,7 +128,7 @@ func Mount(mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retEr
 }
 
 // List lists builds
-func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
+func List(ctx context.Context, filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 	buildTypes := map[types.BuildType]bool{}
 	for _, buildType := range filtering.Types {
 		buildTypes[buildType] = true
@@ -149,13 +149,13 @@ func List(filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) 
 		}
 	}
 
-	builds, err := s.Builds()
+	builds, err := s.Builds(ctx)
 	if err != nil {
 		return nil, err
 	}
 	list := make([]types.BuildInfo, 0, len(builds))
 	for _, buildID := range builds {
-		info, err := s.Info(buildID)
+		info, err := s.Info(ctx, buildID)
 		if err != nil {
 			return nil, err
 		}
@@ -175,12 +175,12 @@ type Result struct {
 }
 
 // Drop drops builds
-func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
+func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
 	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
 		return nil, errors.New("neither filters are provided nor All is set")
 	}
 
-	builds, err := List(filtering, s)
+	builds, err := List(ctx, filtering, s)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 				break
 			}
 			var err error
-			build, err = s.Info(build.BuildID)
+			build, err = s.Info(ctx, build.BuildID)
 			if err != nil {
 				return nil, err
 			}
@@ -236,7 +236,7 @@ func Drop(filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result
 			res.Result = undeployVM(buildID, drop.LibvirtAddr)
 		}
 		if res.Result == nil {
-			res.Result = s.Drop(buildID)
+			res.Result = s.Drop(ctx, buildID)
 		}
 		results = append(results, res)
 	}
@@ -274,18 +274,18 @@ func vmName(doc *etree.Document) string {
 	return nameTag.Text()
 }
 
-func cloneForMount(image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
+func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	buildID := types.NewBuildID(imageType)
-	if _, _, err := s.Clone(image.BuildID, buildKey.Name, buildID); err != nil {
+	if _, _, err := s.Clone(ctx, image.BuildID, buildKey.Name, buildID); err != nil {
 		return types.BuildInfo{}, err
 	}
 	defer func() {
 		if retErr != nil {
-			_ = s.Drop(buildID)
+			_ = s.Drop(ctx, buildID)
 		}
 	}()
 
-	if err := s.StoreManifest(types.ImageManifest{
+	if err := s.StoreManifest(ctx, types.ImageManifest{
 		BuildID: buildID,
 		BasedOn: image.BuildID,
 		Params:  image.Params,
@@ -293,11 +293,11 @@ func cloneForMount(image types.BuildInfo, buildKey types.BuildKey, imageType typ
 		return types.BuildInfo{}, err
 	}
 
-	if err := s.Tag(buildID, buildKey.Tag); err != nil {
+	if err := s.Tag(ctx, buildID, buildKey.Tag); err != nil {
 		return types.BuildInfo{}, err
 	}
 
-	return s.Info(buildID)
+	return s.Info(ctx, buildID)
 }
 
 func mac() string {

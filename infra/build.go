@@ -122,7 +122,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 		}
 		if retErr != nil {
-			if err := b.storage.Drop(buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
+			if err := b.storage.Drop(ctx, buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
 				retErr = err
 			}
 			return
@@ -135,7 +135,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		}
 
 		var err error
-		imgFinalize, path, err = b.storage.CreateEmpty(img.Name(), buildID)
+		imgFinalize, path, err = b.storage.CreateEmpty(ctx, img.Name(), buildID)
 		if err != nil {
 			return "", err
 		}
@@ -157,7 +157,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			err := types.ErrImageDoesNotExist
 			var srcBuildID types.BuildID
 			if !b.rebuild || b.readyBuilds[srcBuildKey] {
-				srcBuildID, err = b.storage.BuildID(srcBuildKey)
+				srcBuildID, err = b.storage.BuildID(ctx, srcBuildKey)
 			}
 
 			switch {
@@ -189,7 +189,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 
 			if !srcBuildID.IsValid() {
-				srcBuildID, err = b.storage.BuildID(srcBuildKey)
+				srcBuildID, err = b.storage.BuildID(ctx, srcBuildKey)
 				if err != nil {
 					return types.BuildInfo{}, err
 				}
@@ -198,12 +198,12 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", srcBuildKey)
 			}
 
-			imgFinalize, path, err = b.storage.Clone(srcBuildID, img.Name(), buildID)
+			imgFinalize, path, err = b.storage.Clone(ctx, srcBuildID, img.Name(), buildID)
 			if err != nil {
 				return types.BuildInfo{}, err
 			}
 
-			buildInfo, err := b.storage.Info(srcBuildID)
+			buildInfo, err := b.storage.Info(ctx, srcBuildID)
 			if err != nil {
 				return types.BuildInfo{}, err
 			}
@@ -239,13 +239,13 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		}
 
 		build.manifest.BuildID = buildID
-		if err := b.storage.StoreManifest(build.manifest); err != nil {
+		if err := b.storage.StoreManifest(ctx, build.manifest); err != nil {
 			return "", err
 		}
 	}
 
 	for _, key := range keys {
-		if err := b.storage.Tag(buildID, key.Tag); err != nil {
+		if err := b.storage.Tag(ctx, buildID, key.Tag); err != nil {
 			return "", err
 		}
 	}
