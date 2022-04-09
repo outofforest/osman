@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/build v1.4.0
 	github.com/outofforest/buildgo v0.2.1
-	github.com/outofforest/go-zfs/v3 v3.0.0
+	github.com/outofforest/go-zfs/v3 v3.1.2
 	github.com/outofforest/ioc/v2 v2.5.0
 	github.com/outofforest/isolator v0.4.2
 	github.com/outofforest/libexec v0.2.1
