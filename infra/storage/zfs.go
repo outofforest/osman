@@ -56,9 +56,12 @@ func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 		return types.BuildInfo{}, err
 	}
 
-	info, err := filesystem.GetProperty(ctx, propertyName)
+	info, exists, err := filesystem.GetProperty(ctx, propertyName)
 	if err != nil {
 		return types.BuildInfo{}, err
+	}
+	if !exists {
+		return types.BuildInfo{}, fmt.Errorf("property %s does not exist on filesystem %s", propertyName, filesystem.Info.Name)
 	}
 
 	var buildInfo types.BuildInfo
@@ -96,13 +99,13 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 
 // CreateEmpty creates blank build
 func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
-	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), map[string]string{
+	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), zfs.CreateFilesystemOptions{Properties: map[string]string{
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   buildID,
 			Name:      imageName,
 			CreatedAt: time.Now(),
 		}))),
-	})
+	}})
 	if err != nil {
 		return nil, "", err
 	}
@@ -126,20 +129,17 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 		return nil, "", err
 	}
 
-	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID))
+	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
+		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
+			BuildID:   dstBuildID,
+			BasedOn:   srcBuildID,
+			Name:      dstImageName,
+			CreatedAt: time.Now(),
+		}))),
+	}})
 	if err != nil {
 		return nil, "", err
 	}
-	err = filesystem.SetProperty(ctx, propertyName, string(must.Bytes(json.Marshal(types.BuildInfo{
-		BuildID:   dstBuildID,
-		BasedOn:   srcBuildID,
-		Name:      dstImageName,
-		CreatedAt: time.Now(),
-	}))))
-	if err != nil {
-		return nil, "", err
-	}
-
 	return func() error {
 		properties := dstBuildID.Type().Properties()
 		if !properties.Mountable {
