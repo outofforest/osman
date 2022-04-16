@@ -68,6 +68,9 @@ linters:
     - gomoddirectives
     - cyclop
     - ireturn
+    - errchkjson
+    - forcetypeassert
+    - maintidx
 
 linters-settings:
   nakedret:

@@ -26,7 +26,7 @@ func parseIgnore(rest string, d *directives) (*Node, map[string]bool, error) {
 
 // parses a whitespace-delimited set of arguments. The result is effectively a
 // linked list of string arguments.
-func parseStringsWhitespaceDelimited(rest string, _ *directives) (*Node, map[string]bool, error) { // nolint: unparam
+func parseStringsWhitespaceDelimited(rest string, _ *directives) (*Node, map[string]bool, error) {
 	if rest == "" {
 		return nil, nil, nil
 	}
