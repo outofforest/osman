@@ -21,7 +21,7 @@ func main() {
 		}
 
 		changeWorkingDir()
-		return build.Do(ctx, "osman", exec)
+		return build.Do(ctx, "go", exec)
 	})
 }
 
