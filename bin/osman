@@ -5,9 +5,6 @@ OUT="./tmp-osman"
 
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit
 
-if [ ! -f "$OUT" ]
-then
-  go build -o "$OUT" ../build/cmd
-fi
+go build -o "$OUT" ../build/cmd
 
 exec "$OUT" "$@"

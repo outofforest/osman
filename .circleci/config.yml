@@ -6,9 +6,7 @@ jobs:
 
     steps:
       - checkout
-      - run: |
-          export PATH="./bin:$PATH"
-          osman dev/lint dev/test build
+      - run: ./bin/osman dev/lint dev/test build
 workflows:
   version: 2
   pull-request:
