@@ -9,7 +9,8 @@ import (
 	"github.com/outofforest/libexec"
 )
 
-func buildApp(ctx context.Context) error {
+func buildApp(ctx context.Context, deps build.DepsFunc) error {
+	deps(buildgo.EnsureGo)
 	return buildgo.GoBuildPkg(ctx, "cmd", "bin/osman-app", false)
 }
 

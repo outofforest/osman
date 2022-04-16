@@ -7,9 +7,10 @@ import (
 
 	"github.com/outofforest/build"
 	"github.com/outofforest/ioc/v2"
-	me "github.com/outofforest/osman/build"
 	"github.com/outofforest/run"
 	"github.com/ridge/must"
+
+	me "github.com/outofforest/osman/build"
 )
 
 func main() {
@@ -20,7 +21,7 @@ func main() {
 		}
 
 		changeWorkingDir()
-		return build.Do(ctx, "Digest", exec)
+		return build.Do(ctx, "osman", exec)
 	})
 }
 
