@@ -4,11 +4,10 @@ jobs:
     docker:
       - image: cimg/go:1.18
 
-    working_directory: ~/osman
     steps:
       - checkout
       - run: |
-          export PATH="$HOME/osman/bin:$PATH"
+          export PATH="./bin:$PATH"
           osman dev/lint dev/test build
 workflows:
   version: 2
