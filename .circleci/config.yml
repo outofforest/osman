@@ -20,7 +20,9 @@ jobs:
     working_directory: ~/osman
     steps:
       - checkout
-      - run: ./bin/osman dev/lint dev/test build
+      - run: |
+          export PATH="$HOME/osman/bin:$PATH"
+          osman dev/lint dev/test build
 workflows:
   version: 2
   pull-request:
