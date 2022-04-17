@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-OUT="./tmp-osman"
+OUT="../bin/tmp-build"
 
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit
 
-go build -o "$OUT" ../build/cmd
+go build -o "$OUT" ./cmd
 
 exec "$OUT" "$@"
