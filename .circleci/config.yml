@@ -6,7 +6,7 @@ jobs:
 
     steps:
       - checkout
-      - run: ./bin/osman dev/lint dev/test build
+      - run: ./build/build dev/lint dev/test build
 workflows:
   version: 2
   pull-request:
