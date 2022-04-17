@@ -201,8 +201,8 @@ github.com/otiai10/mint v1.3.0/go.mod h1:F5AjcsTsWUqX+Na9fpHb52P8pcRX2CI6A3ctIT9
 github.com/otiai10/mint v1.3.3/go.mod h1:/yxELlJQ0ufhjUwhshSj+wFjZ78CnZ48/1wtmBH1OTc=
 github.com/outofforest/build v1.4.0/go.mod h1:taE3Bd0wdFkGm4XeVCT+cl5AO1l0FrXJi/faX0IiPOk=
 github.com/outofforest/build v1.6.0/go.mod h1:sSbcconn8iPIO8tyiU9L9CFVjAVXETDlM3EO0nVpe2w=
-github.com/outofforest/build v1.7.0 h1:9trychkiTY2UZhg0AMWss1bfsMNBFZdtLjW6QTMIMQE=
-github.com/outofforest/build v1.7.0/go.mod h1:sSbcconn8iPIO8tyiU9L9CFVjAVXETDlM3EO0nVpe2w=
+github.com/outofforest/build v1.7.1 h1:ZQ0C+s+5XLGaWuL3bXoFlBvvjduDKkjKfM+eyO1GT5g=
+github.com/outofforest/build v1.7.1/go.mod h1:sSbcconn8iPIO8tyiU9L9CFVjAVXETDlM3EO0nVpe2w=
 github.com/outofforest/buildgo v0.2.1/go.mod h1:L4kwtNRbHgqZVIM3Cn+e3pKpfQxSh3OprNTQbp5ua6A=
 github.com/outofforest/buildgo v0.3.2 h1:sWMIVJAvbywl7fFFYyOkpg75IBx3UyWohbRRCBJIGS0=
 github.com/outofforest/buildgo v0.3.2/go.mod h1:4EbGoYpSxhDpcHz7loN1lZ891opPcFhkGNF5A3WVu8k=
