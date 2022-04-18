@@ -14,4 +14,6 @@ jobs:
         with:
           persist-credentials: false
       - name: CI
-        run: go run ./build/cmd dev/lint dev/test build
+        run: |
+          go build -O ./bin/tmp-build
+          ./bin/tmp-build dev/lint dev/test build
