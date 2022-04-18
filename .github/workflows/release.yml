@@ -23,7 +23,7 @@ jobs:
           script: return context.ref.replace(/refs\/tags\//, '');
       - name: Build OSMan
         run: |
-          go build -o ./bin/tmp-build
+          go build -o ./bin/tmp-build ./build/cmd
           ./bin/tmp-build build
       - name: Build RPM
         id: rpm
