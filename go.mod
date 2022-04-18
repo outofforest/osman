@@ -15,12 +15,9 @@ require (
 	github.com/beevik/etree v1.1.0
 	github.com/digitalocean/go-libvirt v0.0.0-20220407213524-fde04463c367
 	github.com/google/uuid v1.3.0
-	github.com/outofforest/build v1.7.10
-	github.com/outofforest/buildgo v0.3.5
-	github.com/outofforest/go-zfs/v3 v3.1.3
+	github.com/outofforest/go-zfs/v3 v3.1.4
 	github.com/outofforest/ioc/v2 v2.5.0
-	github.com/outofforest/isolator v0.4.5
-	github.com/outofforest/libexec v0.2.1
+	github.com/outofforest/isolator v0.4.6
 	github.com/outofforest/logger v0.2.0
 	github.com/outofforest/run v0.2.2
 	github.com/pkg/errors v0.9.1
@@ -30,6 +27,7 @@ require (
 
 require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/outofforest/libexec v0.2.1 // indirect
 	github.com/ridge/parallel v0.1.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
