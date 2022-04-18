@@ -15,26 +15,25 @@ jobs:
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
-      - uses: actions/github-script@v6
-        name: Extract tag name
+      - name: Extract tag name
         id: tag
+        uses: actions/github-script@v6
         with:
           result-encoding: string
           script: return context.ref.replace(/refs\/tags\//, '');
-      - run: |
-          curl https://raw.githubusercontent.com/outofforest/build/main/build > /tmp/outofforest-build
-          chmod u+x /tmp/outofforest-build
-          /tmp/outofforest-build . build
-        name: Build OSMan
-      - uses: outofforest/rpmbuild@main
-        name: Build RPM
+      - name: Build OSMan
+        run: |
+          go build -o ./bin/tmp-build ./build/cmd
+          ./bin/tmp-build build
+      - name: Build RPM
         id: rpm
+        uses: outofforest/rpmbuild@main
         with:
           spec_file: ./build/osman.spec
           version: ${{ steps.tag.outputs.result }}
           out_dir: ./release
-      - uses: svenstaro/upload-release-action@v2
-        name: Upload RPM package to release
+      - name: Upload RPM package to release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref }}

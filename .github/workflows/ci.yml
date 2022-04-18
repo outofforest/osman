@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [ main ]
+
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+      - name: CI
+        run: |
+          go build -o ./bin/tmp-build ./build/cmd
+          ./bin/tmp-build dev/lint dev/test build
