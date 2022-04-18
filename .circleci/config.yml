@@ -7,11 +7,9 @@ jobs:
     steps:
       - checkout
       - run: |
-          curl https://raw.githubusercontent.com/outofforest/build/main/build > /usr/bin/outofforest-build
-          chmod a+x /usr/bin/outofforest-build
-          ls -lh /usr/bin/outofforest-build
-          cat /usr/bin/outofforest-build
-          /usr/bin/outofforest-build . dev/lint dev/test build
+          curl https://raw.githubusercontent.com/outofforest/build/main/build > ./outofforest-build
+          chmod u+x ./outofforest-build
+          ./outofforest-build . dev/lint dev/test build
 workflows:
   version: 2
   pull-request:
