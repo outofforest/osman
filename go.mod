@@ -15,8 +15,8 @@ require (
 	github.com/beevik/etree v1.1.0
 	github.com/digitalocean/go-libvirt v0.0.0-20220407213524-fde04463c367
 	github.com/google/uuid v1.3.0
-	github.com/outofforest/build v1.7.1
-	github.com/outofforest/buildgo v0.3.2
+	github.com/outofforest/build v1.7.9
+	github.com/outofforest/buildgo v0.3.3
 	github.com/outofforest/go-zfs/v3 v3.1.2
 	github.com/outofforest/ioc/v2 v2.5.0
 	github.com/outofforest/isolator v0.4.2

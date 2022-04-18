@@ -6,7 +6,10 @@ jobs:
 
     steps:
       - checkout
-      - run: ./build/build dev/lint dev/test build
+      - run: |
+          curl https://raw.githubusercontent.com/outofforest/build/main/build > /tmp/outofforest-build
+          chmod u+x /tmp/outofforest-build
+          /tmp/outofforest-build . dev/lint dev/test build
 workflows:
   version: 2
   pull-request:
