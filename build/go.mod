@@ -9,6 +9,5 @@ require (
 	github.com/outofforest/buildgo v0.3.6
 	github.com/outofforest/ioc/v2 v2.5.0
 	github.com/outofforest/libexec v0.2.1
-	github.com/outofforest/osman v0.1.2
 	github.com/outofforest/run v0.2.2
 )
