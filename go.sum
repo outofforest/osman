@@ -194,12 +194,12 @@ github.com/mitchellh/mapstructure v1.4.1/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RR
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
-github.com/outofforest/go-zfs/v3 v3.1.4 h1:tSf3ROEyf4rihCy9BAOidKVptEhPWSWiglVk1NgYSZk=
-github.com/outofforest/go-zfs/v3 v3.1.4/go.mod h1:EEbYceqfxe3/9XmdsrTfSegXfQed3QaMqRQ+vx7yjuE=
+github.com/outofforest/go-zfs/v3 v3.1.5 h1:IOoMOgf7AIBcH4zwxSlMtZ0y93C+HxvCfltDXunKqOo=
+github.com/outofforest/go-zfs/v3 v3.1.5/go.mod h1:EEbYceqfxe3/9XmdsrTfSegXfQed3QaMqRQ+vx7yjuE=
 github.com/outofforest/ioc/v2 v2.5.0 h1:adaOwJrk8IzlauIfe41SG7PNHK23dBQhrpAR5ho7m3E=
 github.com/outofforest/ioc/v2 v2.5.0/go.mod h1:7dAov+lZ7RbJ2TCy/IiK6+bicPmWZspga0P+exKudNE=
-github.com/outofforest/isolator v0.4.7 h1:ZE81BikD1ozyd+qbjBrsiXtQlAXilK6NGUm0DClDRg8=
-github.com/outofforest/isolator v0.4.7/go.mod h1:bPzhbQNHAOKVv+FaMDaA9/5fynrfi1f9c47XU7PkIGY=
+github.com/outofforest/isolator v0.4.8 h1:Vuf0ifyj/thd8SEXNOybkgOR1eMpN4zc3lfkK144SB8=
+github.com/outofforest/isolator v0.4.8/go.mod h1:bPzhbQNHAOKVv+FaMDaA9/5fynrfi1f9c47XU7PkIGY=
 github.com/outofforest/libexec v0.2.1 h1:x1Cfk88do1teCrgNxOotjWBpLGMtvmInNsvsJpP/P44=
 github.com/outofforest/libexec v0.2.1/go.mod h1:G3vH3SymR+QiJLfT3L4EnTqtrilFEukqnTE0JDbO/5Q=
 github.com/outofforest/logger v0.2.0 h1:mBUGPTu/nZjw81Qi/xspF0mdxzMEYl7ytANgNNixXgA=
