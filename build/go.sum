@@ -209,8 +209,6 @@ github.com/outofforest/libexec v0.2.1 h1:x1Cfk88do1teCrgNxOotjWBpLGMtvmInNsvsJpP
 github.com/outofforest/libexec v0.2.1/go.mod h1:G3vH3SymR+QiJLfT3L4EnTqtrilFEukqnTE0JDbO/5Q=
 github.com/outofforest/logger v0.2.0 h1:mBUGPTu/nZjw81Qi/xspF0mdxzMEYl7ytANgNNixXgA=
 github.com/outofforest/logger v0.2.0/go.mod h1:01cg+cIodmNhDh3tHk/eGKTAxbQIwcGM3Apo46ebWAs=
-github.com/outofforest/osman v0.1.2 h1:F9tYtcl/PUOnNnE0FVyHXu5WHAsJd+6tNZNf4b5xw1o=
-github.com/outofforest/osman v0.1.2/go.mod h1:+EQb6FchQOQlGyuRU+Do+hIcEIwm9sibcldn63MU5IU=
 github.com/outofforest/parallel v0.1.2 h1:alKV5c/WzdhVohQUyAWoYyi2Nigv4q1oBMW7Qj41MSQ=
 github.com/outofforest/parallel v0.1.2/go.mod h1:RuwcKVeJYrUFcmydQtOAw8S9zE8p9UhrEjsGMYl5sfU=
 github.com/outofforest/run v0.2.2 h1:a84c9s0D8QdEV9OApkGCVnX1VI1/kEeyWR3kz8uuObc=
