@@ -29,48 +29,6 @@ issues:
 
 linters:
   enable-all: true
-  disable:
-    - gochecknoglobals # this project does not have a rule to have no globals
-    - gochecknoinits   # this project does not have a rule to have no inits
-    - lll              # this project does not have a maximum line length
-    - maligned         # this project does not care about optimizing out last few bytes of memory
-    - godox            # this project explicitly allows FIXMEs in the code
-    - funlen           # this project does not have a maximum function length
-    - nestif           # this project only hires people who can handle nested control structures
-    - testpackage      # this project does not require separate test packages
-    - gofumpt          # this project does not have a rule to format everything using gofumpt
-    # The following checks are disabled due to false positives:
-    - gocyclo
-    - bodyclose
-    - interfacer
-    - gomnd    # this check has good intentions but the implementation is not good
-    - dupl     # this check finds duplicate code where it is plain old Go repetiveness
-    - gocognit # this check is too simplistic, marks even simple functions as "cognitively complex"
-    # The following checks are disabled due to a very low quality - they make suggestions that make code worse:
-    - gosec
-    - goerr113 # fmt.Errorf() prohibition is cruel.
-    # The following checks are disabled due to their all'round silliness:
-    - wsl
-    - godot
-    - varnamelen
-    # Temporarily disabled until all existing problems are fixed
-    - exhaustive
-    - noctx
-    - nlreturn
-    - wrapcheck
-    - paralleltest
-    - thelper
-    - predeclared
-    - exhaustivestruct
-    - errorlint
-    - gci
-    - forbidigo
-    - gomoddirectives
-    - cyclop
-    - ireturn
-    - errchkjson
-    - forcetypeassert
-    - maintidx
 
 linters-settings:
   nakedret:
