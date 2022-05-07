@@ -269,7 +269,12 @@ func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage
 			}
 		}
 	}
-	return List(ctx, filtering, s)
+
+	buildIDs := make([]types.BuildID, 0, len(builds))
+	for _, b := range builds {
+		buildIDs = append(buildIDs, b.BuildID)
+	}
+	return List(ctx, config.Filter{BuildIDs: buildIDs}, s)
 }
 
 func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
