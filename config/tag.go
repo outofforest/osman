@@ -1,6 +1,10 @@
 package config
 
-import "github.com/outofforest/osman/infra/types"
+import (
+	"fmt"
+
+	"github.com/outofforest/osman/infra/types"
+)
 
 // TagFactory collects data for tag config
 type TagFactory struct {
@@ -18,10 +22,18 @@ func (f *TagFactory) Config() Tag {
 		Add:    make([]types.Tag, 0, len(f.Add)),
 	}
 	for _, t := range f.Remove {
-		config.Remove = append(config.Remove, types.Tag(t))
+		tag := types.Tag((t))
+		if !tag.IsValid() {
+			panic(fmt.Errorf("invalid tag '%s'", tag))
+		}
+		config.Remove = append(config.Remove, tag)
 	}
 	for _, t := range f.Add {
-		config.Add = append(config.Add, types.Tag(t))
+		tag := types.Tag((t))
+		if !tag.IsValid() {
+			panic(fmt.Errorf("invalid tag '%s'", tag))
+		}
+		config.Add = append(config.Add, tag)
 	}
 	return config
 }
