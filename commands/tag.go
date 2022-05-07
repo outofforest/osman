@@ -18,8 +18,8 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 	var loggingF *config.LoggingFactory
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
-	var tagF *config.TagFactory
 	var formatF *config.FormatFactory
+	tagF := &config.TagFactory{}
 
 	cmd := &cobra.Command{
 		Short: "Removes and adds tags to the builds",
@@ -48,7 +48,9 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 	loggingF = cmdF.AddLoggingFlags(cmd)
 	storageF = cmdF.AddStorageFlags(cmd)
 	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
-	tagF = cmdF.AddTagFlags(cmd)
 	formatF = cmdF.AddFormatFlags(cmd)
+	cmd.Flags().StringSliceVar(&tagF.Remove, "remove", []string{}, "Tag to be removed")
+	cmd.Flags().StringSliceVar(&tagF.Add, "add", []string{}, "Tag to be added")
+	cmd.Flags().BoolVar(&tagF.All, "all", false, "It is required to set this flag to tag builds if no filters are provided")
 	return cmd
 }

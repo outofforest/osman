@@ -246,13 +246,17 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 
 // Tag removes and add tags to the build
 func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage.Driver) ([]types.BuildInfo, error) {
-	if len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
-		return nil, errors.New("no build provided")
+	if !tag.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
+		return nil, errors.New("neither filters are provided nor All is set")
 	}
 
 	builds, err := List(ctx, filtering, s)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(builds) == 0 {
+		return nil, fmt.Errorf("no builds were selected to tag")
 	}
 
 	for _, t := range tag.Remove {
