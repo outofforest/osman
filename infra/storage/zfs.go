@@ -184,6 +184,9 @@ func (d *zfsDriver) Tag(ctx context.Context, buildID types.BuildID, tag types.Ta
 		if err != nil {
 			return err
 		}
+		if existingInfo.BuildID == info.BuildID {
+			return nil
+		}
 		tags := make(types.Tags, 0, len(existingInfo.Tags)-1)
 		for _, t := range existingInfo.Tags {
 			if t != tag {
