@@ -145,7 +145,7 @@ func (bid BuildID) IsValidType(buildType BuildType) bool {
 	return bid.Type() == buildType
 }
 
-var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_]*$`)
+var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_.]*$`)
 
 // Tag is the tag of build
 type Tag string
