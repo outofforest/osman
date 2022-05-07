@@ -2,14 +2,15 @@ package main
 
 import (
 	"github.com/outofforest/ioc/v2"
+	"github.com/outofforest/run"
+	"github.com/spf13/cobra"
+
 	"github.com/outofforest/osman/commands"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/base"
 	"github.com/outofforest/osman/infra/format"
 	"github.com/outofforest/osman/infra/parser"
 	"github.com/outofforest/osman/infra/storage"
-	"github.com/outofforest/run"
-	"github.com/spf13/cobra"
 )
 
 func iocBuilder(c *ioc.Container) {
@@ -34,6 +35,7 @@ func iocBuilder(c *ioc.Container) {
 	c.SingletonNamed("mount", commands.NewMountCommand)
 	c.SingletonNamed("list", commands.NewListCommand)
 	c.SingletonNamed("drop", commands.NewDropCommand)
+	c.SingletonNamed("tag", commands.NewTagCommand)
 }
 
 func main() {
