@@ -270,8 +270,7 @@ func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage
 		}
 	}
 
-	filtering.BuildIDs = make([]types.BuildID, 0, len(builds))
-	filtering.BuildKeys = nil
+	filtering = config.Filter{BuildIDs: make([]types.BuildID, 0, len(builds)), Types: filtering.Types}
 	for _, b := range builds {
 		filtering.BuildIDs = append(filtering.BuildIDs, b.BuildID)
 	}
