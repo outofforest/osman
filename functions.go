@@ -15,11 +15,12 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
 	"github.com/google/uuid"
+	"github.com/ridge/must"
+
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/storage"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/ridge/must"
 )
 
 // Build builds image
@@ -241,6 +242,34 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 		results = append(results, res)
 	}
 	return results, nil
+}
+
+// Tag removes and add tags to the build
+func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage.Driver) ([]types.BuildInfo, error) {
+	if len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
+		return nil, errors.New("no build provided")
+	}
+
+	builds, err := List(ctx, filtering, s)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range tag.Remove {
+		for _, build := range builds {
+			if err := s.Untag(ctx, build.BuildID, t); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for _, t := range tag.Add {
+		for _, build := range builds {
+			if err := s.Tag(ctx, build.BuildID, t); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return List(ctx, filtering, s)
 }
 
 func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {

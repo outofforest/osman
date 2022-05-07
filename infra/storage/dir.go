@@ -14,6 +14,7 @@ import (
 
 	"github.com/outofforest/isolator"
 	"github.com/outofforest/isolator/client/wire"
+
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
 )
@@ -261,10 +262,24 @@ func (d *dirDriver) StoreManifest(ctx context.Context, manifest types.ImageManif
 // Tag tags build with tag
 func (d *dirDriver) Tag(ctx context.Context, buildID types.BuildID, tag types.Tag) error {
 	tagLink := filepath.Join(d.config.Root, subDirLinks, string(buildID), string(tag))
+
 	if err := os.Remove(tagLink); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return os.Symlink(string(buildID), tagLink)
+}
+
+// Untag removes tag from the build
+func (d *dirDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.Tag) error {
+	tagLink := filepath.Join(d.config.Root, subDirLinks, string(buildID), string(tag))
+	buildDir, err := filepath.EvalSymlinks(tagLink)
+	if err != nil {
+		return fmt.Errorf("build %s is not tagged with %s: %w", buildID, tag, err)
+	}
+	if string(buildID) != filepath.Base(buildDir) {
+		return fmt.Errorf("build %s is not tagged with %s", buildID, tag)
+	}
+	return os.Remove(tagLink)
 }
 
 // Drop drops image

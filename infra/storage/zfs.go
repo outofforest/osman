@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/outofforest/go-zfs/v3"
+	"github.com/ridge/must"
+
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/ridge/must"
 )
 
 const propertyName = "co.exw:info"
@@ -199,6 +200,25 @@ func (d *zfsDriver) Tag(ctx context.Context, buildID types.BuildID, tag types.Ta
 	}
 
 	info.Tags = append(info.Tags, tag)
+	return d.setInfo(ctx, info)
+}
+
+// Untag removes tag from the build
+func (d *zfsDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.Tag) error {
+	info, err := d.Info(ctx, buildID)
+	if err != nil {
+		return err
+	}
+	tags := info.Tags
+	info.Tags = make(types.Tags, 0, len(tags))
+	for _, t := range tags {
+		if t != tag {
+			info.Tags = append(info.Tags, t)
+		}
+	}
+	if len(info.Tags) == len(tags) {
+		return fmt.Errorf("build %s is not tagged with %s", buildID, tag)
+	}
 	return d.setInfo(ctx, info)
 }
 

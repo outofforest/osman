@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/outofforest/ioc/v2"
+
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
 )
@@ -37,6 +38,9 @@ type Driver interface {
 
 	// Tag tags build with tag
 	Tag(ctx context.Context, buildID types.BuildID, tag types.Tag) error
+
+	// Untag removes tag from the build
+	Untag(ctx context.Context, buildID types.BuildID, tag types.Tag) error
 
 	// Drop drops build
 	Drop(ctx context.Context, buildID types.BuildID) error

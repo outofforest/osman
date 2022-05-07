@@ -5,10 +5,11 @@ import (
 
 	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/logger"
+	"github.com/spf13/cobra"
+
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 	"github.com/outofforest/osman/infra/storage"
-	"github.com/spf13/cobra"
 )
 
 // NewCmdFactory returns new CmdFactory
@@ -70,6 +71,16 @@ func (f *CmdFactory) AddFilterFlags(cmd *cobra.Command, defaultTypes []string) *
 	cmd.Flags().BoolVar(&filterF.Untagged, "untagged", false, "If set, only untagged builds are considered")
 
 	return filterF
+}
+
+// AddTagFlags adds taggingflags to command
+func (f *CmdFactory) AddTagFlags(cmd *cobra.Command) *config.TagFactory {
+	tagF := &config.TagFactory{}
+
+	cmd.Flags().StringSliceVar(&tagF.Remove, "remove", []string{}, "Tag to be removed")
+	cmd.Flags().StringSliceVar(&tagF.Add, "add", []string{}, "Tag to be added")
+
+	return tagF
 }
 
 // AddFormatFlags adds formatting flags to command
