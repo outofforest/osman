@@ -47,7 +47,7 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 
 	loggingF = cmdF.AddLoggingFlags(cmd)
 	storageF = cmdF.AddStorageFlags(cmd)
-	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage, config.BuildTypeMount, config.BuildTypeVM})
+	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
 	tagF = cmdF.AddTagFlags(cmd)
 	formatF = cmdF.AddFormatFlags(cmd)
 	return cmd
