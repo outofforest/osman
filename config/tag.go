@@ -8,6 +8,9 @@ import (
 
 // TagFactory collects data for tag config
 type TagFactory struct {
+	// If no filter is provided it is required to set this flag to tag builds
+	All bool
+
 	// Remove is the list of tags to remove
 	Remove []string
 
@@ -18,6 +21,7 @@ type TagFactory struct {
 // Config returns new tag config
 func (f *TagFactory) Config() Tag {
 	config := Tag{
+		All:    f.All,
 		Remove: make([]types.Tag, 0, len(f.Remove)),
 		Add:    make([]types.Tag, 0, len(f.Add)),
 	}
@@ -40,6 +44,9 @@ func (f *TagFactory) Config() Tag {
 
 // Tag stores configuration related to tag operation
 type Tag struct {
+	// If no filter is provided it is required to set this flag to tag builds
+	All bool
+
 	// Remove is the list of tags to remove
 	Remove []types.Tag
 

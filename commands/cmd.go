@@ -73,16 +73,6 @@ func (f *CmdFactory) AddFilterFlags(cmd *cobra.Command, defaultTypes []string) *
 	return filterF
 }
 
-// AddTagFlags adds taggingflags to command
-func (f *CmdFactory) AddTagFlags(cmd *cobra.Command) *config.TagFactory {
-	tagF := &config.TagFactory{}
-
-	cmd.Flags().StringSliceVar(&tagF.Remove, "remove", []string{}, "Tag to be removed")
-	cmd.Flags().StringSliceVar(&tagF.Add, "add", []string{}, "Tag to be added")
-
-	return tagF
-}
-
 // AddFormatFlags adds formatting flags to command
 func (f *CmdFactory) AddFormatFlags(cmd *cobra.Command) *config.FormatFactory {
 	formatF := &config.FormatFactory{}
