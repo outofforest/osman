@@ -3,11 +3,11 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/outofforest/go-zfs/v3"
+	"github.com/pkg/errors"
 	"github.com/ridge/must"
 
 	"github.com/outofforest/osman/config"
@@ -62,7 +62,7 @@ func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 		return types.BuildInfo{}, err
 	}
 	if !exists {
-		return types.BuildInfo{}, fmt.Errorf("property %s does not exist on filesystem %s", propertyName, filesystem.Info.Name)
+		return types.BuildInfo{}, errors.Errorf("property %s does not exist on filesystem %s", propertyName, filesystem.Info.Name)
 	}
 
 	var buildInfo types.BuildInfo
@@ -95,7 +95,7 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 			return buildID, nil
 		}
 	}
-	return "", fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist)
+	return "", errors.WithStack(fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist))
 }
 
 // CreateEmpty creates blank build
@@ -220,7 +220,7 @@ func (d *zfsDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.
 		}
 	}
 	if len(info.Tags) == len(tags) {
-		return fmt.Errorf("build %s is not tagged with %s", buildID, tag)
+		return errors.Errorf("build %s is not tagged with %s", buildID, tag)
 	}
 	return d.setInfo(ctx, info)
 }
@@ -229,11 +229,11 @@ func (d *zfsDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.
 func (d *zfsDriver) Drop(ctx context.Context, buildID types.BuildID) error {
 	filesystem, err := zfs.GetFilesystem(ctx, d.config.Root+"/"+string(buildID))
 	if err != nil {
-		return fmt.Errorf("build %s does not exist: %w", buildID, types.ErrImageDoesNotExist)
+		return errors.WithStack(fmt.Errorf("build %s does not exist: %w", buildID, types.ErrImageDoesNotExist))
 	}
 
 	if err := filesystem.Destroy(ctx, zfs.DestroyRecursive); err != nil {
-		return fmt.Errorf("build %s have children: %w", buildID, ErrImageHasChildren)
+		return errors.WithStack(fmt.Errorf("build %s have children: %w", buildID, ErrImageHasChildren))
 	}
 	return nil
 }

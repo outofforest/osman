@@ -15,7 +15,6 @@ import (
 
 // NewTagCommand returns new tag command
 func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
-	var loggingF *config.LoggingFactory
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
 	var formatF *config.FormatFactory
@@ -25,7 +24,6 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 		Short: "Removes and adds tags to the builds",
 		Use:   "tag [flags] [... buildID | [name][:tag]]",
 		RunE: cmdF.Cmd(func(c *ioc.Container) {
-			c.Singleton(loggingF.Config)
 			c.Singleton(storageF.Config)
 			c.Singleton(filterF.Config)
 			c.Singleton(tagF.Config)
@@ -44,8 +42,6 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 			return nil
 		}),
 	}
-
-	loggingF = cmdF.AddLoggingFlags(cmd)
 	storageF = cmdF.AddStorageFlags(cmd)
 	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
 	formatF = cmdF.AddFormatFlags(cmd)

@@ -3,7 +3,6 @@ package osman
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/ridge/must"
 
 	"github.com/outofforest/osman/config"
@@ -45,7 +45,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	properties := mount.Type.Properties()
 	if !properties.Mountable {
-		panic(fmt.Errorf("non-mountable image type received: %s", mount.Type))
+		panic(errors.Errorf("non-mountable image type received: %s", mount.Type))
 	}
 
 	if !mount.ImageBuildID.IsValid() {
@@ -56,7 +56,7 @@ func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo t
 		}
 	}
 	if !mount.ImageBuildID.Type().Properties().Cloneable {
-		return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", mount.ImageBuildID)
+		return types.BuildInfo{}, errors.Errorf("build %s is not cloneable", mount.ImageBuildID)
 	}
 
 	image, err := s.Info(ctx, mount.ImageBuildID)
@@ -92,7 +92,7 @@ func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo t
 	}
 
 	if !mount.MountKey.IsValid() {
-		return types.BuildInfo{}, fmt.Errorf("mount key %s is invalid", mount.MountKey)
+		return types.BuildInfo{}, errors.Errorf("mount key %s is invalid", mount.MountKey)
 	}
 
 	if properties.VM {
@@ -101,7 +101,7 @@ func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo t
 			return types.BuildInfo{}, err
 		}
 		if exists {
-			return types.BuildInfo{}, fmt.Errorf("vm %s has been already defined", mount.MountKey)
+			return types.BuildInfo{}, errors.Errorf("vm %s has been already defined", mount.MountKey)
 		}
 	}
 
@@ -207,7 +207,7 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 	}
 
 	if len(toDelete) == 0 {
-		return nil, fmt.Errorf("no builds were selected to delete")
+		return nil, errors.New("no builds were selected to delete")
 	}
 
 	enqueued := map[types.BuildID]bool{}
@@ -256,7 +256,7 @@ func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage
 	}
 
 	if len(builds) == 0 {
-		return nil, fmt.Errorf("no builds were selected to tag")
+		return nil, errors.New("no builds were selected to tag")
 	}
 
 	for _, t := range tag.Remove {
@@ -429,7 +429,7 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 func libvirtConn(addr string) (*libvirt.Libvirt, error) {
 	addrParts := strings.SplitN(addr, "://", 2)
 	if len(addrParts) != 2 {
-		return nil, fmt.Errorf("address %s has invalid format", addr)
+		return nil, errors.Errorf("address %s has invalid format", addr)
 	}
 
 	conn, err := net.DialTimeout(addrParts[0], addrParts[1], 2*time.Second)

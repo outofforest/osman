@@ -2,9 +2,9 @@ package storage
 
 import (
 	"context"
-	"errors"
 
 	"github.com/outofforest/ioc/v2"
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"

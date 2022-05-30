@@ -2,14 +2,14 @@ package infra
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/outofforest/isolator"
 	"github.com/outofforest/isolator/client"
 	"github.com/outofforest/isolator/client/wire"
+	"github.com/pkg/errors"
+
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/base"
 	"github.com/outofforest/osman/infra/description"
@@ -75,7 +75,7 @@ func (b *Builder) initialize(buildKey types.BuildKey, path string) (retErr error
 
 func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retBuildID types.BuildID, retErr error) {
 	if !types.IsNameValid(img.Name()) {
-		return "", fmt.Errorf("name %s is invalid", img.Name())
+		return "", errors.Errorf("name %s is invalid", img.Name())
 	}
 	tags := img.Tags()
 	if len(tags) == 0 {
@@ -84,11 +84,11 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	keys := make([]types.BuildKey, 0, len(tags))
 	for _, tag := range tags {
 		if !tag.IsValid() {
-			return "", fmt.Errorf("tag %s is invalid", tag)
+			return "", errors.Errorf("tag %s is invalid", tag)
 		}
 		key := types.NewBuildKey(img.Name(), tag)
 		if stack[key] {
-			return "", fmt.Errorf("loop in dependencies detected on image %s", key)
+			return "", errors.Errorf("loop in dependencies detected on image %s", key)
 		}
 		stack[key] = true
 		keys = append(keys, key)
@@ -147,10 +147,10 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 		var build *imageBuild
 		build = newImageBuild(func(srcBuildKey types.BuildKey) (types.BuildInfo, error) {
 			if !types.IsNameValid(srcBuildKey.Name) {
-				return types.BuildInfo{}, fmt.Errorf("name %s is invalid", srcBuildKey.Name)
+				return types.BuildInfo{}, errors.Errorf("name %s is invalid", srcBuildKey.Name)
 			}
 			if !srcBuildKey.Tag.IsValid() {
-				return types.BuildInfo{}, fmt.Errorf("tag %s is invalid", srcBuildKey.Tag)
+				return types.BuildInfo{}, errors.Errorf("tag %s is invalid", srcBuildKey.Tag)
 			}
 
 			// Try to clone existing image
@@ -195,7 +195,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				}
 			}
 			if !srcBuildID.Type().Properties().Cloneable {
-				return types.BuildInfo{}, fmt.Errorf("build %s is not cloneable", srcBuildKey)
+				return types.BuildInfo{}, errors.Errorf("build %s is not cloneable", srcBuildKey)
 			}
 
 			imgFinalize, path, err = b.storage.Clone(ctx, srcBuildID, img.Name(), buildID)
@@ -317,7 +317,7 @@ func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 			}
 		case wire.Result:
 			if m.Error != "" {
-				return fmt.Errorf("command failed: %s", m.Error)
+				return errors.Errorf("command failed: %s", m.Error)
 			}
 			return nil
 		default:
@@ -334,7 +334,7 @@ func toStream(stream wire.Stream) (*os.File, error) {
 	case wire.StreamErr:
 		f = os.Stderr
 	default:
-		return nil, fmt.Errorf("unknown stream: %d", stream)
+		return nil, errors.Errorf("unknown stream: %d", stream)
 	}
 	return f, nil
 }

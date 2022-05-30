@@ -1,10 +1,11 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/types"
@@ -52,11 +53,11 @@ func (p *specFileParser) Parse(filePath string) ([]description.Command, error) {
 		case "include":
 			cmds, err = p.cmdInclude(args)
 		default:
-			return nil, fmt.Errorf("unknown command '%s' in line %d", child.Value, child.StartLine)
+			return nil, errors.Errorf("unknown command '%s' in line %d", child.Value, child.StartLine)
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("error in line %d of %s command: %w", child.StartLine, child.Value, err)
+			return nil, errors.WithStack(fmt.Errorf("error in line %d of %s command: %w", child.StartLine, child.Value, err))
 		}
 
 		commands = append(commands, cmds...)
@@ -66,7 +67,7 @@ func (p *specFileParser) Parse(filePath string) ([]description.Command, error) {
 
 func (p *specFileParser) cmdFrom(args []string) ([]description.Command, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
+		return nil, errors.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
 	}
 	if args[0] == "" {
 		return nil, errors.New("first argument is empty")
@@ -82,14 +83,14 @@ func (p *specFileParser) cmdFrom(args []string) ([]description.Command, error) {
 
 func (p *specFileParser) cmdParams(args []string) ([]description.Command, error) {
 	if len(args) == 0 {
-		return nil, fmt.Errorf("no arguments passed")
+		return nil, errors.Errorf("no arguments passed")
 	}
 	return []description.Command{description.Params(args...)}, nil
 }
 
 func (p *specFileParser) cmdRun(args []string) ([]description.Command, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
+		return nil, errors.Errorf("incorrect number of arguments, expected: 1, got: %d", len(args))
 	}
 	if args[0] == "" {
 		return nil, errors.New("first argument is empty")
@@ -99,7 +100,7 @@ func (p *specFileParser) cmdRun(args []string) ([]description.Command, error) {
 
 func (p *specFileParser) cmdInclude(args []string) ([]description.Command, error) {
 	if len(args) == 0 {
-		return nil, fmt.Errorf("no arguments passed")
+		return nil, errors.New("no arguments passed")
 	}
 
 	res := []description.Command{}

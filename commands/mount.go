@@ -5,17 +5,17 @@ import (
 	"os"
 
 	"github.com/outofforest/ioc/v2"
+	"github.com/ridge/must"
+	"github.com/spf13/cobra"
+
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 	"github.com/outofforest/osman/infra/types"
-	"github.com/ridge/must"
-	"github.com/spf13/cobra"
 )
 
 // NewMountCommand creates new mount command
 func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
-	var loggingF *config.LoggingFactory
 	var storageF *config.StorageFactory
 	var formatF *config.FormatFactory
 	mountF := &config.MountFactory{}
@@ -25,7 +25,6 @@ func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 		Use:   "mount [flags] image [name][:tag]",
 		RunE: cmdF.Cmd(func(c *ioc.Container) {
-			c.Singleton(loggingF.Config)
 			c.Singleton(storageF.Config)
 			c.Singleton(formatF.Config)
 			c.Singleton(mountF.Config)
@@ -40,7 +39,6 @@ func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 			return nil
 		}),
 	}
-	loggingF = cmdF.AddLoggingFlags(cmd)
 	storageF = cmdF.AddStorageFlags(cmd)
 	formatF = cmdF.AddFormatFlags(cmd)
 	cmd.Flags().StringVar(&mountF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock", "Address libvirt listens on")

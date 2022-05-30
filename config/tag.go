@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/infra/types"
 )
@@ -28,14 +28,14 @@ func (f *TagFactory) Config() Tag {
 	for _, t := range f.Remove {
 		tag := types.Tag((t))
 		if !tag.IsValid() {
-			panic(fmt.Errorf("invalid tag '%s'", tag))
+			panic(errors.Errorf("invalid tag '%s'", tag))
 		}
 		config.Remove = append(config.Remove, tag)
 	}
 	for _, t := range f.Add {
 		tag := types.Tag((t))
 		if !tag.IsValid() {
-			panic(fmt.Errorf("invalid tag '%s'", tag))
+			panic(errors.Errorf("invalid tag '%s'", tag))
 		}
 		config.Add = append(config.Add, tag)
 	}
