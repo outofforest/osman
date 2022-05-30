@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/outofforest/ioc/v2"
-	"github.com/outofforest/logger"
 	"github.com/spf13/cobra"
 
 	"github.com/outofforest/osman/config"
@@ -33,24 +32,10 @@ func (f *CmdFactory) Cmd(setupFunc interface{}, cmdFunc interface{}) func(cmd *c
 		if setupFunc != nil {
 			f.c.Call(setupFunc)
 		}
-		f.c.Resolve(func(loggingCfg config.Logging) {
-			if !loggingCfg.Verbose {
-				logger.VerboseOff()
-			}
-		})
 		var err error
 		f.c.Call(cmdFunc, &err)
 		return err
 	}
-}
-
-// AddLoggingFlags adds logging flags to command
-func (f *CmdFactory) AddLoggingFlags(cmd *cobra.Command) *config.LoggingFactory {
-	loggingF := &config.LoggingFactory{}
-
-	cmd.Flags().BoolVarP(&loggingF.VerboseLogging, "verbose", "v", false, "Turns on verbose logging")
-
-	return loggingF
 }
 
 // AddStorageFlags adds storage flags to command

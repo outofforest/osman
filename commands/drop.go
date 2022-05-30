@@ -1,19 +1,19 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/outofforest/ioc/v2"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
-	"github.com/spf13/cobra"
 )
 
 // NewDropCommand returns new drop command
 func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
-	var loggingF *config.LoggingFactory
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
 	var formatF *config.FormatFactory
@@ -23,7 +23,6 @@ func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
 		Short: "Drops builds",
 		Use:   "drop [flags] [... buildID | [name][:tag]]",
 		RunE: cmdF.Cmd(func(c *ioc.Container) {
-			c.Singleton(loggingF.Config)
 			c.Singleton(storageF.Config)
 			c.Singleton(filterF.Config)
 			c.Singleton(formatF.Config)
@@ -46,7 +45,6 @@ func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
 			return err
 		}),
 	}
-	loggingF = cmdF.AddLoggingFlags(cmd)
 	storageF = cmdF.AddStorageFlags(cmd)
 	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
 	formatF = cmdF.AddFormatFlags(cmd)

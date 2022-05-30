@@ -4,13 +4,14 @@ package parser
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/pkg/errors"
 )
 
 // Node is a structure used to represent a parse tree.
@@ -111,7 +112,7 @@ type directives struct {
 // allowed as token.
 func (d *directives) setEscapeToken(s string) error {
 	if s != "`" && s != `\` {
-		return fmt.Errorf("invalid escape token '%s' does not match ` or \\", s)
+		return errors.Errorf("invalid escape token '%s' does not match ` or \\", s)
 	}
 	d.escapeToken = rune(s[0])
 	// The escape token is used both to escape characters in a line and as line
@@ -149,7 +150,7 @@ func (d *directives) possibleParserDirective(line string) error {
 	}
 
 	if _, ok := d.seen[k]; ok {
-		return fmt.Errorf("only one %s parser directive can be used", k)
+		return errors.Errorf("only one %s parser directive can be used", k)
 	}
 	d.seen[k] = struct{}{}
 
@@ -370,7 +371,7 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 func handleScannerError(err error) error {
 	switch err {
 	case bufio.ErrTooLong:
-		return fmt.Errorf("dockerfile line greater than max allowed size of %d", bufio.MaxScanTokenSize-1)
+		return errors.Errorf("dockerfile line greater than max allowed size of %d", bufio.MaxScanTokenSize-1)
 	default:
 		return err
 	}

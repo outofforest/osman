@@ -8,10 +8,10 @@ package parser
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -53,7 +53,7 @@ func parseStringsWhitespaceDelimited(rest string, _ *directives) (*Node, map[str
 func parseJSON(rest string, _ *directives) (*Node, map[string]bool, error) {
 	rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
 	if !strings.HasPrefix(rest, "[") {
-		return nil, nil, fmt.Errorf(`error parsing "%s" as a JSON array`, rest)
+		return nil, nil, errors.Errorf(`error parsing "%s" as a JSON array`, rest)
 	}
 
 	var myJSON []interface{}

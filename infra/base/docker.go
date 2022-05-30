@@ -1,11 +1,10 @@
 package base
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/outofforest/isolator"
 	"github.com/outofforest/isolator/client/wire"
+	"github.com/pkg/errors"
+
 	"github.com/outofforest/osman/infra/types"
 )
 
@@ -41,7 +40,7 @@ func (f *dockerInitializer) Init(dir string, buildKey types.BuildKey) (retErr er
 	}
 	result, ok := msg.(wire.Result)
 	if !ok {
-		return fmt.Errorf("expected Result, got: %T", msg)
+		return errors.Errorf("expected Result, got: %T", msg)
 	}
 	if result.Error != "" {
 		return errors.New(result.Error)

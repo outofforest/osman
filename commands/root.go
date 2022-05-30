@@ -2,6 +2,7 @@ package commands
 
 import (
 	"github.com/outofforest/ioc/v2"
+	"github.com/outofforest/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -11,6 +12,7 @@ func NewRootCommand(c *ioc.Container) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	logger.AddFlags(logger.ToolDefaultConfig, rootCmd.PersistentFlags())
 	c.ForEachNamed(func(cmd *cobra.Command) {
 		rootCmd.AddCommand(cmd)
 	})

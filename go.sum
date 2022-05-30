@@ -202,12 +202,13 @@ github.com/outofforest/isolator v0.5.0 h1:OVEQaILASJyR5GVG8SczEzO8YgmXvH/Jeh8Q6S
 github.com/outofforest/isolator v0.5.0/go.mod h1:iINYPHGowUklXODKf9qZt0SZJggOzcimMHRxMG9pz4E=
 github.com/outofforest/libexec v0.3.0 h1:SImOgSKtq1q1bQgxoDWaiWyE2+omPo2/lQj8YG5ZyjY=
 github.com/outofforest/libexec v0.3.0/go.mod h1:qYv/qAFlxw6yq3oEUbbYUbBLSjHsm/X9CvWdSqHNm9E=
-github.com/outofforest/logger v0.2.0 h1:mBUGPTu/nZjw81Qi/xspF0mdxzMEYl7ytANgNNixXgA=
 github.com/outofforest/logger v0.2.0/go.mod h1:01cg+cIodmNhDh3tHk/eGKTAxbQIwcGM3Apo46ebWAs=
+github.com/outofforest/logger v0.3.1 h1:Wggh2eqXMUTfvYLOxGYoeIyZEOWbENncRXQED3H1Ubc=
+github.com/outofforest/logger v0.3.1/go.mod h1:09lY6eHvNz/tuXC7ADw2Oy4FxNevW2C+NBShMlSuRhA=
 github.com/outofforest/parallel v0.2.0 h1:K9dAeOPodnuJvHPmd5OL7eiQ9dd7xXRpuN0PF79tDYM=
 github.com/outofforest/parallel v0.2.0/go.mod h1:1SEyhQoKVijqj3pRrGIyjhDObSeXWr64CSzOEYBYrEs=
-github.com/outofforest/run v0.2.3 h1:C/KkzDNFpDvFB2UtFshZYwhAgmZpk7EkhHA/aMdXlsg=
-github.com/outofforest/run v0.2.3/go.mod h1:mrPCBhJ6WweAsd9jNqjjK6my4hrPtnUMkCHzNAMcLXk=
+github.com/outofforest/run v0.2.7 h1:IdPkx8AKAE2MeKfjXeCdraIJSIWNRshKkHihJF7nLUk=
+github.com/outofforest/run v0.2.7/go.mod h1:WJ0e2u72zFGoOb7cIDXvaHUGwjtROXRFwuimwCjZpRY=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.9.3/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

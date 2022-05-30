@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/outofforest/isolator"
 	"github.com/outofforest/isolator/client/wire"
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
@@ -73,7 +73,7 @@ func (d *dirDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 	}
 	imageLinkStatT, ok := stat.Sys().(*syscall.Stat_t)
 	if !ok {
-		return types.BuildInfo{}, fmt.Errorf("stat can't be retrieved: %s", catalogLink)
+		return types.BuildInfo{}, errors.Errorf("stat can't be retrieved: %s", catalogLink)
 	}
 
 	catalogDir, err := filepath.EvalSymlinks(catalogLink)
@@ -135,7 +135,7 @@ func (d *dirDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 	buildDir, err := filepath.EvalSymlinks(filepath.Join(d.config.Root, subDirCatalog, buildKey.Name, string(buildKey.Tag)))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist)
+			return "", errors.WithStack(fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist))
 		}
 		return "", err
 	}
@@ -223,7 +223,7 @@ func (d *dirDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}
 	result, ok := msg.(wire.Result)
 	if !ok {
-		return nil, "", fmt.Errorf("expected Result, got: %T", msg)
+		return nil, "", errors.Errorf("expected Result, got: %T", msg)
 	}
 	if result.Error != "" {
 		return nil, "", errors.New(result.Error)
@@ -274,10 +274,10 @@ func (d *dirDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.
 	tagLink := filepath.Join(d.config.Root, subDirLinks, string(buildID), string(tag))
 	buildDir, err := filepath.EvalSymlinks(tagLink)
 	if err != nil {
-		return fmt.Errorf("build %s is not tagged with %s: %w", buildID, tag, err)
+		return errors.WithStack(fmt.Errorf("build %s is not tagged with %s: %w", buildID, tag, err))
 	}
 	if string(buildID) != filepath.Base(buildDir) {
-		return fmt.Errorf("build %s is not tagged with %s", buildID, tag)
+		return errors.Errorf("build %s is not tagged with %s", buildID, tag)
 	}
 	return os.Remove(tagLink)
 }
@@ -294,14 +294,14 @@ func (d *dirDriver) Drop(ctx context.Context, buildID types.BuildID) (retErr err
 	buildDir, err := filepath.EvalSymlinks(filepath.Join(catalogLink, string(buildID)))
 	switch {
 	case os.IsNotExist(err):
-		return fmt.Errorf("image %s does not exist: %w", buildID, types.ErrImageDoesNotExist)
+		return errors.WithStack(fmt.Errorf("image %s does not exist: %w", buildID, types.ErrImageDoesNotExist))
 	case err != nil:
 		return err
 	default:
 		_, err := os.Stat(filepath.Join(buildDir, subDirChildren))
 		switch {
 		case err == nil:
-			return fmt.Errorf("build %s has children: %w", buildID, ErrImageHasChildren)
+			return errors.WithStack(fmt.Errorf("build %s has children: %w", buildID, ErrImageHasChildren))
 		case os.IsNotExist(err):
 		default:
 			return err

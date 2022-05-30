@@ -3,7 +3,6 @@ package types
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"hash/crc32"
 	"regexp"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/ridge/must"
 )
 
@@ -52,7 +52,7 @@ func RandomString(length int) string {
 // NewBuildID returns new random build ID
 func NewBuildID(buildType BuildType) BuildID {
 	if !buildType.IsValid() {
-		panic(fmt.Errorf("invalid build type: %s", buildType))
+		panic(errors.Errorf("invalid build type: %s", buildType))
 	}
 	buildIDCore := string(buildType) + RandomString(buildIDLength)
 	return BuildID(buildIDCore + checksum(buildIDCore))
@@ -62,7 +62,7 @@ func NewBuildID(buildType BuildType) BuildID {
 func ParseBuildID(strBuildID string) (BuildID, error) {
 	buildID := BuildID(strBuildID)
 	if !buildID.IsValid() {
-		return "", fmt.Errorf("invalid build ID: '%s'", strBuildID)
+		return "", errors.Errorf("invalid build ID: '%s'", strBuildID)
 	}
 	return buildID, nil
 }
@@ -190,7 +190,7 @@ func ParseBuildKey(strBuildKey string) (BuildKey, error) {
 	parts := strings.SplitN(strBuildKey, ":", 2)
 	name := parts[0]
 	if name != "" && !IsNameValid(name) {
-		return BuildKey{}, fmt.Errorf("name '%s' is invalid", name)
+		return BuildKey{}, errors.Errorf("name '%s' is invalid", name)
 	}
 
 	var tag Tag
@@ -201,7 +201,7 @@ func ParseBuildKey(strBuildKey string) (BuildKey, error) {
 		}
 	}
 	if tag != "" && !tag.IsValid() {
-		return BuildKey{}, fmt.Errorf("tag '%s' is invalid", tag)
+		return BuildKey{}, errors.Errorf("tag '%s' is invalid", tag)
 	}
 
 	return BuildKey{Name: name, Tag: tag}, nil

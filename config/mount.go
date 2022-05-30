@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/types"
@@ -47,7 +47,7 @@ func (f *MountFactory) Config(args Args) Mount {
 	}
 	buildKey, err := types.ParseBuildKey(args[0])
 	if err != nil {
-		panic(fmt.Errorf("argument '%s' is neither valid build ID nor build key", args[0]))
+		panic(errors.Errorf("argument '%s' is neither valid build ID nor build key", args[0]))
 	}
 	if buildKey.Tag == "" {
 		buildKey.Tag = description.DefaultTag

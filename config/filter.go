@@ -1,8 +1,9 @@
 package config
 
 import (
-	"fmt"
 	"sort"
+
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/infra/types"
 )
@@ -54,7 +55,7 @@ func (f *FilterFactory) Config(args Args) Filter {
 	for _, t := range f.Types {
 		buildType, exists := typeMapping[t]
 		if !exists {
-			panic(fmt.Errorf("build type '%s' is invalid", t))
+			panic(errors.Errorf("build type '%s' is invalid", t))
 		}
 		config.Types = append(config.Types, buildType)
 	}
@@ -68,7 +69,7 @@ func (f *FilterFactory) Config(args Args) Filter {
 
 		buildKey, err := types.ParseBuildKey(arg)
 		if err != nil {
-			panic(fmt.Errorf("argument '%s' is neither valid build ID nor build key", arg))
+			panic(errors.Errorf("argument '%s' is neither valid build ID nor build key", arg))
 		}
 		config.BuildKeys = append(config.BuildKeys, buildKey)
 	}

@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/specfile/stack"
 )

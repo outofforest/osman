@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/outofforest/ioc/v2"
+	"github.com/pkg/errors"
+
 	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/types"
 )
@@ -44,7 +46,7 @@ func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) 
 	}
 
 	if !p.c.NameExists(ext, (*Parser)(nil)) {
-		return nil, fmt.Errorf("parser not found for file %s: %w", filePath, types.ErrImageDoesNotExist)
+		return nil, errors.WithStack(fmt.Errorf("parser not found for file %s: %w", filePath, types.ErrImageDoesNotExist))
 	}
 
 	var parser Parser
