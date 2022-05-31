@@ -71,6 +71,8 @@ linters:
     - errchkjson
     - forcetypeassert
     - maintidx
+    - exhaustruct
+    - nonamedreturns
 
 linters-settings:
   nakedret:
