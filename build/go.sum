@@ -6,14 +6,12 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/outofforest/build v1.8.5/go.mod h1:ofN1CcP04pF6YDJMnz+X/3Ae3l2R78t8i3oLNjG9sYc=
 github.com/outofforest/build v1.8.9 h1:NUfB+2taHlmw2Q5aQICCcGLhDPU4ePcipGL/lnsjkcs=
 github.com/outofforest/build v1.8.9/go.mod h1:uuS8XIRnsK5sKXEoA6p7g7Zc7DeoU7fszxPAZd94Bb4=
-github.com/outofforest/buildgo v0.4.5 h1:DObvUh3vffl+yW96MYkLBvdP1xatWWHzNwEpAUzKiuQ=
-github.com/outofforest/buildgo v0.4.5/go.mod h1:Upvl3SO2qUwbJRfMN5D5AnqjWBN0lS6BXGviZi5k8Ro=
+github.com/outofforest/buildgo v0.4.6 h1:PrsqYsgu/QrrABAmep5OsZvL0OKiUiQbf6JqLQZIzlM=
+github.com/outofforest/buildgo v0.4.6/go.mod h1:vfysL6qRUzdgHlf4ekF1LGR67bFBbnBacd+wtEGhSfI=
 github.com/outofforest/ioc/v2 v2.5.1 h1:azZeDCemJzkLS/UkAJ5kGFPIRe6Q7jKWhPLjev4w80E=
 github.com/outofforest/ioc/v2 v2.5.1/go.mod h1:INJd2c6HTjA8zZfdnrO1spsyNAlxpjttkOXE+0WetzI=
-github.com/outofforest/libexec v0.3.1/go.mod h1:gtoGwYltgbr4xdDPaOK2drncIHZMRG8J24Fmc9HzNGo=
 github.com/outofforest/libexec v0.3.2 h1:SRplzJJwwjAVKfNqdbNNLf1ddaeHViwqVYQeZr5VMn0=
 github.com/outofforest/libexec v0.3.2/go.mod h1:8rAjxg49LWe62nXKiMYQDvTT70GSpK2pPyDbuow1zBw=
 github.com/outofforest/logger v0.3.1/go.mod h1:09lY6eHvNz/tuXC7ADw2Oy4FxNevW2C+NBShMlSuRhA=
@@ -21,7 +19,6 @@ github.com/outofforest/logger v0.3.2 h1:TJuq2YRjcLdYILRt3eLqDPDiAQIXQEMsHd7KkmTh
 github.com/outofforest/logger v0.3.2/go.mod h1:7tZq4O4iqXtj1yhFTt2i2JdXVOG1Oav79Kp1aYDvf8M=
 github.com/outofforest/parallel v0.2.1 h1:ASnhcrWsicg3Oa4rsRAVLqasVva5047dER81Il1gW1s=
 github.com/outofforest/parallel v0.2.1/go.mod h1:D+bcz/EGZUHfkxqCLeHa61nj693l/ZT3NrKBcI9C3us=
-github.com/outofforest/run v0.2.8/go.mod h1:ZHRyC0CTlOWW7btIWFIAxyRYYTTKSHjh/SCWdiLuO/I=
 github.com/outofforest/run v0.2.9 h1:4E0CC43C3rPhzSi7GRNHzls8L1aBWRtoz+95z7+WRH0=
 github.com/outofforest/run v0.2.9/go.mod h1:CtKExOjc/zv4fTL9hhSRjIKD/uEqur4xcsTdUbBMCz4=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
