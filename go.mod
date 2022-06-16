@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/go-zfs/v3 v3.1.11
 	github.com/outofforest/ioc/v2 v2.5.1
-	github.com/outofforest/isolator v0.5.2
+	github.com/outofforest/isolator v0.5.3
 	github.com/outofforest/logger v0.3.2
 	github.com/outofforest/run v0.2.9
 	github.com/pkg/errors v0.9.1
@@ -25,7 +25,7 @@ require (
 
 require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/outofforest/libexec v0.3.1 // indirect
+	github.com/outofforest/libexec v0.3.2 // indirect
 	github.com/outofforest/parallel v0.2.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
