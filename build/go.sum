@@ -7,8 +7,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/outofforest/build v1.8.9/go.mod h1:uuS8XIRnsK5sKXEoA6p7g7Zc7DeoU7fszxPAZd94Bb4=
-github.com/outofforest/build v1.8.10 h1:ZE0ya4a2G83RNnuqH1FqzfjAkCts+SFMZDtbdLAQxqo=
-github.com/outofforest/build v1.8.10/go.mod h1:FGym6apl263k/4/Eg+EDa3JDZdHG1WEh67WKphF0lX4=
+github.com/outofforest/build v1.8.11 h1:XCqvsQGt3KgT0k4fn2Jiw/HYX9xci8kf8KNVhjgJPbk=
+github.com/outofforest/build v1.8.11/go.mod h1:Z3c+JrT9TLt/QDuS4aYi0Xml1UQHnbeXzlApVFNtXCM=
 github.com/outofforest/buildgo v0.4.6 h1:PrsqYsgu/QrrABAmep5OsZvL0OKiUiQbf6JqLQZIzlM=
 github.com/outofforest/buildgo v0.4.6/go.mod h1:vfysL6qRUzdgHlf4ekF1LGR67bFBbnBacd+wtEGhSfI=
 github.com/outofforest/ioc/v2 v2.5.1 h1:azZeDCemJzkLS/UkAJ5kGFPIRe6Q7jKWhPLjev4w80E=
@@ -39,8 +39,8 @@ github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.2/go.mod h1:R6va5+xMeoiuVRoj+gSkQ7d3FALtqAAGI1FQKckRals=
-github.com/stretchr/testify v1.7.3 h1:dAm0YRdRQlWojc3CrCRgPBzG5f941d0zvAKu7qY4e+I=
-github.com/stretchr/testify v1.7.3/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+github.com/stretchr/testify v1.7.4 h1:wZRexSlwd7ZXfKINDLsO4r7WBt3gTKONc6K/VesHvHM=
+github.com/stretchr/testify v1.7.4/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
