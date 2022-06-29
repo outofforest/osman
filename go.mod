@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/go-zfs/v3 v3.1.12
 	github.com/outofforest/ioc/v2 v2.5.1
-	github.com/outofforest/isolator v0.5.3
+	github.com/outofforest/isolator v0.5.4
 	github.com/outofforest/logger v0.3.2
 	github.com/outofforest/run v0.2.9
 	github.com/pkg/errors v0.9.1
