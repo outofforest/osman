@@ -14,7 +14,7 @@ require (
 	github.com/digitalocean/go-libvirt v0.0.0-20220407213524-fde04463c367
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/go-zfs/v3 v3.1.12
-	github.com/outofforest/ioc/v2 v2.5.1
+	github.com/outofforest/ioc/v2 v2.5.2
 	github.com/outofforest/isolator v0.5.4
 	github.com/outofforest/logger v0.3.2
 	github.com/outofforest/run v0.2.9
