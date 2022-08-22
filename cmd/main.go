@@ -20,7 +20,6 @@ func iocBuilder(c *ioc.Container) {
 	c.Transient(infra.NewBuilder)
 
 	c.Singleton(storage.Resolve)
-	c.SingletonNamed("dir", storage.NewDirDriver)
 	c.SingletonNamed("zfs", storage.NewZFSDriver)
 
 	c.Singleton(parser.NewResolvingParser)
