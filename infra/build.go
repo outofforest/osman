@@ -65,12 +65,8 @@ func (b *Builder) initialize(buildKey types.BuildKey, path string) (retErr error
 	if buildKey.Name == "scratch" {
 		return nil
 	}
-	// permissions on root dir has to be set to 755 to allow read access for everyone so linux boots correctly
-	root := filepath.Join(path, "root")
-	if err := os.Mkdir(root, 0o755); err != nil {
-		return err
-	}
-	return b.initializer.Init(root, buildKey)
+	// permissions on path dir has to be set to 755 to allow read access for everyone so linux boots correctly
+	return b.initializer.Init(path, buildKey)
 }
 
 func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retBuildID types.BuildID, retErr error) {
@@ -106,7 +102,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 		}
 		if path != "" {
-			if err := os.Remove(filepath.Join(path, "root", ".specdir")); err != nil && !os.IsNotExist(err) {
+			if err := os.Remove(filepath.Join(path, ".specdir")); err != nil && !os.IsNotExist(err) {
 				if retErr == nil {
 					retErr = err
 				}
