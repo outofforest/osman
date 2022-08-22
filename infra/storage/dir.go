@@ -196,7 +196,7 @@ func (d *dirDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	if err := d.symlink(filepath.Join("..", "..", buildDir), filepath.Join(d.config.Root, buildLink)); err != nil {
 		return nil, "", err
 	}
-	dst := filepath.Join(buildDir, subDirBuild, "root")
+	dst := filepath.Join(buildDir, subDirBuild)
 	if err := os.MkdirAll(filepath.Join(d.config.Root, dst), 0o700); err != nil {
 		return nil, "", err
 	}
@@ -212,7 +212,7 @@ func (d *dirDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}()
 
 	if err := isolator.Send(wire.Copy{
-		Src: filepath.Join(srcBuildDir, subDirBuild, "root"),
+		Src: filepath.Join(srcBuildDir, subDirBuild),
 		Dst: dst,
 	}); err != nil {
 		return nil, "", err

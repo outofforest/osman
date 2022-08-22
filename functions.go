@@ -394,7 +394,7 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 	driverTag := filesystemTag.CreateElement("driver")
 	driverTag.CreateAttr("type", "virtiofs")
 	sourceTag := filesystemTag.CreateElement("source")
-	sourceTag.CreateAttr("dir", info.Mounted+"/root")
+	sourceTag.CreateAttr("dir", info.Mounted)
 	targetTag := filesystemTag.CreateElement("target")
 	targetTag.CreateAttr("dir", "root")
 
@@ -421,8 +421,8 @@ func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKe
 		cmdlineTag.RemoveChild(ch)
 	}
 
-	kernelTag.CreateText(info.Mounted + "/root/boot/vmlinuz")
-	initrdTag.CreateText(info.Mounted + "/root/boot/initramfs.img")
+	kernelTag.CreateText(info.Mounted + "/boot/vmlinuz")
+	initrdTag.CreateText(info.Mounted + "/boot/initramfs.img")
 	cmdlineTag.CreateText(strings.Join(append([]string{"root=virtiofs:root"}, info.Params...), " "))
 }
 
