@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -71,6 +70,7 @@ func (d *dirDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
+	//nolint:nosnakecase
 	imageLinkStatT, ok := stat.Sys().(*syscall.Stat_t)
 	if !ok {
 		return types.BuildInfo{}, errors.Errorf("stat can't be retrieved: %s", catalogLink)
@@ -81,7 +81,7 @@ func (d *dirDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 		return types.BuildInfo{}, err
 	}
 
-	manifestRaw, err := ioutil.ReadFile(filepath.Join(d.config.Root, subDirManifests, string(buildID)))
+	manifestRaw, err := os.ReadFile(filepath.Join(d.config.Root, subDirManifests, string(buildID)))
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -256,7 +256,7 @@ func (d *dirDriver) StoreManifest(ctx context.Context, manifest types.ImageManif
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(manifestFile, manifestRaw, 0o600)
+	return os.WriteFile(manifestFile, manifestRaw, 0o600)
 }
 
 // Tag tags build with tag

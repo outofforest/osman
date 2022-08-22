@@ -25,7 +25,6 @@ import (
 // This data structure is frankly pretty lousy for handling complex languages,
 // but lucky for us the SpecFile isn't very complicated. This structure
 // works a little more effectively than a "proper" parse tree for our needs.
-//
 type Node struct {
 	Value       string          // actual content
 	Next        *Node           // the next item in the current sexp
