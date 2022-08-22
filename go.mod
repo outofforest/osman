@@ -16,7 +16,7 @@ require (
 	github.com/outofforest/go-zfs/v3 v3.1.12
 	github.com/outofforest/ioc/v2 v2.5.2
 	github.com/outofforest/isolator v0.5.4
-	github.com/outofforest/logger v0.3.2
+	github.com/outofforest/logger v0.3.3
 	github.com/outofforest/run v0.2.10
 	github.com/pkg/errors v0.9.1
 	github.com/ridge/must v0.6.0
@@ -30,5 +30,5 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	go.uber.org/zap v1.21.0 // indirect
+	go.uber.org/zap v1.22.0 // indirect
 )
