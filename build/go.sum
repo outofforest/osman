@@ -15,11 +15,13 @@ github.com/outofforest/ioc/v2 v2.5.1/go.mod h1:INJd2c6HTjA8zZfdnrO1spsyNAlxpjttk
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
 github.com/outofforest/ioc/v2 v2.5.2/go.mod h1:yI+FHuHchC/t6nVo3WJ96qEgCXdHQKFI/4wW2/75YcU=
 github.com/outofforest/libexec v0.3.2/go.mod h1:8rAjxg49LWe62nXKiMYQDvTT70GSpK2pPyDbuow1zBw=
-github.com/outofforest/libexec v0.3.3 h1:Vh6nLaLQXNbd2x8jSdYxEBTK+2Ttm/ks2HKZ/GUcgoo=
 github.com/outofforest/libexec v0.3.3/go.mod h1:geV/hCtkT+28qlzvOt+2/PZwuP37CNhRwEzBepjtwUc=
+github.com/outofforest/libexec v0.3.5 h1:7VUb+Ws8MwAfC/sW27huHcty9d4fnw96SRJ/z6JHKfc=
+github.com/outofforest/libexec v0.3.5/go.mod h1:mb5LWjLARhAUMA3vHklWWzUmqVa+7b7rs9qQJpneEus=
 github.com/outofforest/logger v0.3.1/go.mod h1:09lY6eHvNz/tuXC7ADw2Oy4FxNevW2C+NBShMlSuRhA=
-github.com/outofforest/logger v0.3.2 h1:TJuq2YRjcLdYILRt3eLqDPDiAQIXQEMsHd7KkmThfdg=
 github.com/outofforest/logger v0.3.2/go.mod h1:7tZq4O4iqXtj1yhFTt2i2JdXVOG1Oav79Kp1aYDvf8M=
+github.com/outofforest/logger v0.3.3 h1:ijkqF+1tzhwaygYpIZq2Bx+sgUmpghpC7XMrrrMtK7Y=
+github.com/outofforest/logger v0.3.3/go.mod h1:+M5sO17Va9V33t28Qs9VqRQ8bFV501Uhq2PtQY+R3Ms=
 github.com/outofforest/parallel v0.2.1/go.mod h1:D+bcz/EGZUHfkxqCLeHa61nj693l/ZT3NrKBcI9C3us=
 github.com/outofforest/parallel v0.2.2 h1:mXoLGbqTI7d12zvLvd2lrZCIDuu6iTNdsuCz9VjRXAQ=
 github.com/outofforest/parallel v0.2.2/go.mod h1:VRGOljH7uGPTlxRqe0hnNujqMjrxsJ3MlZon8n6TA9M=
