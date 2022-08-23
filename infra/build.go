@@ -117,7 +117,6 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return
 			}
 		}
-		return
 		if retErr != nil {
 			if err := b.storage.Drop(ctx, buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
 				retErr = err
