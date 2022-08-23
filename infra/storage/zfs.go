@@ -101,6 +101,7 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 // CreateEmpty creates blank build
 func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
 	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), zfs.CreateFilesystemOptions{Properties: map[string]string{
+		"mountpoint": "/" + d.config.Root + "/" + string(buildID) + "/root",
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   buildID,
 			Name:      imageName,
@@ -131,6 +132,7 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}
 
 	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
+		"mountpoint": "/" + d.config.Root + "/" + string(dstBuildID) + "/root",
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,

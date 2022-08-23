@@ -117,6 +117,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 				return
 			}
 		}
+		return
 		if retErr != nil {
 			if err := b.storage.Drop(ctx, buildID); err != nil && !errors.Is(err, types.ErrImageDoesNotExist) {
 				retErr = err
@@ -205,7 +206,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 
 			build.isolator, terminateIsolator, err = isolator.Start(isolator.Config{
-				Dir: path,
+				Dir: filepath.Dir(path),
 				Executor: wire.Config{
 					Mounts: []wire.Mount{
 						{
