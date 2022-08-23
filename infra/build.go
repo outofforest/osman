@@ -205,7 +205,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			}
 
 			build.isolator, terminateIsolator, err = isolator.Start(isolator.Config{
-				Dir: path,
+				Dir: filepath.Dir(path),
 				Executor: wire.Config{
 					Mounts: []wire.Mount{
 						{
