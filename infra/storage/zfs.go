@@ -116,6 +116,9 @@ func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID t
 		if err := filesystem.Unmount(ctx); err != nil {
 			return err
 		}
+		if err := filesystem.SetProperty(ctx, "mountpoint", "none"); err != nil {
+			return err
+		}
 		if err := filesystem.SetProperty(ctx, "canmount", "off"); err != nil {
 			return err
 		}
@@ -147,14 +150,8 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}
 	return func() error {
 		if !properties.Mountable || !properties.AutoMount {
-			value, _, err := filesystem.GetProperty(ctx, "mounted")
-			if err != nil {
+			if err := filesystem.Unmount(ctx); err != nil {
 				return err
-			}
-			if value == "yes" {
-				if err := filesystem.Unmount(ctx); err != nil {
-					return err
-				}
 			}
 			if err := filesystem.SetProperty(ctx, "mountpoint", "none"); err != nil {
 				return err
