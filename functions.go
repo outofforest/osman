@@ -412,12 +412,14 @@ func forEachBootMaster(fn func(mountpoint string) error) error {
 }
 
 func copyFile(dst, src string, perm os.FileMode) error {
+	//nolint:nosnakecase // imported constant
 	srcFile, err := os.OpenFile(src, os.O_RDONLY, 0)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	defer srcFile.Close()
 
+	//nolint:nosnakecase // imported constant
 	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE, perm)
 	if err != nil {
 		return errors.WithStack(err)
