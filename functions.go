@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/beevik/etree"
@@ -236,6 +238,9 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 		if buildID.Type().Properties().VM {
 			res.Result = undeployVM(buildID, drop.LibvirtAddr)
 		}
+		if buildID.Type() == types.BuildTypeBoot && res.Result == nil {
+			res.Result = cleanKernel(buildID)
+		}
 		if res.Result == nil {
 			res.Result = s.Drop(ctx, buildID)
 		}
@@ -314,7 +319,7 @@ func vmName(doc *etree.Document) string {
 
 func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	buildID := types.NewBuildID(imageType)
-	finalizeFn, _, err := s.Clone(ctx, image.BuildID, buildKey.Name, buildID)
+	finalizeFn, buildMountpoint, err := s.Clone(ctx, image.BuildID, buildKey.Name, buildID)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -336,11 +341,91 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 		return types.BuildInfo{}, err
 	}
 
+	if imageType == types.BuildTypeBoot {
+		if err := copyKernel(buildMountpoint, buildID); err != nil {
+			return types.BuildInfo{}, err
+		}
+	}
+
 	if err := finalizeFn(); err != nil {
 		return types.BuildInfo{}, err
 	}
 
 	return s.Info(ctx, buildID)
+}
+
+func copyKernel(buildMountPoint string, buildID types.BuildID) error {
+	buildBinDir := filepath.Join(buildMountPoint, "boot")
+	return forEachBootMaster(func(diskMountpoint string) error {
+		kernelDir := filepath.Join(diskMountpoint, "zfs", string(buildID))
+		if err := os.MkdirAll(kernelDir, 0o755); err != nil {
+			return errors.WithStack(err)
+		}
+		if err := copyFile(filepath.Join(kernelDir, "vmlinuz"), filepath.Join(buildBinDir, "vmlinuz"), 0o755); err != nil {
+			return errors.WithStack(err)
+		}
+		return errors.WithStack(copyFile(filepath.Join(kernelDir, "initramfs.img"), filepath.Join(buildBinDir, "initramfs.img"), 0o600))
+	})
+}
+
+func cleanKernel(buildID types.BuildID) error {
+	return forEachBootMaster(func(diskMountpoint string) error {
+		kernelDir := filepath.Join(diskMountpoint, "zfs", string(buildID))
+		if err := os.RemoveAll(kernelDir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
+}
+
+func forEachBootMaster(fn func(mountpoint string) error) error {
+	path := "/dev/disk/by-label"
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(f.Name(), "boot-master-") {
+			disk := filepath.Join(path, f.Name())
+			diskMountpoint, err := os.MkdirTemp("", "boot-master-*")
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if err := syscall.Mount(disk, diskMountpoint, "ext4", 0, ""); err != nil {
+				return errors.Wrapf(err, "mounting disk '%s' failed", disk)
+			}
+			if err := fn(diskMountpoint); err != nil {
+				return err
+			}
+			if err := syscall.Unmount(diskMountpoint, 0); err != nil {
+				return errors.Wrapf(err, "unmounting disk '%s' failed", disk)
+			}
+			if err := os.Remove(diskMountpoint); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+	}
+	return nil
+}
+
+func copyFile(dst, src string, perm os.FileMode) error {
+	srcFile, err := os.OpenFile(src, os.O_RDONLY, 0)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE, perm)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return errors.WithStack(err)
 }
 
 func mac() string {
