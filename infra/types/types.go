@@ -86,8 +86,14 @@ type BuildTypeProperties struct {
 	// Cloneable means image may be cloned
 	Cloneable bool
 
-	// Mountable means image stays mounted
+	// Revertable means image might be reverted to original state
+	Revertable bool
+
+	// Mountable means image can't be mounted
 	Mountable bool
+
+	// AutoMount means image is automatically mounted
+	AutoMount bool
 
 	// VM means vm in libvirt is defined for this image
 	VM bool
@@ -100,16 +106,25 @@ const (
 	// BuildTypeMount is the mount build type
 	BuildTypeMount BuildType = "mid"
 
+	// BuildTypeBoot is the boot build type
+	BuildTypeBoot BuildType = "bid"
+
 	// BuildTypeVM is the vm build type
 	BuildTypeVM BuildType = "vid"
 )
 
 var buildTypes = map[BuildType]BuildTypeProperties{
 	BuildTypeImage: {
-		Cloneable: true,
+		Cloneable:  true,
+		Revertable: true,
 	},
 	BuildTypeMount: {
 		Mountable: true,
+		AutoMount: true,
+	},
+	BuildTypeBoot: {
+		Mountable:  true,
+		Revertable: true,
 	},
 	BuildTypeVM: {
 		Mountable: true,

@@ -42,7 +42,7 @@ func NewListCommand(cmdF *CmdFactory) *cobra.Command {
 	}
 
 	storageF = cmdF.AddStorageFlags(cmd)
-	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage, config.BuildTypeMount, config.BuildTypeVM})
+	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage, config.BuildTypeMount, config.BuildTypeBoot, config.BuildTypeVM})
 	formatF = cmdF.AddFormatFlags(cmd)
 	return cmd
 }

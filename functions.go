@@ -314,13 +314,16 @@ func vmName(doc *etree.Document) string {
 
 func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	buildID := types.NewBuildID(imageType)
-	if _, _, err := s.Clone(ctx, image.BuildID, buildKey.Name, buildID); err != nil {
+	finalizeFn, _, err := s.Clone(ctx, image.BuildID, buildKey.Name, buildID)
+	if err != nil {
 		return types.BuildInfo{}, err
 	}
 	defer func() {
 		if retErr != nil {
 			_ = s.Drop(ctx, buildID)
+			return
 		}
+		retErr = finalizeFn()
 	}()
 
 	if err := s.StoreManifest(ctx, types.ImageManifest{
