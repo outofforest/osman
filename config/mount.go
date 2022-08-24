@@ -9,6 +9,9 @@ import (
 
 // MountFactory collects data for mount config
 type MountFactory struct {
+	// Boot means that the mount is created for booting host machine
+	Boot bool
+
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
 
@@ -26,7 +29,13 @@ func (f *MountFactory) Config(args Args) Mount {
 		LibvirtAddr: f.LibvirtAddr,
 		Type:        types.BuildTypeMount,
 	}
+	if f.Boot {
+		config.Type = types.BuildTypeBoot
+	}
 	if f.VMFile != "" {
+		if f.Boot {
+			panic(errors.New("can't mount as boot and vm at the same time"))
+		}
 		config.Type = types.BuildTypeVM
 		if f.VMFile != "auto" {
 			config.VMFile = f.VMFile

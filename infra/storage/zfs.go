@@ -71,7 +71,7 @@ func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 	}
 
 	mounted := ""
-	if buildID.Type().Properties().Mountable {
+	if buildID.Type().Properties().Mountable && filesystem.Info.Mountpoint != "none" {
 		mounted = filesystem.Info.Mountpoint
 	}
 	buildInfo.Mounted = mounted
@@ -131,8 +131,15 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 		return nil, "", err
 	}
 
+	properties := dstBuildID.Type().Properties()
+
+	mountpoint := "none"
+	if properties.AutoMount {
+		mountpoint = "/" + d.config.Root + "/" + string(dstBuildID) + "/root"
+	}
+
 	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
-		"mountpoint": "/" + d.config.Root + "/" + string(dstBuildID) + "/root",
+		"mountpoint": mountpoint,
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,
@@ -144,16 +151,23 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 		return nil, "", err
 	}
 	return func() error {
-		properties := dstBuildID.Type().Properties()
-		if !properties.Mountable {
-			if err := filesystem.Unmount(ctx); err != nil {
+		if !properties.Mountable || !properties.AutoMount {
+			value, _, err := filesystem.GetProperty(ctx, "mounted")
+			if err != nil {
 				return err
 			}
+			if value == "yes" {
+				if err := filesystem.Unmount(ctx); err != nil {
+					return err
+				}
+			}
+		}
+		if !properties.Mountable {
 			if err := filesystem.SetProperty(ctx, "canmount", "off"); err != nil {
 				return err
 			}
 		}
-		if properties.Cloneable {
+		if properties.Cloneable || properties.Revertable {
 			if _, err := filesystem.Snapshot(ctx, "image"); err != nil {
 				return err
 			}
