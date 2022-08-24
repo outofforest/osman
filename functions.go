@@ -321,9 +321,7 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 	defer func() {
 		if retErr != nil {
 			_ = s.Drop(ctx, buildID)
-			return
 		}
-		retErr = finalizeFn()
 	}()
 
 	if err := s.StoreManifest(ctx, types.ImageManifest{
@@ -338,13 +336,17 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 		return types.BuildInfo{}, err
 	}
 
+	if err := finalizeFn(); err != nil {
+		return types.BuildInfo{}, err
+	}
+
 	return s.Info(ctx, buildID)
 }
 
 func mac() string {
 	buf := make([]byte, 5)
 	must.Any(rand.Read(buf))
-	res := "00" // just to ensure that unicast address is generated
+	res := "00" // to ensure that unicast address is generated
 	for _, b := range buf {
 		res += fmt.Sprintf(":%02x", b)
 	}
