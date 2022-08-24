@@ -243,13 +243,14 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 		if buildID.Type().Properties().VM {
 			res.Result = undeployVM(buildID, drop.LibvirtAddr)
 		}
+		if res.Result == nil {
+			res.Result = s.Drop(ctx, buildID)
+		}
 		if buildID.Type() == types.BuildTypeBoot && res.Result == nil {
 			genGRUB = true
 			res.Result = cleanKernel(buildID)
 		}
-		if res.Result == nil {
-			res.Result = s.Drop(ctx, buildID)
-		}
+
 		results = append(results, res)
 	}
 
