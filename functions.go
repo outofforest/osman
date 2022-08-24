@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	_ "embed"
+	_ "embed" // to embed grub config template
 	"fmt"
 	"io"
 	"net"
