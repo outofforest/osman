@@ -1,15 +1,19 @@
 package osman
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	_ "embed"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/beevik/etree"
@@ -232,6 +236,7 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 	}
 
 	results := make([]Result, 0, len(deleteSequence))
+	var genGRUB bool
 	for i := len(deleteSequence) - 1; i >= 0; i-- {
 		buildID := deleteSequence[i]
 		res := Result{BuildID: buildID}
@@ -239,6 +244,7 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 			res.Result = undeployVM(buildID, drop.LibvirtAddr)
 		}
 		if buildID.Type() == types.BuildTypeBoot && res.Result == nil {
+			genGRUB = true
 			res.Result = cleanKernel(buildID)
 		}
 		if res.Result == nil {
@@ -246,6 +252,13 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 		}
 		results = append(results, res)
 	}
+
+	if genGRUB {
+		if err := generateGRUB(ctx, s); err != nil {
+			return nil, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -351,6 +364,12 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 		return types.BuildInfo{}, err
 	}
 
+	if imageType == types.BuildTypeBoot {
+		if err := generateGRUB(ctx, s); err != nil {
+			return types.BuildInfo{}, err
+		}
+	}
+
 	return s.Info(ctx, buildID)
 }
 
@@ -378,6 +397,38 @@ func cleanKernel(buildID types.BuildID) error {
 	})
 }
 
+//go:embed grub.tmpl.cfg
+var grubTemplate string
+var grubTemplateCompiled = template.Must(template.New("grub").Parse(grubTemplate))
+
+func generateGRUB(ctx context.Context, s storage.Driver) error {
+	builds, err := List(ctx, config.Filter{Types: []types.BuildType{types.BuildTypeBoot}}, s)
+	if err != nil {
+		return err
+	}
+	sort.Slice(builds, func(i, j int) bool {
+		return builds[i].CreatedAt.After(builds[j].CreatedAt)
+	})
+	for i, b := range builds {
+		if len(b.Tags) > 0 {
+			builds[i].Name += ":" + string(b.Tags[0])
+		}
+	}
+
+	buf := &bytes.Buffer{}
+	if err := grubTemplateCompiled.Execute(buf, builds); err != nil {
+		return errors.WithStack(err)
+	}
+	grubConfig := buf.Bytes()
+	return forEachBootMaster(func(diskMountpoint string) error {
+		grubDir := filepath.Join(diskMountpoint, "grub2")
+		if err := os.WriteFile(filepath.Join(grubDir, "grub.cfg"), grubConfig, 0o644); err != nil {
+			return errors.WithStack(err)
+		}
+		return errors.WithStack(os.WriteFile(filepath.Join(grubDir, fmt.Sprintf("grub-%s.cfg", time.Now().UTC().Format(time.RFC3339))), grubConfig, 0o644))
+	})
+}
+
 func forEachBootMaster(fn func(mountpoint string) error) error {
 	path := "/dev/disk/by-label"
 	files, err := os.ReadDir(path)
@@ -385,27 +436,26 @@ func forEachBootMaster(fn func(mountpoint string) error) error {
 		return errors.WithStack(err)
 	}
 	for _, f := range files {
-		if f.IsDir() {
+		if f.IsDir() || !strings.HasPrefix(f.Name(), "boot-master-") {
 			continue
 		}
-		if strings.HasPrefix(f.Name(), "boot-master-") {
-			disk := filepath.Join(path, f.Name())
-			diskMountpoint, err := os.MkdirTemp("", "boot-master-*")
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if err := syscall.Mount(disk, diskMountpoint, "ext4", 0, ""); err != nil {
-				return errors.Wrapf(err, "mounting disk '%s' failed", disk)
-			}
-			if err := fn(diskMountpoint); err != nil {
-				return err
-			}
-			if err := syscall.Unmount(diskMountpoint, 0); err != nil {
-				return errors.Wrapf(err, "unmounting disk '%s' failed", disk)
-			}
-			if err := os.Remove(diskMountpoint); err != nil {
-				return errors.WithStack(err)
-			}
+
+		disk := filepath.Join(path, f.Name())
+		diskMountpoint, err := os.MkdirTemp("", "boot-master-*")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if err := syscall.Mount(disk, diskMountpoint, "ext4", 0, ""); err != nil {
+			return errors.Wrapf(err, "mounting disk '%s' failed", disk)
+		}
+		if err := fn(diskMountpoint); err != nil {
+			return err
+		}
+		if err := syscall.Unmount(diskMountpoint, 0); err != nil {
+			return errors.Wrapf(err, "unmounting disk '%s' failed", disk)
+		}
+		if err := os.Remove(diskMountpoint); err != nil {
+			return errors.WithStack(err)
 		}
 	}
 	return nil
