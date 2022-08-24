@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/outofforest/go-zfs/v3"
@@ -100,8 +101,9 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 
 // CreateEmpty creates blank build
 func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
+	buildDir := "/" + d.config.Root + "/" + string(buildID)
 	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), zfs.CreateFilesystemOptions{Properties: map[string]string{
-		"mountpoint": "/" + d.config.Root + "/" + string(buildID) + "/root",
+		"mountpoint": buildDir + "/root",
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   buildID,
 			Name:      imageName,
@@ -122,6 +124,9 @@ func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID t
 		if err := filesystem.SetProperty(ctx, "canmount", "off"); err != nil {
 			return err
 		}
+		if err := os.RemoveAll(buildDir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return errors.WithStack(err)
+		}
 		_, err := filesystem.Snapshot(ctx, "image")
 		return err
 	}, filesystem.Info.Mountpoint, nil
@@ -135,9 +140,9 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}
 
 	properties := dstBuildID.Type().Properties()
-
+	buildDir := "/" + d.config.Root + "/" + string(dstBuildID)
 	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
-		"mountpoint": "/" + d.config.Root + "/" + string(dstBuildID) + "/root",
+		"mountpoint": buildDir + "/root",
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,
@@ -155,6 +160,9 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 			}
 			if err := filesystem.SetProperty(ctx, "mountpoint", "none"); err != nil {
 				return err
+			}
+			if err := os.RemoveAll(buildDir); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return errors.WithStack(err)
 			}
 		}
 		if !properties.Mountable {
@@ -245,6 +253,9 @@ func (d *zfsDriver) Drop(ctx context.Context, buildID types.BuildID) error {
 
 	if err := filesystem.Destroy(ctx, zfs.DestroyRecursive); err != nil {
 		return errors.WithStack(fmt.Errorf("build %s have children: %w", buildID, ErrImageHasChildren))
+	}
+	if err := os.RemoveAll("/" + d.config.Root + "/" + string(buildID)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return errors.WithStack(err)
 	}
 	return nil
 }
