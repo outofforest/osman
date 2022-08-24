@@ -133,13 +133,8 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 
 	properties := dstBuildID.Type().Properties()
 
-	mountpoint := "none"
-	if properties.AutoMount {
-		mountpoint = "/" + d.config.Root + "/" + string(dstBuildID) + "/root"
-	}
-
 	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
-		"mountpoint": mountpoint,
+		"mountpoint": "/" + d.config.Root + "/" + string(dstBuildID) + "/root",
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,
@@ -160,6 +155,9 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 				if err := filesystem.Unmount(ctx); err != nil {
 					return err
 				}
+			}
+			if err := filesystem.SetProperty(ctx, "mountpoint", "none"); err != nil {
+				return err
 			}
 		}
 		if !properties.Mountable {
