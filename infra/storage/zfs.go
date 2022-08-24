@@ -250,6 +250,15 @@ func (d *zfsDriver) Drop(ctx context.Context, buildID types.BuildID) error {
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("build %s does not exist: %w", buildID, types.ErrImageDoesNotExist))
 	}
+	mounted, _, err := filesystem.GetProperty(ctx, "mounted")
+	if err != nil {
+		return err
+	}
+	if mounted == "yes" {
+		if err := filesystem.Unmount(ctx); err != nil {
+			return err
+		}
+	}
 
 	if err := filesystem.Destroy(ctx, zfs.DestroyRecursive); err != nil {
 		return errors.WithStack(fmt.Errorf("build %s have children: %w", buildID, ErrImageHasChildren))
