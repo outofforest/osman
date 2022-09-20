@@ -1,9 +1,11 @@
 package commands
 
 import (
+	"os"
 	"strings"
 
 	"github.com/outofforest/ioc/v2"
+	"github.com/ridge/must"
 	"github.com/spf13/cobra"
 
 	"github.com/outofforest/osman/config"
@@ -42,7 +44,7 @@ func (f *CmdFactory) Cmd(setupFunc interface{}, cmdFunc interface{}) func(cmd *c
 func (f *CmdFactory) AddStorageFlags(cmd *cobra.Command) *config.StorageFactory {
 	storageF := &config.StorageFactory{}
 
-	cmd.Flags().StringVar(&storageF.Root, "storage-root", "tank/builds", "Location where built images are stored")
+	cmd.Flags().StringVar(&storageF.Root, "storage-root", "tank/builds/"+must.String(os.Hostname()), "Location where built images are stored")
 	cmd.Flags().StringVar(&storageF.Driver, "storage-driver", "zfs", "Storage driver to use: "+strings.Join(f.c.Names((*storage.Driver)(nil)), " | "))
 
 	return storageF
