@@ -48,7 +48,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 }
 
 // Mount mounts image
-func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
+func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	properties := mount.Type.Properties()
 	if !properties.Mountable {
 		panic(errors.Errorf("non-mountable image type received: %s", mount.Type))
@@ -111,7 +111,7 @@ func Mount(ctx context.Context, mount config.Mount, s storage.Driver) (retInfo t
 		}
 	}
 
-	info, err := cloneForMount(ctx, image, mount.MountKey, mount.Type, s)
+	info, err := cloneForMount(ctx, image, storage, mount, s)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -182,7 +182,7 @@ type Result struct {
 }
 
 // Drop drops builds
-func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
+func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
 	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
 		return nil, errors.New("neither filters are provided nor All is set")
 	}
@@ -248,14 +248,14 @@ func Drop(ctx context.Context, filtering config.Filter, drop config.Drop, s stor
 		}
 		if buildID.Type() == types.BuildTypeBoot && res.Result == nil {
 			genGRUB = true
-			res.Result = cleanKernel(buildID)
+			res.Result = cleanKernel(buildID, "boot-")
 		}
 
 		results = append(results, res)
 	}
 
 	if genGRUB {
-		if err := generateGRUB(ctx, s); err != nil {
+		if err := generateGRUB(ctx, storage, s); err != nil {
 			return nil, err
 		}
 	}
@@ -331,9 +331,9 @@ func vmName(doc *etree.Document) string {
 	return nameTag.Text()
 }
 
-func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.BuildKey, imageType types.BuildType, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
-	buildID := types.NewBuildID(imageType)
-	finalizeFn, buildMountpoint, err := s.Clone(ctx, image.BuildID, buildKey.Name, buildID)
+func cloneForMount(ctx context.Context, image types.BuildInfo, storage config.Storage, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
+	buildID := types.NewBuildID(mount.Type)
+	finalizeFn, buildMountpoint, err := s.Clone(ctx, image.BuildID, mount.MountKey.Name, buildID)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -351,12 +351,12 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 		return types.BuildInfo{}, err
 	}
 
-	if err := s.Tag(ctx, buildID, buildKey.Tag); err != nil {
+	if err := s.Tag(ctx, buildID, mount.MountKey.Tag); err != nil {
 		return types.BuildInfo{}, err
 	}
 
-	if imageType == types.BuildTypeBoot {
-		if err := copyKernel(buildMountpoint, buildID); err != nil {
+	if mount.Type == types.BuildTypeBoot {
+		if err := copyKernel(buildMountpoint, storage, buildID); err != nil {
 			return types.BuildInfo{}, err
 		}
 	}
@@ -365,8 +365,8 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 		return types.BuildInfo{}, err
 	}
 
-	if imageType == types.BuildTypeBoot {
-		if err := generateGRUB(ctx, s); err != nil {
+	if mount.Type == types.BuildTypeBoot {
+		if err := generateGRUB(ctx, storage, s); err != nil {
 			return types.BuildInfo{}, err
 		}
 	}
@@ -374,9 +374,9 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, buildKey types.Bu
 	return s.Info(ctx, buildID)
 }
 
-func copyKernel(buildMountPoint string, buildID types.BuildID) error {
+func copyKernel(buildMountPoint string, storage config.Storage, buildID types.BuildID) error {
 	buildBinDir := filepath.Join(buildMountPoint, "boot")
-	return forEachBootMaster(func(diskMountpoint string) error {
+	return forEachBootMaster(bootPrefix(storage.Root), func(diskMountpoint string) error {
 		kernelDir := filepath.Join(diskMountpoint, "zfs", string(buildID))
 		if err := os.MkdirAll(kernelDir, 0o755); err != nil {
 			return errors.WithStack(err)
@@ -388,8 +388,8 @@ func copyKernel(buildMountPoint string, buildID types.BuildID) error {
 	})
 }
 
-func cleanKernel(buildID types.BuildID) error {
-	return forEachBootMaster(func(diskMountpoint string) error {
+func cleanKernel(buildID types.BuildID, bootPrefix string) error {
+	return forEachBootMaster(bootPrefix, func(diskMountpoint string) error {
 		kernelDir := filepath.Join(diskMountpoint, "zfs", string(buildID))
 		if err := os.RemoveAll(kernelDir); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return errors.WithStack(err)
@@ -402,7 +402,12 @@ func cleanKernel(buildID types.BuildID) error {
 var grubTemplate string
 var grubTemplateCompiled = template.Must(template.New("grub").Parse(grubTemplate))
 
-func generateGRUB(ctx context.Context, s storage.Driver) error {
+type grubConfig struct {
+	StorageRoot string
+	Builds      []types.BuildInfo
+}
+
+func generateGRUB(ctx context.Context, storage config.Storage, s storage.Driver) error {
 	builds, err := List(ctx, config.Filter{Types: []types.BuildType{types.BuildTypeBoot}}, s)
 	if err != nil {
 		return err
@@ -410,18 +415,23 @@ func generateGRUB(ctx context.Context, s storage.Driver) error {
 	sort.Slice(builds, func(i, j int) bool {
 		return builds[i].CreatedAt.After(builds[j].CreatedAt)
 	})
+
 	for i, b := range builds {
 		if len(b.Tags) > 0 {
 			builds[i].Name += ":" + string(b.Tags[0])
 		}
 	}
 
+	config := grubConfig{
+		StorageRoot: storage.Root,
+		Builds:      builds,
+	}
 	buf := &bytes.Buffer{}
-	if err := grubTemplateCompiled.Execute(buf, builds); err != nil {
+	if err := grubTemplateCompiled.Execute(buf, config); err != nil {
 		return errors.WithStack(err)
 	}
 	grubConfig := buf.Bytes()
-	return forEachBootMaster(func(diskMountpoint string) error {
+	return forEachBootMaster(bootPrefix(storage.Root), func(diskMountpoint string) error {
 		grubDir := filepath.Join(diskMountpoint, "grub2")
 		if err := os.WriteFile(filepath.Join(grubDir, "grub.cfg"), grubConfig, 0o644); err != nil {
 			return errors.WithStack(err)
@@ -430,19 +440,19 @@ func generateGRUB(ctx context.Context, s storage.Driver) error {
 	})
 }
 
-func forEachBootMaster(fn func(mountpoint string) error) error {
+func forEachBootMaster(prefix string, fn func(mountpoint string) error) error {
 	path := "/dev/disk/by-label"
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	for _, f := range files {
-		if f.IsDir() || !strings.HasPrefix(f.Name(), "boot-master-") {
+		if f.IsDir() || !strings.HasPrefix(f.Name(), prefix) {
 			continue
 		}
 
 		disk := filepath.Join(path, f.Name())
-		diskMountpoint, err := os.MkdirTemp("", "boot-master-*")
+		diskMountpoint, err := os.MkdirTemp("", prefix+"*")
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -653,4 +663,8 @@ func undeployVM(buildID types.BuildID, libvirtAddr string) error {
 		}
 	}
 	return nil
+}
+
+func bootPrefix(storageRoot string) string {
+	return "boot-" + filepath.Base(storageRoot) + "-"
 }
