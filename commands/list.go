@@ -13,6 +13,8 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
+var defaultFields = []string{"BuildID", "BasedOn", "CreatedAt", "Name", "Tags", "Mounted"}
+
 // NewListCommand returns new list command
 func NewListCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
@@ -36,7 +38,7 @@ func NewListCommand(cmdF *CmdFactory) *cobra.Command {
 			sort.Slice(builds, func(i int, j int) bool {
 				return builds[i].CreatedAt.Before(builds[j].CreatedAt)
 			})
-			fmt.Println(formatter.Format(builds))
+			fmt.Println(formatter.Format(builds, defaultFields...))
 			return nil
 		}),
 	}

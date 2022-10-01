@@ -28,7 +28,6 @@ type zfsDriver struct {
 	config config.Storage
 }
 
-// Builds returns available builds
 func (d *zfsDriver) Builds(ctx context.Context) ([]types.BuildID, error) {
 	rootFs, err := zfs.GetFilesystem(ctx, d.config.Root)
 	if err != nil {
@@ -68,7 +67,7 @@ func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 
 	var buildInfo types.BuildInfo
 	if err := json.Unmarshal([]byte(info), &buildInfo); err != nil {
-		return types.BuildInfo{}, err
+		return types.BuildInfo{}, errors.WithStack(err)
 	}
 
 	mounted := ""
@@ -186,6 +185,7 @@ func (d *zfsDriver) StoreManifest(ctx context.Context, manifest types.ImageManif
 		return err
 	}
 	info.Params = manifest.Params
+	info.Boots = manifest.Boots
 	return d.setInfo(ctx, info)
 }
 

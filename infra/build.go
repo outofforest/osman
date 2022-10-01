@@ -265,7 +265,7 @@ type imageBuild struct {
 	isolator *client.Client
 }
 
-// from is a handler for FROM
+// From is a handler for FROM
 func (b *imageBuild) From(cmd *description.FromCommand) error {
 	if b.fromDone {
 		return errors.New("directive FROM may be specified only once")
@@ -280,7 +280,7 @@ func (b *imageBuild) From(cmd *description.FromCommand) error {
 	return nil
 }
 
-// params sets kernel params for image
+// Params sets kernel params for image
 func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 	if !b.fromDone {
 		return errors.New("description has to start with FROM directive")
@@ -289,7 +289,7 @@ func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 	return nil
 }
 
-// run is a handler for RUN
+// Run is a handler for RUN
 func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 	if !b.fromDone {
 		return errors.New("description has to start with FROM directive")
@@ -320,6 +320,15 @@ func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 			return errors.New("unexpected message received")
 		}
 	}
+}
+
+// Boot sets boot option for an image
+func (b *imageBuild) Boot(cmd *description.BootCommand) error {
+	if !b.fromDone {
+		return errors.New("description has to start with FROM directive")
+	}
+	b.manifest.Boots = append(b.manifest.Boots, types.Boot{Title: cmd.Title, Params: cmd.Params})
+	return nil
 }
 
 func toStream(stream wire.Stream) (*os.File, error) {

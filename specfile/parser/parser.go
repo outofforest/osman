@@ -181,6 +181,7 @@ func init() {
 		"params":  parseStringsWhitespaceDelimited,
 		"run":     parseMaybeJSON,
 		"include": parseStringsWhitespaceDelimited,
+		"boot":    parseMaybeJSONToList,
 	}
 }
 

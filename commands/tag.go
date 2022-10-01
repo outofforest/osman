@@ -38,7 +38,7 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 			sort.Slice(builds, func(i int, j int) bool {
 				return builds[i].CreatedAt.Before(builds[j].CreatedAt)
 			})
-			fmt.Println(formatter.Format(builds))
+			fmt.Println(formatter.Format(builds, defaultFields...))
 			return nil
 		}),
 	}

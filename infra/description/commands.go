@@ -28,6 +28,14 @@ func Run(command string) Command {
 	}
 }
 
+// Boot returns handler for BOOT command
+func Boot(title string, params []string) Command {
+	return &BootCommand{
+		Title:  title,
+		Params: params,
+	}
+}
+
 // FromCommand executes FROM command
 type FromCommand struct {
 	BuildKey types.BuildKey
@@ -56,4 +64,15 @@ type RunCommand struct {
 // Execute executes build command
 func (cmd *RunCommand) Execute(build ImageBuild) error {
 	return build.Run(cmd)
+}
+
+// BootCommand executes BOOT command
+type BootCommand struct {
+	Title  string
+	Params []string
+}
+
+// Execute executes build command
+func (cmd *BootCommand) Execute(build ImageBuild) error {
+	return build.Boot(cmd)
 }

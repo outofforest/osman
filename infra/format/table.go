@@ -15,7 +15,7 @@ type tableFormatter struct {
 }
 
 // Format formats slice into table string
-func (f *tableFormatter) Format(objOrSlice interface{}) string {
+func (f *tableFormatter) Format(objOrSlice interface{}, fieldsToPrint ...string) string {
 	objOrSliceValue := reflect.ValueOf(objOrSlice)
 	objOrSliceType := objOrSliceValue.Type()
 	elementType := objOrSliceType
@@ -23,10 +23,11 @@ func (f *tableFormatter) Format(objOrSlice interface{}) string {
 		elementType = objOrSliceType.Elem()
 	}
 
+	enabledFields := mapEnabledFields(fieldsToPrint)
 	fields := make([]reflect.StructField, 0, elementType.NumField())
 	for i := 0; i < elementType.NumField(); i++ {
 		field := elementType.Field(i)
-		if field.Anonymous {
+		if field.Anonymous || (!enabledFields[field.Name] && fieldsToPrint != nil) {
 			continue
 		}
 		fields = append(fields, field)

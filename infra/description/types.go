@@ -23,4 +23,7 @@ type ImageBuild interface {
 
 	// Run executes RUN command
 	Run(cmd *RunCommand) error
+
+	// Boot executes BOOT command
+	Boot(cmd *BootCommand) error
 }
