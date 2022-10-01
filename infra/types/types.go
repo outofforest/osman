@@ -242,6 +242,12 @@ func (bk BuildKey) IsValid() bool {
 // Params is a list of params configured on image
 type Params []string
 
+// Boot represents a boot option for an image
+type Boot struct {
+	Title  string
+	Params []string
+}
+
 func (p Params) String() string {
 	values := make([]string, len(p))
 	copy(values, p)
@@ -255,6 +261,7 @@ type ImageManifest struct {
 	BuildID BuildID
 	BasedOn BuildID
 	Params  Params
+	Boots   []Boot
 }
 
 // BuildInfo stores all the information about build
@@ -265,5 +272,6 @@ type BuildInfo struct {
 	Name      string
 	Tags      Tags
 	Params    Params
+	Boots     []Boot
 	Mounted   string
 }

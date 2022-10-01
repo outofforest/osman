@@ -51,7 +51,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	properties := mount.Type.Properties()
 	if !properties.Mountable {
-		panic(errors.Errorf("non-mountable image type received: %s", mount.Type))
+		return types.BuildInfo{}, errors.Errorf("non-mountable image type received: %s", mount.Type)
 	}
 
 	if !mount.ImageBuildID.IsValid() {
@@ -68,6 +68,10 @@ func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s st
 	image, err := s.Info(ctx, mount.ImageBuildID)
 	if err != nil {
 		return types.BuildInfo{}, err
+	}
+
+	if mount.Type == types.BuildTypeBoot && len(image.Boots) == 0 {
+		return types.BuildInfo{}, errors.New("image can't be mounted for booting because it was built without specifying BOOT option(s)")
 	}
 
 	var nameFromBuild bool
@@ -343,11 +347,16 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, storage config.St
 		}
 	}()
 
-	if err := s.StoreManifest(ctx, types.ImageManifest{
+	manifest := types.ImageManifest{
 		BuildID: buildID,
 		BasedOn: image.BuildID,
 		Params:  image.Params,
-	}); err != nil {
+	}
+	if mount.Type == types.BuildTypeBoot {
+		manifest.Boots = image.Boots
+	}
+
+	if err := s.StoreManifest(ctx, manifest); err != nil {
 		return types.BuildInfo{}, err
 	}
 

@@ -26,8 +26,6 @@ func parseIgnore(rest string, d *directives) (*Node, map[string]bool, error) {
 
 // parses a whitespace-delimited set of arguments. The result is effectively a
 // linked list of string arguments.
-//
-//nolint:unparam
 func parseStringsWhitespaceDelimited(rest string, _ *directives) (*Node, map[string]bool, error) {
 	if rest == "" {
 		return nil, nil, nil
@@ -49,6 +47,22 @@ func parseStringsWhitespaceDelimited(rest string, _ *directives) (*Node, map[str
 	prevnode.Next = nil
 
 	return rootnode, nil, nil
+}
+
+// parseMaybeJSONToList determines if the argument appears to be a JSON array. If
+// so, passes to parseJSON; if not, attempts to parse it as a whitespace
+// delimited string.
+func parseMaybeJSONToList(rest string, d *directives) (*Node, map[string]bool, error) {
+	node, attrs, err := parseJSON(rest, d)
+
+	if err == nil {
+		return node, attrs, nil
+	}
+	if err == errDockerfileNotStringArray {
+		return nil, nil, err
+	}
+
+	return parseStringsWhitespaceDelimited(rest, d)
 }
 
 // parseJSON converts JSON arrays to an AST.

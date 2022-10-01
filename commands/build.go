@@ -34,7 +34,7 @@ func NewBuildCommand(cmdF *CmdFactory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(formatter.Format(builds))
+			fmt.Println(formatter.Format(builds, defaultFields...))
 			return nil
 		}),
 	}

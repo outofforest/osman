@@ -52,6 +52,8 @@ func (p *specFileParser) Parse(filePath string) ([]description.Command, error) {
 			cmds, err = p.cmdRun(args)
 		case "include":
 			cmds, err = p.cmdInclude(args)
+		case "boot":
+			cmds, err = p.cmdBoot(args)
 		default:
 			return nil, errors.Errorf("unknown command '%s' in line %d", child.Value, child.StartLine)
 		}
@@ -116,4 +118,27 @@ func (p *specFileParser) cmdInclude(args []string) ([]description.Command, error
 		res = append(res, cmds...)
 	}
 	return res, nil
+}
+
+func (p *specFileParser) cmdBoot(args []string) ([]description.Command, error) {
+	if len(args) == 0 {
+		return nil, errors.New("no arguments passed")
+	}
+
+	if args[0] == "" {
+		return nil, errors.New("empty argument passed")
+	}
+
+	var params []string
+	if len(args) > 1 {
+		params = make([]string, 0, len(args)-1)
+
+		for _, arg := range args[1:] {
+			if arg == "" {
+				return nil, errors.New("empty argument passed")
+			}
+			params = append(params, arg)
+		}
+	}
+	return []description.Command{description.Boot(args[0], params)}, nil
 }
