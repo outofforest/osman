@@ -6,11 +6,8 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/outofforest/build v1.8.18/go.mod h1:nYhBpOqIOFDXVWJsAezMbkvZkkFU7lzveWKgVEdgvEA=
 github.com/outofforest/build v1.8.19 h1:oI3xBukS8pL99HMcRnP/6OL+H+X380FarsM7dcjzRXM=
 github.com/outofforest/build v1.8.19/go.mod h1:JJzGyGfFAXS6t/soqvBLbnsKDaGWA9jws0Cu2o7cfU8=
-github.com/outofforest/buildgo v0.5.4 h1:3BiOhwgb88bV27OcQIB3aF8w5NUTpqDRbXDvigyPTZA=
-github.com/outofforest/buildgo v0.5.4/go.mod h1:bcKEFh3vXyj4k2YhxW4RF5qESrX7gshmDpZzrmxQP0M=
 github.com/outofforest/buildgo v0.5.5 h1:cjmi8tl19+UG1hvu6s/MV9ks+3creGYKQtMhWA8p4rc=
 github.com/outofforest/buildgo v0.5.5/go.mod h1:TXMKkbJjM0iq5lFm9Y1HE4s8G4jv0ZoPq2xiQa4ckJE=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
@@ -21,7 +18,6 @@ github.com/outofforest/logger v0.3.3 h1:ijkqF+1tzhwaygYpIZq2Bx+sgUmpghpC7XMrrrMt
 github.com/outofforest/logger v0.3.3/go.mod h1:+M5sO17Va9V33t28Qs9VqRQ8bFV501Uhq2PtQY+R3Ms=
 github.com/outofforest/parallel v0.2.3 h1:DRIgHr7XTL4LLgsTqrj041kulv4ajtbCkRbkOG5psWY=
 github.com/outofforest/parallel v0.2.3/go.mod h1:cu210xIjJtOMXR2ERzEcNA2kr0Z0xfZjSKw2jTxAQ2E=
-github.com/outofforest/run v0.2.13 h1:5R+OM6HOUsQdWat/eTC8dWT+bu1B/patr28UB9FJvo0=
 github.com/outofforest/run v0.2.13/go.mod h1:6FJb2S4fdY3Mqsvz4vG1m7cHAj+8aJ8nCPX1bl9pBBo=
 github.com/outofforest/run v0.2.14 h1:kM/14+h2w454us8uepnY7wa0owihDirCCjRLzdK+j+Y=
 github.com/outofforest/run v0.2.14/go.mod h1:9Tgz1tsZMV+sk935lZ9WiOfjj7lFjIXWYsW4RBqq1Ag=
