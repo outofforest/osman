@@ -11,7 +11,7 @@ replace (
 
 require (
 	github.com/beevik/etree v1.1.0
-	github.com/digitalocean/go-libvirt v0.0.0-20220811165305-15feff002086
+	github.com/digitalocean/go-libvirt v0.0.0-20221122165534-e3cbf86fc1f6
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/go-zfs/v3 v3.1.14
 	github.com/outofforest/ioc/v2 v2.5.2
@@ -30,5 +30,5 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	go.uber.org/zap v1.22.0 // indirect
+	go.uber.org/zap v1.24.0 // indirect
 )
