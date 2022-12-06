@@ -12,10 +12,12 @@ github.com/outofforest/buildgo v0.5.5 h1:cjmi8tl19+UG1hvu6s/MV9ks+3creGYKQtMhWA8
 github.com/outofforest/buildgo v0.5.5/go.mod h1:TXMKkbJjM0iq5lFm9Y1HE4s8G4jv0ZoPq2xiQa4ckJE=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
 github.com/outofforest/ioc/v2 v2.5.2/go.mod h1:yI+FHuHchC/t6nVo3WJ96qEgCXdHQKFI/4wW2/75YcU=
-github.com/outofforest/libexec v0.3.6 h1:DLNKodoop9Hh1M/EbZvueaige/knSZ+e6r+xxc/7lH0=
 github.com/outofforest/libexec v0.3.6/go.mod h1:3s2VtYSqj/2VE47yec0tRSZwU39vo1TIZbPfsC9fGn8=
-github.com/outofforest/logger v0.3.3 h1:ijkqF+1tzhwaygYpIZq2Bx+sgUmpghpC7XMrrrMtK7Y=
+github.com/outofforest/libexec v0.3.8 h1:AKWevDZRcmK2G/u3SbRUbzwEy3wynrrQgBWq4D0ZCNE=
+github.com/outofforest/libexec v0.3.8/go.mod h1:J2rUB/m0ER8UNOHd3/UQM55bvh1cbMwhb8gibeF/zyo=
 github.com/outofforest/logger v0.3.3/go.mod h1:+M5sO17Va9V33t28Qs9VqRQ8bFV501Uhq2PtQY+R3Ms=
+github.com/outofforest/logger v0.3.4 h1:6Yg527Z0JTFM7HAycaZGgPlTyH+MsNdvpJqpvXDF/6E=
+github.com/outofforest/logger v0.3.4/go.mod h1:wOsyVEu2nnueGK+IZuD1tOWYx6tXGV48earpJsDPT3Y=
 github.com/outofforest/parallel v0.2.3 h1:DRIgHr7XTL4LLgsTqrj041kulv4ajtbCkRbkOG5psWY=
 github.com/outofforest/parallel v0.2.3/go.mod h1:cu210xIjJtOMXR2ERzEcNA2kr0Z0xfZjSKw2jTxAQ2E=
 github.com/outofforest/run v0.2.13/go.mod h1:6FJb2S4fdY3Mqsvz4vG1m7cHAj+8aJ8nCPX1bl9pBBo=
