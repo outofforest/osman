@@ -73,6 +73,7 @@ linters:
     - maintidx
     - exhaustruct
     - nonamedreturns
+    - musttag
 
 linters-settings:
   nakedret:
