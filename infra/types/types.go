@@ -123,6 +123,7 @@ var buildTypes = map[BuildType]BuildTypeProperties{
 		AutoMount: true,
 	},
 	BuildTypeBoot: {
+		Mountable:  true,
 		Revertable: true,
 	},
 	BuildTypeVM: {
