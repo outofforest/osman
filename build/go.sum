@@ -7,8 +7,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/outofforest/build v1.8.19/go.mod h1:JJzGyGfFAXS6t/soqvBLbnsKDaGWA9jws0Cu2o7cfU8=
-github.com/outofforest/build v1.8.20 h1:xVpmVtUGLShqIe1Gg6FecrqxeAGAuSRhBiLBU06FYhw=
-github.com/outofforest/build v1.8.20/go.mod h1:gd5EOtPl+txJRbj+w+ythbXniZ39WIFT/ZSy7cnIfQU=
+github.com/outofforest/build v1.8.21 h1:TOUWvWXJiG6fO8Ri4Zo/IpHnsz9Arax2rNOdWa2DicE=
+github.com/outofforest/build v1.8.21/go.mod h1:wrSDgB+uDVp+Ni7evMCsjP2AsjHlzeBDwGaVxmRllHM=
 github.com/outofforest/buildgo v0.5.5 h1:cjmi8tl19+UG1hvu6s/MV9ks+3creGYKQtMhWA8p4rc=
 github.com/outofforest/buildgo v0.5.5/go.mod h1:TXMKkbJjM0iq5lFm9Y1HE4s8G4jv0ZoPq2xiQa4ckJE=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
@@ -22,8 +22,8 @@ github.com/outofforest/logger v0.3.4/go.mod h1:wOsyVEu2nnueGK+IZuD1tOWYx6tXGV48e
 github.com/outofforest/parallel v0.2.3 h1:DRIgHr7XTL4LLgsTqrj041kulv4ajtbCkRbkOG5psWY=
 github.com/outofforest/parallel v0.2.3/go.mod h1:cu210xIjJtOMXR2ERzEcNA2kr0Z0xfZjSKw2jTxAQ2E=
 github.com/outofforest/run v0.2.13/go.mod h1:6FJb2S4fdY3Mqsvz4vG1m7cHAj+8aJ8nCPX1bl9pBBo=
-github.com/outofforest/run v0.2.14 h1:kM/14+h2w454us8uepnY7wa0owihDirCCjRLzdK+j+Y=
-github.com/outofforest/run v0.2.14/go.mod h1:9Tgz1tsZMV+sk935lZ9WiOfjj7lFjIXWYsW4RBqq1Ag=
+github.com/outofforest/run v0.2.15 h1:Ga76qMr9+f5A+UlSh/8I/C1UFpqu7ygAUK8C9x+0Bsg=
+github.com/outofforest/run v0.2.15/go.mod h1:2XNX2mOkNLxeerUOvX66LKcKD59fHfU40zGfsYNXVpk=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
