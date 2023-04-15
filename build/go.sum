@@ -6,11 +6,11 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/outofforest/build v1.8.19/go.mod h1:JJzGyGfFAXS6t/soqvBLbnsKDaGWA9jws0Cu2o7cfU8=
+github.com/outofforest/build v1.8.20/go.mod h1:gd5EOtPl+txJRbj+w+ythbXniZ39WIFT/ZSy7cnIfQU=
 github.com/outofforest/build v1.8.21 h1:TOUWvWXJiG6fO8Ri4Zo/IpHnsz9Arax2rNOdWa2DicE=
 github.com/outofforest/build v1.8.21/go.mod h1:wrSDgB+uDVp+Ni7evMCsjP2AsjHlzeBDwGaVxmRllHM=
-github.com/outofforest/buildgo v0.5.5 h1:cjmi8tl19+UG1hvu6s/MV9ks+3creGYKQtMhWA8p4rc=
-github.com/outofforest/buildgo v0.5.5/go.mod h1:TXMKkbJjM0iq5lFm9Y1HE4s8G4jv0ZoPq2xiQa4ckJE=
+github.com/outofforest/buildgo v0.5.6 h1:BJn1+C8d+4Ozfv0NKqyWgWuN/+NMrJ4ZVF2NvSaWWbE=
+github.com/outofforest/buildgo v0.5.6/go.mod h1:vuQAiQP0YCYMAW9aaZ97VD5mYSxGvpg9VbACvr/eeAU=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
 github.com/outofforest/ioc/v2 v2.5.2/go.mod h1:yI+FHuHchC/t6nVo3WJ96qEgCXdHQKFI/4wW2/75YcU=
 github.com/outofforest/libexec v0.3.6/go.mod h1:3s2VtYSqj/2VE47yec0tRSZwU39vo1TIZbPfsC9fGn8=
@@ -54,7 +54,6 @@ go.uber.org/multierr v1.6.0/go.mod h1:cdWPpRnG4AhwMwsgIHip0KRBQjJy5kYEpYjJxpXp9i
 go.uber.org/multierr v1.8.0 h1:dg6GjLku4EH+249NNmoIciG9N/jURbDG+pFlTkhzIC8=
 go.uber.org/multierr v1.8.0/go.mod h1:7EAYxJLBy9rStEaz58O2t4Uvip6FSURkq8/ppBp95ak=
 go.uber.org/zap v1.22.0/go.mod h1:H4siCOZOrAolnUPJEkfaSjDqyP+BDS0DdDWzwcgt3+U=
-go.uber.org/zap v1.23.0/go.mod h1:D+nX8jyLsMHMYrln8A0rJjFt/T/9/bGgIhAqxv5URuY=
 go.uber.org/zap v1.24.0 h1:FiJd5l1UOLj0wCgbSE0rwwXHzEdAZS6hiiSnxJN/D60=
 go.uber.org/zap v1.24.0/go.mod h1:2kMP+WWQ8aoFoedH3T2sq6iJ2yDWpHbP0f6MQbS9Gkg=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
