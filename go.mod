@@ -10,7 +10,7 @@ replace (
 )
 
 require (
-	github.com/beevik/etree v1.1.0
+	github.com/beevik/etree v1.1.3
 	github.com/digitalocean/go-libvirt v0.0.0-20221122165534-e3cbf86fc1f6
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/go-zfs/v3 v3.1.14
