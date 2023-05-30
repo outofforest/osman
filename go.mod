@@ -17,7 +17,7 @@ require (
 	github.com/outofforest/ioc/v2 v2.5.2
 	github.com/outofforest/isolator v0.5.6
 	github.com/outofforest/logger v0.3.4
-	github.com/outofforest/run v0.2.15
+	github.com/outofforest/run v0.3.1
 	github.com/pkg/errors v0.9.1
 	github.com/ridge/must v0.6.0
 	github.com/spf13/cobra v1.7.0
