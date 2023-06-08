@@ -16,5 +16,5 @@ jobs:
       - name: CI
         run: |
           cd ./build
-          go build -o ../bin/tmp-build ./cmd
-          ../bin/tmp-build dev/lint dev/test build
+          go build -o ../bin/.cache/build ./cmd
+          ../bin/.cache/build dev/lint dev/test build
