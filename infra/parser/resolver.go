@@ -36,7 +36,7 @@ func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) 
 			info, err := os.Stat(f)
 			switch {
 			case err != nil && !os.IsNotExist(err):
-				return nil, err
+				return nil, errors.WithStack(err)
 			case err == nil && !info.IsDir():
 				filePath = f
 				ext = e

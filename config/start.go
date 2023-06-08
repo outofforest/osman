@@ -7,19 +7,26 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// MountFactory collects data for mount config
-type MountFactory struct {
-	// Boot means that the mount is created for booting host machine
-	Boot bool
+// StartFactory collects data for start config
+type StartFactory struct {
+	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
+	XMLDir string
+
+	// VMFile is the file containing VM definition
+	VMFile string
+
+	// LibvirtAddr is the address libvirt listens on
+	LibvirtAddr string
 }
 
-// Config returns new mount config
-func (f *MountFactory) Config(args Args) Mount {
-	config := Mount{
-		Type: types.BuildTypeMount,
+// Config returns new start config
+func (f *StartFactory) Config(args Args) Start {
+	config := Start{
+		XMLDir:      f.XMLDir,
+		LibvirtAddr: f.LibvirtAddr,
 	}
-	if f.Boot {
-		config.Type = types.BuildTypeBoot
+	if f.VMFile != "auto" {
+		config.VMFile = f.VMFile
 	}
 	if len(args) >= 2 {
 		var err error
@@ -45,8 +52,8 @@ func (f *MountFactory) Config(args Args) Mount {
 	return config
 }
 
-// Mount stores configuration for mount command
-type Mount struct {
+// Start stores configuration for start command
+type Start struct {
 	// ImageBuildID is the build ID of image to mount
 	ImageBuildID types.BuildID
 
@@ -56,6 +63,12 @@ type Mount struct {
 	// MountKey is the build key of mounted image
 	MountKey types.BuildKey
 
-	// Type is the type of mount
-	Type types.BuildType
+	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
+	XMLDir string
+
+	// VMFile is the file containing VM definition
+	VMFile string
+
+	// LibvirtAddr is the address libvirt listens on
+	LibvirtAddr string
 }

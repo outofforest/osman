@@ -25,13 +25,13 @@ type specFileParser struct {
 func (p *specFileParser) Parse(filePath string) ([]description.Command, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer file.Close()
 
 	parsed, err := parser.Parse(file)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	commands := make([]description.Command, 0, len(parsed.AST.Children))
