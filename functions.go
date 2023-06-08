@@ -74,9 +74,7 @@ func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s st
 		return types.BuildInfo{}, errors.New("image can't be mounted for booting because it was built without specifying BOOT option(s)")
 	}
 
-	var nameFromBuild bool
 	if mount.MountKey.Name == "" {
-		nameFromBuild = true
 		mount.MountKey.Name = image.Name
 	}
 
@@ -84,35 +82,8 @@ func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s st
 		mount.MountKey.Tag = types.Tag(types.RandomString(5))
 	}
 
-	if mount.VMFile == "" {
-		mount.VMFile = filepath.Join(mount.XMLDir, mount.MountKey.Name+".xml")
-	}
-
-	var doc *etree.Document
-	if properties.VM {
-		doc = etree.NewDocument()
-		if err := doc.ReadFromFile(mount.VMFile); err != nil {
-			return types.BuildInfo{}, err
-		}
-		if nameFromBuild {
-			if name := vmName(doc); name != "" {
-				mount.MountKey.Name = name
-			}
-		}
-	}
-
 	if !mount.MountKey.IsValid() {
 		return types.BuildInfo{}, errors.Errorf("mount key %s is invalid", mount.MountKey)
-	}
-
-	if properties.VM {
-		exists, err := vmExists(mount.MountKey, mount.LibvirtAddr)
-		if err != nil {
-			return types.BuildInfo{}, err
-		}
-		if exists {
-			return types.BuildInfo{}, errors.Errorf("vm %s has been already defined", mount.MountKey)
-		}
 	}
 
 	info, err := cloneForMount(ctx, image, storage, mount, s)
@@ -125,15 +96,59 @@ func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s st
 		}
 	}()
 
-	if properties.VM {
-		prepareVM(doc, info, mount.MountKey)
-		xmlDef, err := doc.WriteToString()
-		if err != nil {
-			return types.BuildInfo{}, err
+	return info, nil
+}
+
+// Start starts VM
+func Start(ctx context.Context, storage config.Storage, start config.Start, s storage.Driver) (types.BuildInfo, error) {
+	var nameFromBuild bool
+	if start.MountKey.Name == "" {
+		nameFromBuild = true
+		start.MountKey.Name = start.ImageBuildKey.Name
+	}
+	if start.MountKey.Tag == "" {
+		start.MountKey.Tag = types.Tag(types.RandomString(5))
+	}
+	if start.VMFile == "" {
+		start.VMFile = filepath.Join(start.XMLDir, start.MountKey.Name+".xml")
+	}
+
+	doc := etree.NewDocument()
+	if err := doc.ReadFromFile(start.VMFile); err != nil {
+		return types.BuildInfo{}, errors.WithStack(err)
+	}
+
+	if nameFromBuild {
+		if name := vmName(doc); name != "" {
+			start.MountKey.Name = name
 		}
-		if err := deployVM(xmlDef, mount.LibvirtAddr); err != nil {
-			return types.BuildInfo{}, err
-		}
+	}
+
+	exists, err := vmExists(start.MountKey, start.LibvirtAddr)
+	if err != nil {
+		return types.BuildInfo{}, err
+	}
+	if exists {
+		return types.BuildInfo{}, errors.Errorf("vm %s has been already defined", start.MountKey)
+	}
+
+	info, err := Mount(ctx, storage, config.Mount{
+		ImageBuildID:  start.ImageBuildID,
+		ImageBuildKey: start.ImageBuildKey,
+		MountKey:      start.MountKey,
+		Type:          types.BuildTypeVM,
+	}, s)
+	if err != nil {
+		return types.BuildInfo{}, err
+	}
+
+	prepareVM(doc, info, start.MountKey)
+	xmlDef, err := doc.WriteToString()
+	if err != nil {
+		return types.BuildInfo{}, errors.WithStack(err)
+	}
+	if err := deployVM(xmlDef, start.LibvirtAddr); err != nil {
+		return types.BuildInfo{}, err
 	}
 	return info, nil
 }
@@ -600,12 +615,12 @@ func libvirtConn(addr string) (*libvirt.Libvirt, error) {
 
 	conn, err := net.DialTimeout(addrParts[0], addrParts[1], 2*time.Second)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	l := libvirt.NewWithDialer(dialers.NewAlreadyConnected(conn))
 	if err := l.Connect(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return l, nil
 }
@@ -638,8 +653,16 @@ func deployVM(vmDef string, libvirtAddr string) error {
 		_ = l.Disconnect()
 	}()
 
-	_, err = l.DomainDefineXML(vmDef)
-	return err
+	domain, err := l.DomainDefineXML(vmDef)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if err := l.DomainCreate(domain); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 func undeployVM(buildID types.BuildID, libvirtAddr string) error {
@@ -653,16 +676,16 @@ func undeployVM(buildID types.BuildID, libvirtAddr string) error {
 
 	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	for _, d := range domains {
 		xml, err := l.DomainGetXMLDesc(d, 0)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		doc := etree.NewDocument()
 		if err := doc.ReadFromString(xml); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		buildIDTag := doc.FindElement("//metadata/osman:osman/osman:buildid")
 		if buildIDTag == nil {
@@ -670,7 +693,7 @@ func undeployVM(buildID types.BuildID, libvirtAddr string) error {
 		}
 		if buildID == types.BuildID(buildIDTag.Text()) {
 			if err := l.DomainUndefineFlags(d, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata); err != nil && !libvirt.IsNotFound(err) {
-				return err
+				return errors.WithStack(err)
 			}
 			return nil
 		}
