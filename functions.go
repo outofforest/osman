@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	_ "embed" // to embed grub config template
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -22,11 +24,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
+	"libvirt.org/go/libvirtxml"
 
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/storage"
 	"github.com/outofforest/osman/infra/types"
+)
+
+const (
+	defaultNATInterface        = "osman-nat"
+	defaultNATInterfaceNetwork = "10.0.0.0/24"
+	hostInterface              = "bond0"
+	virtualBridgePrefix        = "virbr"
 )
 
 // Build builds image
@@ -130,6 +140,10 @@ func Start(ctx context.Context, storage config.Storage, start config.Start, s st
 	}
 	if exists {
 		return types.BuildInfo{}, errors.Errorf("vm %s has been already defined", start.MountKey)
+	}
+
+	if err := ensureNetwork(ctx, start.LibvirtAddr); err != nil {
+		return types.BuildInfo{}, err
 	}
 
 	info, err := Mount(ctx, storage, config.Mount{
@@ -525,6 +539,89 @@ func mac() string {
 	return res
 }
 
+func ensureNetwork(ctx context.Context, libvirtAddr string) error {
+	l, err := libvirtConn(libvirtAddr)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = l.Disconnect()
+	}()
+
+	_, err = l.NetworkLookupByName(defaultNATInterface)
+	if err == nil {
+		return nil
+	}
+	if !isError(err, libvirt.ErrNoNetwork) {
+		return errors.WithStack(err)
+	}
+
+	_, ipNet, err := net.ParseCIDR(defaultNATInterfaceNetwork)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	ones, bits := ipNet.Mask.Size()
+	netSize := uint32(1 << (bits - ones))
+
+	bridgeSuffix := sha256.Sum256([]byte(defaultNATInterface))
+	network, err := l.NetworkDefineXML(must.String((&libvirtxml.Network{
+		Name: defaultNATInterface,
+		Forward: &libvirtxml.NetworkForward{
+			Mode: "nat",
+			Dev:  hostInterface,
+			Interfaces: []libvirtxml.NetworkForwardInterface{
+				{
+					Dev: hostInterface,
+				},
+			},
+		},
+		Bridge: &libvirtxml.NetworkBridge{
+			Name:  virtualBridgePrefix + hex.EncodeToString(bridgeSuffix[:])[:15-len(virtualBridgePrefix)],
+			STP:   "on",
+			Delay: "0",
+		},
+		IPs: []libvirtxml.NetworkIP{
+			{
+				Address: uint32ToIP4(ip4ToUint32(ipNet.IP) + 1).To4().String(),
+				Netmask: fmt.Sprintf("%d.%d.%d.%d", ipNet.Mask[0], ipNet.Mask[1], ipNet.Mask[2], ipNet.Mask[3]),
+				DHCP: &libvirtxml.NetworkDHCP{Ranges: []libvirtxml.NetworkDHCPRange{
+					{
+						Start: uint32ToIP4(ip4ToUint32(ipNet.IP) + 2).To4().String(),
+						End:   uint32ToIP4(ip4ToUint32(ipNet.IP) + netSize - 2).To4().String(),
+					},
+				}},
+			},
+		},
+	}).Marshal()))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if err := l.NetworkCreate(network); err != nil {
+		return errors.WithStack(err)
+	}
+
+	for {
+		network, err := l.NetworkLookupByName(defaultNATInterface)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		active, err := l.NetworkIsActive(network)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if active == 1 {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return errors.WithStack(err)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
 func prepareVM(doc *etree.Document, info types.BuildInfo, buildKey types.BuildKey) {
 	nameTag := doc.FindElement("//name")
 	for _, ch := range nameTag.Child {
@@ -703,4 +800,23 @@ func undeployVM(buildID types.BuildID, libvirtAddr string) error {
 
 func bootPrefix(storageRoot string) string {
 	return "boot-" + filepath.Base(storageRoot) + "-"
+}
+
+func ip4ToUint32(ip net.IP) uint32 {
+	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+}
+
+func uint32ToIP4(val uint32) net.IP {
+	return net.IPv4(byte(val>>24), byte(val>>16), byte(val>>8), byte(val)).To4()
+}
+
+func isError(err error, expectedError libvirt.ErrorNumber) bool {
+	for err != nil {
+		e, ok := err.(libvirt.Error)
+		if ok {
+			return e.Code == uint32(expectedError)
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }
