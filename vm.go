@@ -541,6 +541,7 @@ func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
 	})
 	vcpus := [][]uint{}
 	for _, sck := range socketsToSort {
+		//nolint:scopelint // using sck in function below is fine because code is sequential
 		sort.Slice(sck.SiblingsToSort, func(i, j int) bool {
 			return sck.SiblingsToSort[i].Weight < sck.SiblingsToSort[j].Weight
 		})
