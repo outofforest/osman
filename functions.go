@@ -276,7 +276,6 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 				if err != nil {
 					return nil, err
 				}
-
 			}
 			res.Result = undeployVM(l, buildID)
 		}
