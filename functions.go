@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/digitalocean/go-libvirt"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 	"libvirt.org/go/libvirtxml"
@@ -115,7 +116,15 @@ func Start(ctx context.Context, storage config.Storage, start config.Start, s st
 		}
 	}
 
-	exists, err := vmExists(start.MountKey, start.LibvirtAddr)
+	l, err := libvirtConn(start.LibvirtAddr)
+	if err != nil {
+		return types.BuildInfo{}, err
+	}
+	defer func() {
+		_ = l.Disconnect()
+	}()
+
+	exists, err := vmExists(l, start.MountKey)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -133,12 +142,15 @@ func Start(ctx context.Context, storage config.Storage, start config.Start, s st
 		return types.BuildInfo{}, err
 	}
 
-	domain, mac := prepareVM(domain, info, start.MountKey)
-	if err := addVMToDefaultNetwork(ctx, start.LibvirtAddr, mac); err != nil {
+	domain, mac, err := prepareVM(l, domain, info, start.MountKey)
+	if err != nil {
+		return types.BuildInfo{}, err
+	}
+	if err := addVMToDefaultNetwork(ctx, l, mac); err != nil {
 		return types.BuildInfo{}, err
 	}
 
-	if err := deployVM(domain, start.LibvirtAddr); err != nil {
+	if err := deployVM(l, domain); err != nil {
 		return types.BuildInfo{}, err
 	}
 	return info, nil
@@ -245,13 +257,28 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 		sort(build.BuildID)
 	}
 
+	var l *libvirt.Libvirt
+	defer func() {
+		if l != nil {
+			_ = l.Disconnect()
+		}
+	}()
+
 	results := make([]Result, 0, len(deleteSequence))
 	var genGRUB bool
 	for i := len(deleteSequence) - 1; i >= 0; i-- {
 		buildID := deleteSequence[i]
 		res := Result{BuildID: buildID}
 		if buildID.Type().Properties().VM {
-			res.Result = undeployVM(buildID, drop.LibvirtAddr)
+			if l == nil {
+				var err error
+				l, err = libvirtConn(drop.LibvirtAddr)
+				if err != nil {
+					return nil, err
+				}
+
+			}
+			res.Result = undeployVM(l, buildID)
 		}
 		if res.Result == nil {
 			res.Result = s.Drop(ctx, buildID)

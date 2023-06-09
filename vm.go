@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,15 +40,7 @@ func mac() string {
 	return res
 }
 
-func addVMToDefaultNetwork(ctx context.Context, libvirtAddr string, mac string) error {
-	l, err := libvirtConn(libvirtAddr)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = l.Disconnect()
-	}()
-
+func addVMToDefaultNetwork(ctx context.Context, l *libvirt.Libvirt, mac string) error {
 	_, ipNet, err := net.ParseCIDR(defaultNATNetwork)
 	if err != nil {
 		return errors.WithStack(err)
@@ -162,14 +156,7 @@ func addVMToDefaultNetwork(ctx context.Context, libvirtAddr string, mac string) 
 	return errors.Errorf("no free IPs in the network %q", defaultNATNetworkName)
 }
 
-func removeVMFromDefaultNetwork(libvirtAddr string, mac string) error {
-	l, err := libvirtConn(libvirtAddr)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = l.Disconnect()
-	}()
+func removeVMFromDefaultNetwork(l *libvirt.Libvirt, mac string) error {
 	network, err := l.NetworkLookupByName(defaultNATNetworkName)
 	if isError(err, libvirt.ErrNoNetwork) {
 		return nil
@@ -233,7 +220,7 @@ func removeVMFromDefaultNetwork(libvirtAddr string, mac string) error {
 	return nil
 }
 
-func prepareVM(domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) (libvirtxml.Domain, string) {
+func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) (libvirtxml.Domain, string, error) {
 	mac := mac()
 	domainDoc.Name = buildKey.String()
 
@@ -291,7 +278,60 @@ func prepareVM(domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types
 	domainDoc.OS.Initrd = info.Mounted + "/boot/initramfs.img"
 	domainDoc.OS.Cmdline = strings.Join(append([]string{"root=virtiofs:root"}, info.Params...), " ")
 
-	return domainDoc, mac
+	if domainDoc.CPU == nil || domainDoc.CPU.Topology == nil {
+		return libvirtxml.Domain{}, "", errors.New("cpu topology must be specified")
+	}
+
+	capabilitiesRaw, err := l.ConnectGetCapabilities()
+	if err != nil {
+		return libvirtxml.Domain{}, "", errors.WithStack(err)
+	}
+
+	var capabilitiesDoc libvirtxml.Caps
+	if err := capabilitiesDoc.Unmarshal(capabilitiesRaw); err != nil {
+		return libvirtxml.Domain{}, "", errors.WithStack(err)
+	}
+
+	if domainDoc.VCPU == nil || domainDoc.VCPU.Value == 0 {
+		return libvirtxml.Domain{}, "", errors.New("number of vcpus is not provided")
+	}
+	if domainDoc.CPU == nil {
+		return libvirtxml.Domain{}, "", errors.New("cpu settings are not provided")
+	}
+	domainDoc.VCPU.Value += domainDoc.VCPU.Value % uint(capabilitiesDoc.Host.CPU.Topology.Threads)
+	cores := int(domainDoc.VCPU.Value) / capabilitiesDoc.Host.CPU.Topology.Threads
+	domainDoc.CPU.Topology = &libvirtxml.DomainCPUTopology{
+		Sockets: 1,
+		Dies:    1,
+		Cores:   cores,
+		Threads: capabilitiesDoc.Host.CPU.Topology.Threads,
+	}
+
+	if domainDoc.IOThreads == 0 {
+		domainDoc.IOThreads = 1
+	}
+
+	availableVCPUs, err := computeVCPUAvailability(l)
+	if err != nil {
+		return libvirtxml.Domain{}, "", errors.WithStack(err)
+	}
+	if len(availableVCPUs) < cores {
+		return libvirtxml.Domain{}, "", errors.New("vm requires more cores than available on host")
+	}
+
+	domainDoc.CPUTune = &libvirtxml.DomainCPUTune{}
+	var vcpuIndex uint
+	for i := 0; i < cores; i++ {
+		for _, cpuID := range availableVCPUs[i] {
+			domainDoc.CPUTune.VCPUPin = append(domainDoc.CPUTune.VCPUPin, libvirtxml.DomainCPUTuneVCPUPin{
+				VCPU:   vcpuIndex,
+				CPUSet: fmt.Sprintf("%d", cpuID),
+			})
+			vcpuIndex++
+		}
+	}
+
+	return domainDoc, mac, nil
 }
 
 func libvirtConn(addr string) (*libvirt.Libvirt, error) {
@@ -312,16 +352,8 @@ func libvirtConn(addr string) (*libvirt.Libvirt, error) {
 	return l, nil
 }
 
-func vmExists(buildKey types.BuildKey, libvirtAddr string) (bool, error) {
-	l, err := libvirtConn(libvirtAddr)
-	if err != nil {
-		return false, err
-	}
-	defer func() {
-		_ = l.Disconnect()
-	}()
-
-	_, err = l.DomainLookupByName(buildKey.String())
+func vmExists(l *libvirt.Libvirt, buildKey types.BuildKey) (bool, error) {
+	_, err := l.DomainLookupByName(buildKey.String())
 	if libvirt.IsNotFound(err) {
 		return false, nil
 	}
@@ -331,15 +363,7 @@ func vmExists(buildKey types.BuildKey, libvirtAddr string) (bool, error) {
 	return true, nil
 }
 
-func deployVM(domainDoc libvirtxml.Domain, libvirtAddr string) error {
-	l, err := libvirtConn(libvirtAddr)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = l.Disconnect()
-	}()
-
+func deployVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain) error {
 	xml, err := domainDoc.Marshal()
 	if err != nil {
 		return errors.WithStack(err)
@@ -356,15 +380,7 @@ func deployVM(domainDoc libvirtxml.Domain, libvirtAddr string) error {
 	return nil
 }
 
-func undeployVM(buildID types.BuildID, libvirtAddr string) error {
-	l, err := libvirtConn(libvirtAddr)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = l.Disconnect()
-	}()
-
+func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
 	if err != nil {
 		return errors.WithStack(err)
@@ -405,7 +421,7 @@ func undeployVM(buildID types.BuildID, libvirtAddr string) error {
 			}
 
 			if mac != "" {
-				return removeVMFromDefaultNetwork(libvirtAddr, mac)
+				return removeVMFromDefaultNetwork(l, mac)
 			}
 
 			return nil
@@ -437,4 +453,101 @@ func isError(err error, expectedError libvirt.ErrorNumber) bool {
 		err = errors.Unwrap(err)
 	}
 	return false
+}
+
+type sibling struct {
+	Weight uint
+	CPUs   []uint
+}
+type socket struct {
+	Weight         uint
+	CPUToSiblings  map[uint]string
+	Siblings       map[string]*sibling
+	SiblingsToSort []*sibling
+}
+
+func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
+	capabilitiesRaw, err := l.ConnectGetCapabilities()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var capabilitiesDoc libvirtxml.Caps
+	if err := capabilitiesDoc.Unmarshal(capabilitiesRaw); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	sockets := map[uint]*socket{}
+	socketsToSort := []*socket{}
+	cpuToSockets := map[uint]*socket{}
+	for _, cell := range capabilitiesDoc.Host.NUMA.Cells.Cells {
+		for _, cpu := range cell.CPUS.CPUs {
+			cpuID := uint(cpu.ID)
+			socketID := uint(*cpu.SocketID)
+			sck, exists := sockets[socketID]
+			if !exists {
+				sck = &socket{
+					CPUToSiblings: map[uint]string{},
+					Siblings:      map[string]*sibling{},
+				}
+				sockets[socketID] = sck
+				socketsToSort = append(socketsToSort, sck)
+			}
+			cpuToSockets[cpuID] = sck
+			sck.CPUToSiblings[cpuID] = cpu.Siblings
+			sbl, exists := sck.Siblings[cpu.Siblings]
+			if !exists {
+				sbl = &sibling{}
+				sck.Siblings[cpu.Siblings] = sbl
+				sck.SiblingsToSort = append(sck.SiblingsToSort, sbl)
+			}
+			sbl.CPUs = append(sbl.CPUs, cpuID)
+		}
+	}
+
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	for _, d := range domains {
+		xml, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(xml); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		if domainDoc.CPUTune == nil {
+			continue
+		}
+		for _, pin := range domainDoc.CPUTune.VCPUPin {
+			for _, cpuStr := range strings.Split(pin.CPUSet, ",") {
+				cpu, err := strconv.Atoi(strings.TrimSpace(cpuStr))
+				if err != nil {
+					return nil, errors.WithStack(err)
+				}
+				cpuID := uint(cpu)
+				sck := cpuToSockets[cpuID]
+				sck.Weight++
+				sck.Siblings[sck.CPUToSiblings[cpuID]].Weight++
+			}
+		}
+	}
+
+	sort.Slice(socketsToSort, func(i, j int) bool {
+		return socketsToSort[i].Weight < socketsToSort[j].Weight
+	})
+	vcpus := [][]uint{}
+	for _, sck := range socketsToSort {
+		sort.Slice(sck.SiblingsToSort, func(i, j int) bool {
+			return sck.SiblingsToSort[i].Weight < sck.SiblingsToSort[j].Weight
+		})
+		for _, sbl := range sck.SiblingsToSort {
+			vcpus = append(vcpus, sbl.CPUs)
+		}
+	}
+
+	return vcpus, nil
 }
