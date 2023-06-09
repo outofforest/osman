@@ -74,6 +74,7 @@ linters:
     - exhaustruct
     - nonamedreturns
     - musttag
+    - golint
 
 linters-settings:
   nakedret:

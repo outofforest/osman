@@ -127,9 +127,8 @@ func addVMToDefaultNetwork(ctx context.Context, libvirtAddr string, mac string) 
 		return errors.Errorf("exactly one IP section is expected for network on network %q", defaultNATNetworkName)
 	}
 
-	ip := networkDoc.IPs[0]
 	usedIPs := map[uint32]struct{}{}
-	if ip.DHCP != nil {
+	if ip := networkDoc.IPs[0]; ip.DHCP != nil {
 		for _, host := range ip.DHCP.Hosts {
 			if host.MAC == mac {
 				return errors.Errorf("mac address %q already defined on network %q", mac, defaultNATNetworkName)
@@ -199,8 +198,7 @@ func removeVMFromDefaultNetwork(libvirtAddr string, mac string) error {
 	var ipToDelete string
 	networkNeeded := false
 
-	ip := networkDoc.IPs[0]
-	if ip.DHCP != nil {
+	if ip := networkDoc.IPs[0]; ip.DHCP != nil {
 		for _, h := range ip.DHCP.Hosts {
 			if h.MAC == mac {
 				ipToDelete = h.IP
