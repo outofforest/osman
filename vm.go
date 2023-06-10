@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/beevik/etree"
@@ -18,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
+	"github.com/vishvananda/netlink"
 	"libvirt.org/go/libvirtxml"
 
 	"github.com/outofforest/osman/infra/types"
@@ -26,7 +28,6 @@ import (
 const (
 	defaultNATNetworkName = "osman-nat"
 	defaultNATNetwork     = "10.0.0.0/24"
-	hostInterface         = "bond0"
 	virtualBridgePrefix   = "virbr"
 )
 
@@ -53,15 +54,34 @@ func addVMToDefaultNetwork(ctx context.Context, l *libvirt.Libvirt, mac string) 
 			return errors.WithStack(err)
 		}
 
+		routes, err := netlink.RouteList(nil, syscall.AF_UNSPEC)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		var defaultIface *net.Interface
+		for _, r := range routes {
+			if isDefaultRoute(r) {
+				var err error
+				if defaultIface, err = net.InterfaceByIndex(r.LinkIndex); err != nil {
+					return errors.WithStack(err)
+				}
+				break
+			}
+		}
+		if defaultIface == nil {
+			return errors.New("default network interface not found")
+		}
+
 		bridgeSuffix := sha256.Sum256([]byte(defaultNATNetworkName))
 		network, err = l.NetworkDefineXML(must.String((&libvirtxml.Network{
 			Name: defaultNATNetworkName,
 			Forward: &libvirtxml.NetworkForward{
 				Mode: "nat",
-				Dev:  hostInterface,
+				Dev:  defaultIface.Name,
 				Interfaces: []libvirtxml.NetworkForwardInterface{
 					{
-						Dev: hostInterface,
+						Dev: defaultIface.Name,
 					},
 				},
 			},
@@ -551,4 +571,12 @@ func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
 	}
 
 	return vcpus, nil
+}
+
+func isDefaultRoute(route netlink.Route) bool {
+	if route.Dst == nil {
+		return true
+	}
+	ones, _ := route.Dst.Mask.Size()
+	return ones == 0
 }
