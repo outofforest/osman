@@ -341,7 +341,8 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 
 	domainDoc.CPUTune = &libvirtxml.DomainCPUTune{}
 	var vcpuIndex uint
-	for i := 0; i < cores; i++ {
+	i := 0
+	for ; i < cores; i++ {
 		for _, cpuID := range availableVCPUs[i] {
 			domainDoc.CPUTune.VCPUPin = append(domainDoc.CPUTune.VCPUPin, libvirtxml.DomainCPUTuneVCPUPin{
 				VCPU:   vcpuIndex,
@@ -349,6 +350,22 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 			})
 			vcpuIndex++
 		}
+	}
+	domainDoc.CPUTune.IOThreadPin = []libvirtxml.DomainCPUTuneIOThreadPin{}
+	for j := uint(1); j <= domainDoc.IOThreads; i, j = i+1, j+1 {
+		if i == len(availableVCPUs) {
+			i = 0
+		}
+		domainDoc.CPUTune.IOThreadPin = append(domainDoc.CPUTune.IOThreadPin, libvirtxml.DomainCPUTuneIOThreadPin{
+			IOThread: j,
+			CPUSet:   joinUInts(availableVCPUs[i]),
+		})
+	}
+	if i == len(availableVCPUs) {
+		i = 0
+	}
+	domainDoc.CPUTune.EmulatorPin = &libvirtxml.DomainCPUTuneEmulatorPin{
+		CPUSet: joinUInts(availableVCPUs[i]),
 	}
 
 	return domainDoc, mac, nil
@@ -542,17 +559,29 @@ func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
 		if domainDoc.CPUTune == nil {
 			continue
 		}
+		cpuSet := []string{}
 		for _, pin := range domainDoc.CPUTune.VCPUPin {
-			for _, cpuStr := range strings.Split(pin.CPUSet, ",") {
-				cpu, err := strconv.Atoi(strings.TrimSpace(cpuStr))
-				if err != nil {
-					return nil, errors.WithStack(err)
-				}
-				cpuID := uint(cpu)
-				sck := cpuToSockets[cpuID]
-				sck.Weight++
-				sck.Siblings[sck.CPUToSiblings[cpuID]].Weight++
+			cpuSet = append(cpuSet, strings.Split(pin.CPUSet, ",")...)
+		}
+		for _, pin := range domainDoc.CPUTune.IOThreadPin {
+			cpuSet = append(cpuSet, strings.Split(pin.CPUSet, ",")...)
+		}
+		if domainDoc.CPUTune.EmulatorPin != nil {
+			cpuSet = append(cpuSet, strings.Split(domainDoc.CPUTune.EmulatorPin.CPUSet, ",")...)
+		}
+		for _, cpuStr := range cpuSet {
+			cpuStr = strings.TrimSpace(cpuStr)
+			if cpuStr == "" {
+				continue
 			}
+			cpu, err := strconv.Atoi(cpuStr)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			cpuID := uint(cpu)
+			sck := cpuToSockets[cpuID]
+			sck.Weight++
+			sck.Siblings[sck.CPUToSiblings[cpuID]].Weight++
 		}
 	}
 
@@ -579,4 +608,15 @@ func isDefaultRoute(route netlink.Route) bool {
 	}
 	ones, _ := route.Dst.Mask.Size()
 	return ones == 0
+}
+
+func joinUInts(vals []uint) string {
+	result := ""
+	for _, v := range vals {
+		if result != "" {
+			result += ","
+		}
+		result += fmt.Sprintf("%d", v)
+	}
+	return result
 }
