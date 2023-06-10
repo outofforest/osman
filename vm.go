@@ -436,6 +436,14 @@ func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 			continue
 		}
 		if buildID == types.BuildID(buildIDTag.Text()) {
+			active, err := l.DomainIsActive(d)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if active == 1 {
+				return errors.Errorf("vm %q cannot be deleted because it is running", d.Name)
+			}
+
 			var domainDoc libvirtxml.Domain
 			if err := domainDoc.Unmarshal(xml); err != nil {
 				return errors.WithStack(err)
