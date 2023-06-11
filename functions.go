@@ -142,11 +142,11 @@ func Start(ctx context.Context, storage config.Storage, start config.Start, s st
 		return types.BuildInfo{}, err
 	}
 
-	domain, mac, err := prepareVM(l, domain, info, start.MountKey)
+	domain, macNAT, err := prepareVM(l, domain, info, start.MountKey)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
-	if err := addVMToDefaultNetwork(ctx, l, mac); err != nil {
+	if err := addVMToNetwork(ctx, l, networkNAT, macNAT); err != nil {
 		return types.BuildInfo{}, err
 	}
 
