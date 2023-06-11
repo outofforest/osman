@@ -3,8 +3,6 @@ package osman
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"sort"
@@ -25,11 +23,19 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-const (
-	defaultNATNetworkName = "osman-nat"
-	defaultNATNetwork     = "10.0.0.0/24"
-	virtualBridgePrefix   = "virbr"
-)
+type network struct {
+	Name           string
+	Type           string
+	PrivateNetwork string
+	Bridge         string
+}
+
+var networkNAT = network{
+	Name:           "osman-nat",
+	Type:           "nat",
+	PrivateNetwork: "10.0.0.0/24",
+	Bridge:         "osmannat",
+}
 
 func mac() string {
 	buf := make([]byte, 5)
@@ -41,14 +47,14 @@ func mac() string {
 	return res
 }
 
-func addVMToDefaultNetwork(ctx context.Context, l *libvirt.Libvirt, mac string) error {
-	_, ipNet, err := net.ParseCIDR(defaultNATNetwork)
+func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac string) error {
+	_, privateNet, err := net.ParseCIDR(n.PrivateNetwork)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	netSize := netSize(ipNet)
+	privateNetSize := netSize(privateNet)
 
-	network, err := l.NetworkLookupByName(defaultNATNetworkName)
+	network, err := l.NetworkLookupByName(n.Name)
 	if err != nil {
 		if !isError(err, libvirt.ErrNoNetwork) {
 			return errors.WithStack(err)
@@ -59,44 +65,45 @@ func addVMToDefaultNetwork(ctx context.Context, l *libvirt.Libvirt, mac string) 
 			return errors.WithStack(err)
 		}
 
-		var defaultIface *net.Interface
+		var defaultIfaceName string
 		for _, r := range routes {
 			if isDefaultRoute(r) {
-				var err error
-				if defaultIface, err = net.InterfaceByIndex(r.LinkIndex); err != nil {
+				defaultIface, err := net.InterfaceByIndex(r.LinkIndex)
+				if err != nil {
 					return errors.WithStack(err)
 				}
+				defaultIfaceName = defaultIface.Name
 				break
 			}
 		}
-		if defaultIface == nil {
+		if defaultIfaceName == "" {
 			return errors.New("default network interface not found")
 		}
 
-		bridgeSuffix := sha256.Sum256([]byte(defaultNATNetworkName))
-		network, err = l.NetworkDefineXML(must.String((&libvirtxml.Network{
-			Name: defaultNATNetworkName,
+		networkDoc := &libvirtxml.Network{
+			Name: n.Name,
 			Forward: &libvirtxml.NetworkForward{
-				Mode: "nat",
-				Dev:  defaultIface.Name,
+				Mode: n.Type,
+				Dev:  defaultIfaceName,
 				Interfaces: []libvirtxml.NetworkForwardInterface{
 					{
-						Dev: defaultIface.Name,
+						Dev: defaultIfaceName,
 					},
 				},
 			},
 			Bridge: &libvirtxml.NetworkBridge{
-				Name:  virtualBridgePrefix + hex.EncodeToString(bridgeSuffix[:])[:15-len(virtualBridgePrefix)],
+				Name:  n.Bridge,
 				STP:   "on",
 				Delay: "0",
 			},
 			IPs: []libvirtxml.NetworkIP{
 				{
-					Address: uint32ToIP4(ip4ToUint32(ipNet.IP) + 1).To4().String(),
-					Netmask: fmt.Sprintf("%d.%d.%d.%d", ipNet.Mask[0], ipNet.Mask[1], ipNet.Mask[2], ipNet.Mask[3]),
+					Address: uint32ToIP4(ip4ToUint32(privateNet.IP) + 1).To4().String(),
+					Netmask: fmt.Sprintf("%d.%d.%d.%d", privateNet.Mask[0], privateNet.Mask[1], privateNet.Mask[2], privateNet.Mask[3]),
 				},
 			},
-		}).Marshal()))
+		}
+		network, err = l.NetworkDefineXML(must.String(networkDoc.Marshal()))
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -105,10 +112,6 @@ func addVMToDefaultNetwork(ctx context.Context, l *libvirt.Libvirt, mac string) 
 		}
 
 		for {
-			network, err := l.NetworkLookupByName(defaultNATNetworkName)
-			if err != nil {
-				return errors.WithStack(err)
-			}
 			active, err := l.NetworkIsActive(network)
 			if err != nil {
 				return errors.WithStack(err)
@@ -135,49 +138,53 @@ func addVMToDefaultNetwork(ctx context.Context, l *libvirt.Libvirt, mac string) 
 		return err
 	}
 	if len(networkDoc.IPs) == 0 {
-		return errors.Errorf("no IP section defined on network %q", defaultNATNetworkName)
+		return errors.Errorf("no IP section defined on network %q", n.Name)
 	}
 	if len(networkDoc.IPs) > 1 {
-		return errors.Errorf("exactly one IP section is expected for network on network %q", defaultNATNetworkName)
+		return errors.Errorf("exactly one IP section is expected for network on network %q", n.Name)
 	}
 
-	usedIPs := map[uint32]struct{}{}
+	usedPrivateIPs := map[uint32]struct{}{}
 	if ip := networkDoc.IPs[0]; ip.DHCP != nil {
 		for _, host := range ip.DHCP.Hosts {
 			if host.MAC == mac {
-				return errors.Errorf("mac address %q already defined on network %q", mac, defaultNATNetworkName)
+				return errors.Errorf("mac address %q already defined on network %q", mac, n.Name)
 			}
-			usedIPs[ip4ToUint32(net.ParseIP(host.IP))] = struct{}{}
+			usedPrivateIPs[ip4ToUint32(net.ParseIP(host.IP))] = struct{}{}
 		}
 	}
 
-	start := ip4ToUint32(ipNet.IP) + 2
-	end := start + netSize - 3
+	start := ip4ToUint32(privateNet.IP) + 2
+	end := start + privateNetSize - 3
+	var privateIP net.IP
 	for i := start; i <= end; i++ {
-		if _, exists := usedIPs[i]; exists {
+		if _, exists := usedPrivateIPs[i]; exists {
 			continue
 		}
 
-		err := l.NetworkUpdateCompat(
-			network,
-			libvirt.NetworkUpdateCommandAddLast,
-			libvirt.NetworkSectionIPDhcpHost,
-			0,
-			fmt.Sprintf("<host mac='%s' ip='%s' />", mac, uint32ToIP4(i)),
-			libvirt.NetworkUpdateAffectLive|libvirt.NetworkUpdateAffectConfig,
-		)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		return nil
+		privateIP = uint32ToIP4(i)
+		break
+	}
+	if privateIP == nil {
+		return errors.Errorf("no free private IPs in the network %q", n.Name)
+	}
+	err = l.NetworkUpdateCompat(
+		network,
+		libvirt.NetworkUpdateCommandAddLast,
+		libvirt.NetworkSectionIPDhcpHost,
+		0,
+		fmt.Sprintf("<host mac='%s' ip='%s' />", mac, privateIP),
+		libvirt.NetworkUpdateAffectLive|libvirt.NetworkUpdateAffectConfig,
+	)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
-	return errors.Errorf("no free IPs in the network %q", defaultNATNetworkName)
+	return nil
 }
 
-func removeVMFromDefaultNetwork(l *libvirt.Libvirt, mac string) error {
-	network, err := l.NetworkLookupByName(defaultNATNetworkName)
+func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string) error {
+	network, err := l.NetworkLookupByName(n.Name)
 	if isError(err, libvirt.ErrNoNetwork) {
 		return nil
 	}
@@ -196,10 +203,10 @@ func removeVMFromDefaultNetwork(l *libvirt.Libvirt, mac string) error {
 	}
 
 	if len(networkDoc.IPs) == 0 {
-		return errors.Errorf("no IP section defined on network %q", defaultNATNetworkName)
+		return errors.Errorf("no IP section defined on network %q", n.Name)
 	}
 	if len(networkDoc.IPs) > 1 {
-		return errors.Errorf("exactly one IP section is expected for network on network %q", defaultNATNetworkName)
+		return errors.Errorf("exactly one IP section is expected for network on network %q", n.Name)
 	}
 
 	var ipToDelete string
@@ -241,7 +248,7 @@ func removeVMFromDefaultNetwork(l *libvirt.Libvirt, mac string) error {
 }
 
 func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) (libvirtxml.Domain, string, error) {
-	mac := mac()
+	macNAT := mac()
 	domainDoc.Name = buildKey.String()
 
 	uuid, err := uuid.NewUUID()
@@ -257,19 +264,21 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 	if domainDoc.Devices == nil {
 		domainDoc.Devices = &libvirtxml.DomainDeviceList{}
 	}
-	domainDoc.Devices.Interfaces = append(domainDoc.Devices.Interfaces, libvirtxml.DomainInterface{
-		MAC: &libvirtxml.DomainInterfaceMAC{
-			Address: mac,
-		},
-		Source: &libvirtxml.DomainInterfaceSource{
-			Network: &libvirtxml.DomainInterfaceSourceNetwork{
-				Network: defaultNATNetworkName,
+	domainDoc.Devices.Interfaces = append(domainDoc.Devices.Interfaces,
+		libvirtxml.DomainInterface{
+			MAC: &libvirtxml.DomainInterfaceMAC{
+				Address: macNAT,
+			},
+			Source: &libvirtxml.DomainInterfaceSource{
+				Network: &libvirtxml.DomainInterfaceSourceNetwork{
+					Network: networkNAT.Name,
+				},
+			},
+			Model: &libvirtxml.DomainInterfaceModel{
+				Type: "virtio",
 			},
 		},
-		Model: &libvirtxml.DomainInterfaceModel{
-			Type: "virtio",
-		},
-	})
+	)
 
 	domainDoc.Devices.Filesystems = append(domainDoc.Devices.Filesystems, libvirtxml.DomainFilesystem{
 		Driver: &libvirtxml.DomainFilesystemDriver{
@@ -368,7 +377,7 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 		CPUSet: joinUInts(availableVCPUs[i]),
 	}
 
-	return domainDoc, mac, nil
+	return domainDoc, macNAT, nil
 }
 
 func libvirtConn(addr string) (*libvirt.Libvirt, error) {
@@ -449,14 +458,14 @@ func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 				return errors.WithStack(err)
 			}
 
-			var mac string
+			var macNAT string
 			if domainDoc.Devices != nil {
 				for _, i := range domainDoc.Devices.Interfaces {
 					if i.Source == nil || i.Source.Network == nil {
 						continue
 					}
-					if i.Source.Network.Network == defaultNATNetworkName && i.MAC != nil {
-						mac = i.MAC.Address
+					if i.Source.Network.Network == networkNAT.Name && i.MAC != nil {
+						macNAT = i.MAC.Address
 					}
 				}
 			}
@@ -465,8 +474,8 @@ func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 				return errors.WithStack(err)
 			}
 
-			if mac != "" {
-				return removeVMFromDefaultNetwork(l, mac)
+			if macNAT != "" {
+				return removeVMFromNetwork(l, networkNAT, macNAT)
 			}
 
 			return nil
