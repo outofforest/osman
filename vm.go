@@ -14,6 +14,8 @@ import (
 	"github.com/beevik/etree"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
+	"github.com/google/nftables"
+	"github.com/google/nftables/expr"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
@@ -31,10 +33,10 @@ type network struct {
 }
 
 var networkNAT = network{
-	Name:           "osman-nat",
-	Type:           "nat",
+	Name:           "osman",
+	Type:           "open",
 	PrivateNetwork: "10.0.0.0/24",
-	Bridge:         "osmannat",
+	Bridge:         "osman",
 }
 
 func mac() string {
@@ -84,12 +86,6 @@ func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac stri
 			Name: n.Name,
 			Forward: &libvirtxml.NetworkForward{
 				Mode: n.Type,
-				Dev:  defaultIfaceName,
-				Interfaces: []libvirtxml.NetworkForwardInterface{
-					{
-						Dev: defaultIfaceName,
-					},
-				},
 			},
 			Bridge: &libvirtxml.NetworkBridge{
 				Name:  n.Bridge,
@@ -125,6 +121,68 @@ func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac stri
 				return errors.WithStack(err)
 			case <-time.After(100 * time.Millisecond):
 			}
+		}
+
+		c := &nftables.Conn{}
+		chains, err := c.ListChains()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		var postroutingChain *nftables.Chain
+		for _, ch := range chains {
+			if ch.Table != nil &&
+				ch.Table.Family == nftables.TableFamilyIPv4 &&
+				ch.Type == nftables.ChainTypeNAT &&
+				ch.Name == "POSTROUTING" {
+				postroutingChain = ch
+				break
+			}
+		}
+
+		if postroutingChain == nil {
+			return errors.New("no POSTROUTING chain")
+		}
+
+		osmanPostroutingChain := c.AddChain(&nftables.Chain{
+			Name:  "OSMAN_POSTROUTING",
+			Table: postroutingChain.Table,
+			Type:  postroutingChain.Type,
+		})
+		c.AddRule(&nftables.Rule{
+			Table: postroutingChain.Table,
+			Chain: postroutingChain,
+			Exprs: []expr.Any{
+				&expr.Counter{},
+				&expr.Verdict{
+					Kind:  expr.VerdictJump,
+					Chain: osmanPostroutingChain.Name,
+				},
+			},
+		})
+		c.AddRule(&nftables.Rule{
+			Table: postroutingChain.Table,
+			Chain: osmanPostroutingChain,
+			Exprs: []expr.Any{
+				&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte(n.Bridge + "\x00"),
+				},
+				&expr.Meta{Key: expr.MetaKeyOIFNAME, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte(defaultIfaceName + "\x00"),
+				},
+				&expr.Counter{},
+				&expr.Masq{},
+			},
+		})
+
+		if err := c.Flush(); err != nil {
+			return errors.WithStack(err)
 		}
 	}
 
