@@ -448,7 +448,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 	return errors.WithStack(c.Flush())
 }
 
-func removeForwardedPorts(buildID types.BuildID) error {
+func removeVMFirewallRules(buildID types.BuildID) error {
 	c := &nftables.Conn{}
 	chains, err := c.ListChains()
 	if err != nil {
@@ -456,6 +456,10 @@ func removeForwardedPorts(buildID types.BuildID) error {
 	}
 
 	for _, ch := range chains {
+		if !strings.HasPrefix(ch.Name, "OSMAN_") {
+			continue
+		}
+
 		rules, err := c.GetRules(ch.Table, ch)
 		if err != nil {
 			return errors.WithStack(err)
@@ -563,7 +567,7 @@ func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string, buildID type
 			return errors.WithStack(err)
 		}
 
-		if err := removeForwardedPorts(buildID); err != nil {
+		if err := removeVMFirewallRules(buildID); err != nil {
 			return err
 		}
 	}
@@ -578,22 +582,103 @@ type forward struct {
 	Proto      string
 }
 
+func (f forward) String() string {
+	return fmt.Sprintf("%s:%d:%d:%s", f.PublicIP, f.PublicPort, f.VMPort, f.Proto)
+}
+
+func (f forward) Key() string {
+	return fmt.Sprintf("%s:%d:%s", f.PublicIP, f.PublicPort, f.Proto)
+}
+
 type metadata struct {
+	BuildID  types.BuildID
 	Forwards []forward
 }
 
+func parseMetadata(domainDoc libvirtxml.Domain) (metadata, error) {
+	if domainDoc.Metadata == nil || domainDoc.Metadata.XML == "" {
+		return metadata{}, nil
+	}
+
+	osmanDoc := etree.NewDocument()
+	if err := osmanDoc.ReadFromString(domainDoc.Metadata.XML); err != nil {
+		return metadata{}, errors.WithStack(err)
+	}
+
+	root := osmanDoc.Root()
+
+	buildIDEl := root.FindElement("osman:buildID")
+	if buildIDEl == nil || buildIDEl.Text() == "" {
+		return metadata{}, errors.New("no build ID found in metadata")
+	}
+
+	meta := metadata{
+		BuildID: types.BuildID(buildIDEl.Text()),
+	}
+
+	forwarded := map[string]struct{}{}
+	for _, e := range root.FindElements("osman:forward") {
+		rule := e.Text()
+		parts1 := strings.SplitN(rule, ":", 3)
+		if len(parts1) != 3 {
+			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		parts2 := strings.SplitN(parts1[2], "/", 2)
+		if len(parts1) != 3 {
+			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+
+		ipStr := parts1[0]
+		hostPortStr := parts1[1]
+		vmPortStr := parts2[0]
+		proto := parts2[1]
+
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		hostPort, err := strconv.Atoi(hostPortStr)
+		if err != nil {
+			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		vmPort, err := strconv.Atoi(vmPortStr)
+		if err != nil {
+			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		if proto != "tcp" && proto != "udp" {
+			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+
+		f := forward{
+			PublicIP:   ip.To4(),
+			PublicPort: uint16(hostPort),
+			VMPort:     uint16(vmPort),
+			Proto:      proto,
+		}
+
+		dupKey := f.Key()
+		if _, exists := forwarded[dupKey]; exists {
+			return metadata{}, errors.Errorf("duplicated public endpoint in forward rule %q", rule)
+		}
+
+		forwarded[dupKey] = struct{}{}
+		meta.Forwards = append(meta.Forwards, f)
+	}
+
+	return meta, nil
+}
+
 func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvirtxml.DomainMetadata, metadata, error) {
-	metaLibvirt := domainDoc.Metadata
-	if metaLibvirt == nil {
-		metaLibvirt = &libvirtxml.DomainMetadata{}
+	if domainDoc.Metadata == nil {
+		domainDoc.Metadata = &libvirtxml.DomainMetadata{}
 	}
 	osmanDoc := etree.NewDocument()
-	if metaLibvirt.XML == "" {
+	if domainDoc.Metadata.XML == "" {
 		root := etree.NewElement("osman:osman")
 		root.CreateAttr("xmlns:osman", "http://go.exw.co/osman")
 		osmanDoc.SetRoot(root)
 	} else {
-		if err := osmanDoc.ReadFromString(metaLibvirt.XML); err != nil {
+		if err := osmanDoc.ReadFromString(domainDoc.Metadata.XML); err != nil {
 			return nil, metadata{}, errors.WithStack(err)
 		}
 	}
@@ -609,52 +694,18 @@ func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvir
 	buildID := root.CreateElement("osman:buildID")
 	buildID.SetText(string(info.BuildID))
 
-	var meta metadata
-	for _, e := range root.FindElements("osman:forward") {
-		rule := e.Text()
-		parts1 := strings.SplitN(rule, ":", 3)
-		if len(parts1) != 3 {
-			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
-		}
-		parts2 := strings.SplitN(parts1[2], "/", 2)
-		if len(parts1) != 3 {
-			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
-		}
-
-		ipStr := parts1[0]
-		hostPortStr := parts1[1]
-		vmPortStr := parts2[0]
-		proto := parts2[1]
-
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
-		}
-		hostPort, err := strconv.Atoi(hostPortStr)
-		if err != nil {
-			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
-		}
-		vmPort, err := strconv.Atoi(vmPortStr)
-		if err != nil {
-			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
-		}
-		if proto != "tcp" && proto != "udp" {
-			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
-		}
-		meta.Forwards = append(meta.Forwards, forward{
-			PublicIP:   ip.To4(),
-			PublicPort: uint16(hostPort),
-			VMPort:     uint16(vmPort),
-			Proto:      proto,
-		})
-	}
-
 	metaLibvirtStr, err := osmanDoc.WriteToString()
 	if err != nil {
 		return nil, metadata{}, errors.WithStack(err)
 	}
-	metaLibvirt.XML = metaLibvirtStr
-	return metaLibvirt, meta, nil
+	domainDoc.Metadata.XML = metaLibvirtStr
+
+	meta, err := parseMetadata(domainDoc)
+	if err != nil {
+		return nil, metadata{}, err
+	}
+
+	return domainDoc.Metadata, meta, nil
 }
 
 func deployVM(ctx context.Context, l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) error {
@@ -670,6 +721,19 @@ func deployVM(ctx context.Context, l *libvirt.Libvirt, domainDoc libvirtxml.Doma
 	metaLibvirt, meta, err := prepareMetadata(domainDoc, info)
 	if err != nil {
 		return err
+	}
+
+	if len(meta.Forwards) > 0 {
+		forwardedEndpoints, err := findForwardedEndpoints(l)
+		if err != nil {
+			return err
+		}
+
+		for _, f := range meta.Forwards {
+			if name, exists := forwardedEndpoints[f.Key()]; exists {
+				return errors.Errorf("forwarding rule %q colides with the one existing in %s", f, name)
+			}
+		}
 	}
 
 	domainDoc.Metadata = metaLibvirt
@@ -926,6 +990,36 @@ type socket struct {
 	CPUToSiblings  map[uint]string
 	Siblings       map[string]*sibling
 	SiblingsToSort []*sibling
+}
+
+func findForwardedEndpoints(l *libvirt.Libvirt) (map[string]string, error) {
+	res := map[string]string{}
+
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	for _, d := range domains {
+		xml, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(xml); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		meta, err := parseMetadata(domainDoc)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, f := range meta.Forwards {
+			res[f.Key()] = domainDoc.Name
+		}
+	}
+
+	return res, nil
 }
 
 func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
