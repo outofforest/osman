@@ -15,11 +15,13 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	"github.com/digitalocean/go-libvirt/socket/dialers"
 	"github.com/google/nftables"
+	"github.com/google/nftables/binaryutil"
 	"github.com/google/nftables/expr"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"libvirt.org/go/libvirtxml"
 
 	"github.com/outofforest/osman/infra/types"
@@ -73,13 +75,36 @@ func addNetworkToFirewall(n network) error {
 	}
 
 	if postroutingChain == nil {
-		return errors.New("no POSTROUTING chain")
+		var natTable *nftables.Table
+		tables, err := c.ListTables()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		for _, t := range tables {
+			if t.Family == nftables.TableFamilyIPv4 &&
+				t.Name == "nat" {
+				natTable = t
+				break
+			}
+		}
+
+		if natTable == nil {
+			return errors.New("no nat table")
+		}
+
+		postroutingChain = c.AddChain(&nftables.Chain{
+			Name:     "POSTROUTING",
+			Table:    natTable,
+			Type:     nftables.ChainTypeNAT,
+			Hooknum:  nftables.ChainHookPostrouting,
+			Priority: nftables.ChainPriorityNATSource,
+		})
 	}
 
 	osmanPostroutingChain := c.AddChain(&nftables.Chain{
 		Name:  "OSMAN_POSTROUTING",
 		Table: postroutingChain.Table,
-		Type:  postroutingChain.Type,
 	})
 	c.AddRule(&nftables.Rule{
 		Table: postroutingChain.Table,
@@ -93,7 +118,7 @@ func addNetworkToFirewall(n network) error {
 		},
 	})
 	c.AddRule(&nftables.Rule{
-		Table: postroutingChain.Table,
+		Table: osmanPostroutingChain.Table,
 		Chain: osmanPostroutingChain,
 		Exprs: []expr.Any{
 			&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
@@ -273,7 +298,189 @@ func deleteNetwork(l *libvirt.Libvirt, n libvirt.Network) error {
 	return removeNetworkFromFirewall()
 }
 
-func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac string) error {
+func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
+	if len(meta.Forwards) == 0 {
+		return nil
+	}
+
+	defaultIfaceName, err := defaultIface()
+	if err != nil {
+		return err
+	}
+
+	c := &nftables.Conn{}
+
+	chains, err := c.ListChains()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	var preroutingChain *nftables.Chain
+	var osmanPreroutingChain *nftables.Chain
+	for _, ch := range chains {
+		if ch.Table == nil || ch.Table.Family != nftables.TableFamilyIPv4 {
+			continue
+		}
+		switch ch.Name {
+		case "PREROUTING":
+			if ch.Type == nftables.ChainTypeNAT {
+				preroutingChain = ch
+			}
+		case "OSMAN_PREROUTING":
+			osmanPreroutingChain = ch
+		}
+	}
+
+	if osmanPreroutingChain == nil {
+		if preroutingChain == nil {
+			var natTable *nftables.Table
+			tables, err := c.ListTables()
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			for _, t := range tables {
+				if t.Family == nftables.TableFamilyIPv4 &&
+					t.Name == "nat" {
+					natTable = t
+					break
+				}
+			}
+
+			if natTable == nil {
+				return errors.New("no nat table")
+			}
+
+			preroutingChain = c.AddChain(&nftables.Chain{
+				Name:     "PREROUTING",
+				Table:    natTable,
+				Type:     nftables.ChainTypeNAT,
+				Hooknum:  nftables.ChainHookPrerouting,
+				Priority: nftables.ChainPriorityNATDest,
+			})
+		}
+
+		osmanPreroutingChain = c.AddChain(&nftables.Chain{
+			Name:  "OSMAN_PREROUTING",
+			Table: preroutingChain.Table,
+		})
+		c.AddRule(&nftables.Rule{
+			Table: preroutingChain.Table,
+			Chain: preroutingChain,
+			Exprs: []expr.Any{
+				&expr.Counter{},
+				&expr.Verdict{
+					Kind:  expr.VerdictJump,
+					Chain: osmanPreroutingChain.Name,
+				},
+			},
+		})
+	}
+
+	for _, f := range meta.Forwards {
+		var proto byte
+		switch f.Proto {
+		case "tcp":
+			proto = unix.IPPROTO_TCP
+		case "udp":
+			proto = unix.IPPROTO_UDP
+		default:
+			panic(errors.Errorf("unknown proto %q", f.Proto))
+		}
+
+		c.AddRule(&nftables.Rule{
+			Table:    osmanPreroutingChain.Table,
+			Chain:    osmanPreroutingChain,
+			UserData: []byte(buildID),
+			Exprs: []expr.Any{
+				&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte(defaultIfaceName + "\x00"),
+				},
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseNetworkHeader,
+					Offset:       16,
+					Len:          4,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     f.PublicIP,
+				},
+				&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte{proto},
+				},
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseTransportHeader,
+					Offset:       2,
+					Len:          2,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     binaryutil.BigEndian.PutUint16(f.PublicPort),
+				},
+				&expr.Immediate{
+					Register: 1,
+					Data:     ip,
+				},
+				&expr.Immediate{
+					Register: 2,
+					Data:     binaryutil.BigEndian.PutUint16(f.VMPort),
+				},
+				&expr.NAT{
+					Type:        expr.NATTypeDestNAT,
+					Family:      unix.NFPROTO_IPV4,
+					RegAddrMin:  1,
+					RegProtoMin: 2,
+				},
+			},
+		})
+	}
+
+	return errors.WithStack(c.Flush())
+}
+
+func removeForwardedPorts(buildID types.BuildID) error {
+	c := &nftables.Conn{}
+	chains, err := c.ListChains()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	for _, ch := range chains {
+		rules, err := c.GetRules(ch.Table, ch)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for _, r := range rules {
+			if types.BuildID(r.UserData) != buildID {
+				continue
+			}
+			if err := c.DelRule(r); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+	}
+
+	return errors.WithStack(c.Flush())
+}
+
+func addVMToNetwork(
+	ctx context.Context,
+	l *libvirt.Libvirt,
+	n network,
+	mac string,
+	meta metadata,
+	buildID types.BuildID,
+) error {
 	network, err := ensureNetwork(ctx, l, n)
 	if err != nil {
 		return err
@@ -284,17 +491,22 @@ func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac stri
 		return err
 	}
 
-	return errors.WithStack(l.NetworkUpdateCompat(
+	err = l.NetworkUpdateCompat(
 		network,
 		libvirt.NetworkUpdateCommandAddLast,
 		libvirt.NetworkSectionIPDhcpHost,
 		0,
 		fmt.Sprintf("<host mac='%s' ip='%s' />", mac, ip),
 		libvirt.NetworkUpdateAffectLive|libvirt.NetworkUpdateAffectConfig,
-	))
+	)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return forwardPorts(meta, ip, buildID)
 }
 
-func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string) error {
+func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string, buildID types.BuildID) error {
 	network, err := l.NetworkLookupByName(n.Name)
 	if isError(err, libvirt.ErrNoNetwork) {
 		return nil
@@ -350,12 +562,102 @@ func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
+
+		if err := removeForwardedPorts(buildID); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) (libvirtxml.Domain, string, error) {
+type forward struct {
+	PublicIP   net.IP
+	PublicPort uint16
+	VMPort     uint16
+	Proto      string
+}
+
+type metadata struct {
+	Forwards []forward
+}
+
+func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvirtxml.DomainMetadata, metadata, error) {
+	metaLibvirt := domainDoc.Metadata
+	if metaLibvirt == nil {
+		metaLibvirt = &libvirtxml.DomainMetadata{}
+	}
+	osmanDoc := etree.NewDocument()
+	if metaLibvirt.XML == "" {
+		root := etree.NewElement("osman:osman")
+		root.CreateAttr("xmlns:osman", "http://go.exw.co/osman")
+		osmanDoc.SetRoot(root)
+	} else {
+		if err := osmanDoc.ReadFromString(metaLibvirt.XML); err != nil {
+			return nil, metadata{}, errors.WithStack(err)
+		}
+	}
+	root := osmanDoc.Root()
+	if osmanDoc.Root().Tag != "osman" {
+		return nil, metadata{}, errors.Errorf("osman:osman tag expected in metadata but %s found instead", root.Tag)
+	}
+
+	if root.FindElement("osman:buildID") != nil {
+		return nil, metadata{}, errors.New("osman:buildID is a forbidden element in metadata")
+	}
+
+	buildID := root.CreateElement("osman:buildID")
+	buildID.SetText(string(info.BuildID))
+
+	var meta metadata
+	for _, e := range root.FindElements("osman:forward") {
+		rule := e.Text()
+		parts1 := strings.SplitN(rule, ":", 3)
+		if len(parts1) != 3 {
+			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		parts2 := strings.SplitN(parts1[2], "/", 2)
+		if len(parts1) != 3 {
+			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+
+		ipStr := parts1[0]
+		hostPortStr := parts1[1]
+		vmPortStr := parts2[0]
+		proto := parts2[1]
+
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		hostPort, err := strconv.Atoi(hostPortStr)
+		if err != nil {
+			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		vmPort, err := strconv.Atoi(vmPortStr)
+		if err != nil {
+			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		if proto != "tcp" && proto != "udp" {
+			return nil, metadata{}, errors.Errorf("invalid forward rule %q", rule)
+		}
+		meta.Forwards = append(meta.Forwards, forward{
+			PublicIP:   ip.To4(),
+			PublicPort: uint16(hostPort),
+			VMPort:     uint16(vmPort),
+			Proto:      proto,
+		})
+	}
+
+	metaLibvirtStr, err := osmanDoc.WriteToString()
+	if err != nil {
+		return nil, metadata{}, errors.WithStack(err)
+	}
+	metaLibvirt.XML = metaLibvirtStr
+	return metaLibvirt, meta, nil
+}
+
+func deployVM(ctx context.Context, l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) error {
 	macNAT := mac()
 	domainDoc.Name = buildKey.String()
 
@@ -365,10 +667,12 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 	}
 	domainDoc.UUID = uuid.String()
 
-	domainDoc.Metadata = &libvirtxml.DomainMetadata{
-		XML: fmt.Sprintf(`<osman:osman xmlns:osman="http://go.exw.co/osman"><osman:buildid>%s</osman:buildid></osman:osman>`, info.BuildID),
+	metaLibvirt, meta, err := prepareMetadata(domainDoc, info)
+	if err != nil {
+		return err
 	}
 
+	domainDoc.Metadata = metaLibvirt
 	if domainDoc.Devices == nil {
 		domainDoc.Devices = &libvirtxml.DomainDeviceList{}
 	}
@@ -416,24 +720,24 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 	domainDoc.OS.Cmdline = strings.Join(append([]string{"root=virtiofs:root"}, info.Params...), " ")
 
 	if domainDoc.CPU == nil || domainDoc.CPU.Topology == nil {
-		return libvirtxml.Domain{}, "", errors.New("cpu topology must be specified")
+		return errors.New("cpu topology must be specified")
 	}
 
 	capabilitiesRaw, err := l.ConnectGetCapabilities()
 	if err != nil {
-		return libvirtxml.Domain{}, "", errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	var capabilitiesDoc libvirtxml.Caps
 	if err := capabilitiesDoc.Unmarshal(capabilitiesRaw); err != nil {
-		return libvirtxml.Domain{}, "", errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	if domainDoc.VCPU == nil || domainDoc.VCPU.Value == 0 {
-		return libvirtxml.Domain{}, "", errors.New("number of vcpus is not provided")
+		return errors.New("number of vcpus is not provided")
 	}
 	if domainDoc.CPU == nil {
-		return libvirtxml.Domain{}, "", errors.New("cpu settings are not provided")
+		return errors.New("cpu settings are not provided")
 	}
 	domainDoc.VCPU.Value += domainDoc.VCPU.Value % uint(capabilitiesDoc.Host.CPU.Topology.Threads)
 	cores := int(domainDoc.VCPU.Value) / capabilitiesDoc.Host.CPU.Topology.Threads
@@ -450,10 +754,10 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 
 	availableVCPUs, err := computeVCPUAvailability(l)
 	if err != nil {
-		return libvirtxml.Domain{}, "", errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 	if len(availableVCPUs) < cores {
-		return libvirtxml.Domain{}, "", errors.New("vm requires more cores than available on host")
+		return errors.New("vm requires more cores than available on host")
 	}
 
 	domainDoc.CPUTune = &libvirtxml.DomainCPUTune{}
@@ -485,7 +789,20 @@ func prepareVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.Build
 		CPUSet: joinUInts(availableVCPUs[i]),
 	}
 
-	return domainDoc, macNAT, nil
+	if err := addVMToNetwork(ctx, l, networkNAT, macNAT, meta, info.BuildID); err != nil {
+		return err
+	}
+
+	domainXML, err := domainDoc.Marshal()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	domain, err := l.DomainDefineXML(domainXML)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return errors.WithStack(l.DomainCreate(domain))
 }
 
 func libvirtConn(addr string) (*libvirt.Libvirt, error) {
@@ -517,23 +834,6 @@ func vmExists(l *libvirt.Libvirt, buildKey types.BuildKey) (bool, error) {
 	return true, nil
 }
 
-func deployVM(l *libvirt.Libvirt, domainDoc libvirtxml.Domain) error {
-	xml, err := domainDoc.Marshal()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	domain, err := l.DomainDefineXML(xml)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	if err := l.DomainCreate(domain); err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
-}
-
 func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
 	if err != nil {
@@ -548,7 +848,7 @@ func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 		if err := doc.ReadFromString(xml); err != nil {
 			return errors.WithStack(err)
 		}
-		buildIDTag := doc.FindElement("//metadata/osman:osman/osman:buildid")
+		buildIDTag := doc.FindElement("//metadata/osman:osman/osman:buildID")
 		if buildIDTag == nil {
 			continue
 		}
@@ -583,7 +883,7 @@ func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
 			}
 
 			if macNAT != "" {
-				return removeVMFromNetwork(l, networkNAT, macNAT)
+				return removeVMFromNetwork(l, networkNAT, macNAT, buildID)
 			}
 
 			return nil
