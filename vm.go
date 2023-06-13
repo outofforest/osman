@@ -26,17 +26,17 @@ import (
 )
 
 type network struct {
-	Name           string
-	Type           string
-	PrivateNetwork string
-	Bridge         string
+	Name    string
+	Type    string
+	Network string
+	Bridge  string
 }
 
 var networkNAT = network{
-	Name:           "osman",
-	Type:           "open",
-	PrivateNetwork: "10.0.0.0/24",
-	Bridge:         "osman",
+	Name:    "osman",
+	Type:    "open",
+	Network: "10.0.0.0/24",
+	Bridge:  "osman",
 }
 
 func mac() string {
@@ -49,39 +49,84 @@ func mac() string {
 	return res
 }
 
-func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac string) error {
-	_, privateNet, err := net.ParseCIDR(n.PrivateNetwork)
+func addNetworkToFirewall(n network) error {
+	defaultIfaceName, err := defaultIface()
+	if err != nil {
+		return err
+	}
+
+	c := &nftables.Conn{}
+	chains, err := c.ListChains()
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	privateNetSize := netSize(privateNet)
 
+	var postroutingChain *nftables.Chain
+	for _, ch := range chains {
+		if ch.Table != nil &&
+			ch.Table.Family == nftables.TableFamilyIPv4 &&
+			ch.Type == nftables.ChainTypeNAT &&
+			ch.Name == "POSTROUTING" {
+			postroutingChain = ch
+			break
+		}
+	}
+
+	if postroutingChain == nil {
+		return errors.New("no POSTROUTING chain")
+	}
+
+	osmanPostroutingChain := c.AddChain(&nftables.Chain{
+		Name:  "OSMAN_POSTROUTING",
+		Table: postroutingChain.Table,
+		Type:  postroutingChain.Type,
+	})
+	c.AddRule(&nftables.Rule{
+		Table: postroutingChain.Table,
+		Chain: postroutingChain,
+		Exprs: []expr.Any{
+			&expr.Counter{},
+			&expr.Verdict{
+				Kind:  expr.VerdictJump,
+				Chain: osmanPostroutingChain.Name,
+			},
+		},
+	})
+	c.AddRule(&nftables.Rule{
+		Table: postroutingChain.Table,
+		Chain: osmanPostroutingChain,
+		Exprs: []expr.Any{
+			&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
+			&expr.Cmp{
+				Op:       expr.CmpOpEq,
+				Register: 1,
+				Data:     []byte(n.Bridge + "\x00"),
+			},
+			&expr.Meta{Key: expr.MetaKeyOIFNAME, Register: 1},
+			&expr.Cmp{
+				Op:       expr.CmpOpEq,
+				Register: 1,
+				Data:     []byte(defaultIfaceName + "\x00"),
+			},
+			&expr.Counter{},
+			&expr.Masq{},
+		},
+	})
+
+	return errors.WithStack(c.Flush())
+}
+
+func ensureNetwork(ctx context.Context, l *libvirt.Libvirt, n network) (libvirt.Network, error) {
 	network, err := l.NetworkLookupByName(n.Name)
 	if err != nil {
 		if !isError(err, libvirt.ErrNoNetwork) {
-			return errors.WithStack(err)
+			return libvirt.Network{}, errors.WithStack(err)
 		}
 
-		routes, err := netlink.RouteList(nil, syscall.AF_UNSPEC)
+		_, ipNet, err := net.ParseCIDR(n.Network)
 		if err != nil {
-			return errors.WithStack(err)
+			return libvirt.Network{}, errors.WithStack(err)
 		}
-
-		var defaultIfaceName string
-		for _, r := range routes {
-			if isDefaultRoute(r) {
-				defaultIface, err := net.InterfaceByIndex(r.LinkIndex)
-				if err != nil {
-					return errors.WithStack(err)
-				}
-				defaultIfaceName = defaultIface.Name
-				break
-			}
-		}
-		if defaultIfaceName == "" {
-			return errors.New("default network interface not found")
-		}
-
 		networkDoc := &libvirtxml.Network{
 			Name: n.Name,
 			Forward: &libvirtxml.NetworkForward{
@@ -94,23 +139,23 @@ func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac stri
 			},
 			IPs: []libvirtxml.NetworkIP{
 				{
-					Address: uint32ToIP4(ip4ToUint32(privateNet.IP) + 1).To4().String(),
-					Netmask: fmt.Sprintf("%d.%d.%d.%d", privateNet.Mask[0], privateNet.Mask[1], privateNet.Mask[2], privateNet.Mask[3]),
+					Address: uint32ToIP4(ip4ToUint32(ipNet.IP) + 1).To4().String(),
+					Netmask: fmt.Sprintf("%d.%d.%d.%d", ipNet.Mask[0], ipNet.Mask[1], ipNet.Mask[2], ipNet.Mask[3]),
 				},
 			},
 		}
 		network, err = l.NetworkDefineXML(must.String(networkDoc.Marshal()))
 		if err != nil {
-			return errors.WithStack(err)
+			return libvirt.Network{}, errors.WithStack(err)
 		}
 		if err := l.NetworkCreate(network); err != nil {
-			return errors.WithStack(err)
+			return libvirt.Network{}, errors.WithStack(err)
 		}
 
 		for {
 			active, err := l.NetworkIsActive(network)
 			if err != nil {
-				return errors.WithStack(err)
+				return libvirt.Network{}, errors.WithStack(err)
 			}
 			if active == 1 {
 				break
@@ -118,127 +163,135 @@ func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac stri
 
 			select {
 			case <-ctx.Done():
-				return errors.WithStack(err)
+				return libvirt.Network{}, errors.WithStack(ctx.Err())
 			case <-time.After(100 * time.Millisecond):
 			}
 		}
 
-		c := &nftables.Conn{}
-		chains, err := c.ListChains()
-		if err != nil {
-			return errors.WithStack(err)
+		if err := addNetworkToFirewall(n); err != nil {
+			return libvirt.Network{}, err
 		}
+	}
 
-		var postroutingChain *nftables.Chain
-		for _, ch := range chains {
-			if ch.Table != nil &&
-				ch.Table.Family == nftables.TableFamilyIPv4 &&
-				ch.Type == nftables.ChainTypeNAT &&
-				ch.Name == "POSTROUTING" {
-				postroutingChain = ch
-				break
-			}
-		}
+	return network, nil
+}
 
-		if postroutingChain == nil {
-			return errors.New("no POSTROUTING chain")
-		}
-
-		osmanPostroutingChain := c.AddChain(&nftables.Chain{
-			Name:  "OSMAN_POSTROUTING",
-			Table: postroutingChain.Table,
-			Type:  postroutingChain.Type,
-		})
-		c.AddRule(&nftables.Rule{
-			Table: postroutingChain.Table,
-			Chain: postroutingChain,
-			Exprs: []expr.Any{
-				&expr.Counter{},
-				&expr.Verdict{
-					Kind:  expr.VerdictJump,
-					Chain: osmanPostroutingChain.Name,
-				},
-			},
-		})
-		c.AddRule(&nftables.Rule{
-			Table: postroutingChain.Table,
-			Chain: osmanPostroutingChain,
-			Exprs: []expr.Any{
-				&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
-				&expr.Cmp{
-					Op:       expr.CmpOpEq,
-					Register: 1,
-					Data:     []byte(n.Bridge + "\x00"),
-				},
-				&expr.Meta{Key: expr.MetaKeyOIFNAME, Register: 1},
-				&expr.Cmp{
-					Op:       expr.CmpOpEq,
-					Register: 1,
-					Data:     []byte(defaultIfaceName + "\x00"),
-				},
-				&expr.Counter{},
-				&expr.Masq{},
-			},
-		})
-
-		if err := c.Flush(); err != nil {
-			return errors.WithStack(err)
-		}
+func findAvailableIP(l *libvirt.Libvirt, n network) (net.IP, error) {
+	network, err := l.NetworkLookupByName(n.Name)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	networkXML, err := l.NetworkGetXMLDesc(network, 0)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	var networkDoc libvirtxml.Network
 	if err := networkDoc.Unmarshal(networkXML); err != nil {
-		return err
+		return nil, err
 	}
 	if len(networkDoc.IPs) == 0 {
-		return errors.Errorf("no IP section defined on network %q", n.Name)
+		return nil, errors.Errorf("no IP section defined on network %q", n.Name)
 	}
 	if len(networkDoc.IPs) > 1 {
-		return errors.Errorf("exactly one IP section is expected for network on network %q", n.Name)
+		return nil, errors.Errorf("exactly one IP section is expected for network on network %q", n.Name)
 	}
 
 	usedPrivateIPs := map[uint32]struct{}{}
 	if ip := networkDoc.IPs[0]; ip.DHCP != nil {
 		for _, host := range ip.DHCP.Hosts {
-			if host.MAC == mac {
-				return errors.Errorf("mac address %q already defined on network %q", mac, n.Name)
-			}
 			usedPrivateIPs[ip4ToUint32(net.ParseIP(host.IP))] = struct{}{}
 		}
 	}
 
-	start := ip4ToUint32(privateNet.IP) + 2
-	end := start + privateNetSize - 3
-	var privateIP net.IP
+	_, netIP, err := net.ParseCIDR(n.Network)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	start := ip4ToUint32(netIP.IP) + 2
+	end := start + netSize(netIP) - 3
+	var ip net.IP
 	for i := start; i <= end; i++ {
 		if _, exists := usedPrivateIPs[i]; exists {
 			continue
 		}
 
-		privateIP = uint32ToIP4(i)
+		ip = uint32ToIP4(i)
 		break
 	}
-	if privateIP == nil {
-		return errors.Errorf("no free private IPs in the network %q", n.Name)
+	if ip == nil {
+		return nil, errors.Errorf("no free IPs in the network %q", n.Name)
 	}
-	err = l.NetworkUpdateCompat(
-		network,
-		libvirt.NetworkUpdateCommandAddLast,
-		libvirt.NetworkSectionIPDhcpHost,
-		0,
-		fmt.Sprintf("<host mac='%s' ip='%s' />", mac, privateIP),
-		libvirt.NetworkUpdateAffectLive|libvirt.NetworkUpdateAffectConfig,
-	)
+	return ip, nil
+}
+
+func removeNetworkFromFirewall() error {
+	c := &nftables.Conn{}
+	chains, err := c.ListChains()
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	return nil
+	for _, ch := range chains {
+		rules, err := c.GetRules(ch.Table, ch)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for _, r := range rules {
+			for _, e := range r.Exprs {
+				verdict, ok := e.(*expr.Verdict)
+				if !ok || !strings.HasPrefix(verdict.Chain, "OSMAN_") {
+					continue
+				}
+				if err := c.DelRule(r); err != nil {
+					return errors.WithStack(err)
+				}
+				break
+			}
+		}
+	}
+
+	for _, ch := range chains {
+		if strings.HasPrefix(ch.Name, "OSMAN_") {
+			c.DelChain(ch)
+		}
+	}
+
+	return errors.WithStack(c.Flush())
+}
+
+func deleteNetwork(l *libvirt.Libvirt, n libvirt.Network) error {
+	if err := l.NetworkDestroy(n); err != nil {
+		return errors.WithStack(err)
+	}
+	if err := l.NetworkUndefine(n); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return removeNetworkFromFirewall()
+}
+
+func addVMToNetwork(ctx context.Context, l *libvirt.Libvirt, n network, mac string) error {
+	network, err := ensureNetwork(ctx, l, n)
+	if err != nil {
+		return err
+	}
+
+	ip, err := findAvailableIP(l, n)
+	if err != nil {
+		return err
+	}
+
+	return errors.WithStack(l.NetworkUpdateCompat(
+		network,
+		libvirt.NetworkUpdateCommandAddLast,
+		libvirt.NetworkSectionIPDhcpHost,
+		0,
+		fmt.Sprintf("<host mac='%s' ip='%s' />", mac, ip),
+		libvirt.NetworkUpdateAffectLive|libvirt.NetworkUpdateAffectConfig,
+	))
 }
 
 func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string) error {
@@ -282,10 +335,7 @@ func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string) error {
 
 	switch {
 	case !networkNeeded:
-		if err := l.NetworkDestroy(network); err != nil {
-			return errors.WithStack(err)
-		}
-		if err := l.NetworkUndefine(network); err != nil {
+		if err := deleteNetwork(l, network); err != nil {
 			return errors.WithStack(err)
 		}
 	case ipToDelete != "":
@@ -694,4 +744,22 @@ func joinUInts(vals []uint) string {
 		result += fmt.Sprintf("%d", v)
 	}
 	return result
+}
+
+func defaultIface() (string, error) {
+	routes, err := netlink.RouteList(nil, syscall.AF_UNSPEC)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	for _, r := range routes {
+		if isDefaultRoute(r) {
+			defaultIface, err := net.InterfaceByIndex(r.LinkIndex)
+			if err != nil {
+				return "", errors.WithStack(err)
+			}
+			return defaultIface.Name, nil
+		}
+	}
+	return "", errors.New("default network interface not found")
 }
