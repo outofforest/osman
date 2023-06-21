@@ -3,8 +3,8 @@ module build
 go 1.18
 
 require (
-	github.com/outofforest/build v1.11.1
-	github.com/outofforest/buildgo v0.6.0
+	github.com/outofforest/build v1.12.0
+	github.com/outofforest/buildgo v0.7.0
 	github.com/outofforest/libexec v0.3.8
 )
 

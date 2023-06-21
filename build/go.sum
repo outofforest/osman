@@ -6,10 +6,10 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/outofforest/build v1.11.1 h1:IDktqMY8eNCdikPxoMvDXv3N5Eh2lEOXwkzvJ1H2fzQ=
-github.com/outofforest/build v1.11.1/go.mod h1:bRSSd1AudXA+bQtgYLyxjdsatkVgk5/zp/OyjWqZtvg=
-github.com/outofforest/buildgo v0.6.0 h1:y5uXfQb8ZNOB91l1rJ+VCPAK/jht3p89k5prU/6VVLQ=
-github.com/outofforest/buildgo v0.6.0/go.mod h1:BdIur6aa2Elp8Yd5TZpRtaHBzne5mRHr2jEcelzh0RU=
+github.com/outofforest/build v1.12.0 h1:RTP6OWNCqAHibA+5cmpW8E5ziEZWJ6Vri0ke3O5yHgE=
+github.com/outofforest/build v1.12.0/go.mod h1:8yi9QwmnZUWDzHwOEJjk8GcKmuLWEbOMzOOsZptOzZ4=
+github.com/outofforest/buildgo v0.7.0 h1:4bqiOY2N0h3u6GOJGo1Wn5xryJuDhXiP0kFSsO12k8s=
+github.com/outofforest/buildgo v0.7.0/go.mod h1:Iu/clNkq3Y6Uvc3XntK/L4zURp3pFnLxXufynThoPhY=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
 github.com/outofforest/ioc/v2 v2.5.2/go.mod h1:yI+FHuHchC/t6nVo3WJ96qEgCXdHQKFI/4wW2/75YcU=
 github.com/outofforest/libexec v0.3.8 h1:AKWevDZRcmK2G/u3SbRUbzwEy3wynrrQgBWq4D0ZCNE=
@@ -37,7 +37,7 @@ github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-github.com/stretchr/testify v1.8.3 h1:RP3t2pwF7cMEbC1dqtB6poj3niw/9gnV4Cjg5oW5gtY=
+github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
