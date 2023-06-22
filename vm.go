@@ -26,6 +26,8 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
+const tableNAT = "nat"
+
 type network struct {
 	Name    string
 	Type    string
@@ -72,7 +74,7 @@ func addNetworkToFirewall(n network) error {
 
 		for _, t := range tables {
 			if t.Family == nftables.TableFamilyIPv4 &&
-				t.Name == "nat" {
+				t.Name == tableNAT {
 				natTable = t
 				break
 			}
@@ -374,7 +376,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) er
 
 			for _, t := range tables {
 				if t.Family == nftables.TableFamilyIPv4 &&
-					t.Name == "nat" {
+					t.Name == tableNAT {
 					natTable = t
 					break
 				}
@@ -419,7 +421,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) er
 
 			for _, t := range tables {
 				if t.Family == nftables.TableFamilyIPv4 &&
-					t.Name == "nat" {
+					t.Name == tableNAT {
 					natTable = t
 					break
 				}
@@ -464,7 +466,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) er
 
 			for _, t := range tables {
 				if t.Family == nftables.TableFamilyIPv4 &&
-					t.Name == "nat" {
+					t.Name == tableNAT {
 					natTable = t
 					break
 				}
