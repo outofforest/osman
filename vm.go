@@ -26,6 +26,8 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
+const tableNAT = "nat"
+
 type network struct {
 	Name    string
 	Type    string
@@ -72,7 +74,7 @@ func addNetworkToFirewall(n network) error {
 
 		for _, t := range tables {
 			if t.Family == nftables.TableFamilyIPv4 &&
-				t.Name == "nat" {
+				t.Name == tableNAT {
 				natTable = t
 				break
 			}
@@ -315,14 +317,14 @@ func deleteNetwork(l *libvirt.Libvirt, n libvirt.Network) error {
 	return removeNetworkFromFirewall()
 }
 
-func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
+func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) error {
 	if len(meta.Forwards) == 0 {
 		return nil
 	}
 
-	defaultIfaceName, err := defaultIface()
+	_, netIP, err := net.ParseCIDR(n.Network)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	c := &nftables.Conn{}
@@ -333,7 +335,11 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 	}
 
 	var preroutingChain *nftables.Chain
+	var postroutingChain *nftables.Chain
+	var outputChain *nftables.Chain
 	var osmanPreroutingChain *nftables.Chain
+	var osmanPostroutingChain *nftables.Chain
+	var osmanOutputChain *nftables.Chain
 	for _, ch := range chains {
 		if ch.Table == nil || ch.Table.Family != nftables.TableFamilyIPv4 {
 			continue
@@ -343,8 +349,20 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 			if ch.Type == nftables.ChainTypeNAT {
 				preroutingChain = ch
 			}
+		case "POSTROUTING":
+			if ch.Type == nftables.ChainTypeNAT {
+				postroutingChain = ch
+			}
+		case "OUTPUT":
+			if ch.Type == nftables.ChainTypeNAT {
+				outputChain = ch
+			}
 		case "OSMAN_PREROUTING":
 			osmanPreroutingChain = ch
+		case "OSMAN_POSTROUTING":
+			osmanPostroutingChain = ch
+		case "OSMAN_OUTPUT":
+			osmanOutputChain = ch
 		}
 	}
 
@@ -358,7 +376,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 
 			for _, t := range tables {
 				if t.Family == nftables.TableFamilyIPv4 &&
-					t.Name == "nat" {
+					t.Name == tableNAT {
 					natTable = t
 					break
 				}
@@ -393,7 +411,101 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 			},
 		})
 	}
+	if osmanPostroutingChain == nil {
+		if postroutingChain == nil {
+			var natTable *nftables.Table
+			tables, err := c.ListTables()
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
+			for _, t := range tables {
+				if t.Family == nftables.TableFamilyIPv4 &&
+					t.Name == tableNAT {
+					natTable = t
+					break
+				}
+			}
+
+			if natTable == nil {
+				return errors.New("no nat table")
+			}
+
+			postroutingChain = c.AddChain(&nftables.Chain{
+				Name:     "POSTROUTING",
+				Table:    natTable,
+				Type:     nftables.ChainTypeNAT,
+				Hooknum:  nftables.ChainHookPostrouting,
+				Priority: nftables.ChainPriorityNATSource,
+			})
+		}
+
+		osmanPostroutingChain = c.AddChain(&nftables.Chain{
+			Name:  "OSMAN_POSTROUTING",
+			Table: postroutingChain.Table,
+		})
+		c.AddRule(&nftables.Rule{
+			Table: postroutingChain.Table,
+			Chain: postroutingChain,
+			Exprs: []expr.Any{
+				&expr.Counter{},
+				&expr.Verdict{
+					Kind:  expr.VerdictJump,
+					Chain: osmanPostroutingChain.Name,
+				},
+			},
+		})
+	}
+	if osmanOutputChain == nil {
+		if outputChain == nil {
+			var natTable *nftables.Table
+			tables, err := c.ListTables()
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			for _, t := range tables {
+				if t.Family == nftables.TableFamilyIPv4 &&
+					t.Name == tableNAT {
+					natTable = t
+					break
+				}
+			}
+
+			if natTable == nil {
+				return errors.New("no nat table")
+			}
+
+			outputChain = c.AddChain(&nftables.Chain{
+				Name:     "OUTPUT",
+				Table:    natTable,
+				Type:     nftables.ChainTypeNAT,
+				Hooknum:  nftables.ChainHookOutput,
+				Priority: nftables.ChainPriorityNATSource,
+			})
+		}
+
+		osmanOutputChain = c.AddChain(&nftables.Chain{
+			Name:  "OSMAN_OUTPUT",
+			Table: outputChain.Table,
+		})
+		c.AddRule(&nftables.Rule{
+			Table: outputChain.Table,
+			Chain: outputChain,
+			Exprs: []expr.Any{
+				&expr.Counter{},
+				&expr.Verdict{
+					Kind:  expr.VerdictJump,
+					Chain: osmanOutputChain.Name,
+				},
+			},
+		})
+	}
+
+	start := ip4ToUint32(netIP.IP) + 2
+	end := start + netSize(netIP) - 4
+	startIP := uint32ToIP4(start)
+	endIP := uint32ToIP4(end)
 	for _, f := range meta.Forwards {
 		var proto byte
 		switch f.Proto {
@@ -405,17 +517,12 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 			panic(errors.Errorf("unknown proto %q", f.Proto))
 		}
 
+		// forwarding traffic incoming requests
 		c.AddRule(&nftables.Rule{
 			Table:    osmanPreroutingChain.Table,
 			Chain:    osmanPreroutingChain,
 			UserData: []byte(buildID),
 			Exprs: []expr.Any{
-				&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
-				&expr.Cmp{
-					Op:       expr.CmpOpEq,
-					Register: 1,
-					Data:     []byte(defaultIfaceName + "\x00"),
-				},
 				&expr.Payload{
 					DestRegister: 1,
 					Base:         expr.PayloadBaseNetworkHeader,
@@ -452,12 +559,126 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 					Register: 2,
 					Data:     binaryutil.BigEndian.PutUint16(f.VMPort),
 				},
+				&expr.Counter{},
 				&expr.NAT{
 					Type:        expr.NATTypeDestNAT,
 					Family:      unix.NFPROTO_IPV4,
 					RegAddrMin:  1,
 					RegProtoMin: 2,
 				},
+			},
+		})
+
+		// forwarding traffic outgoing from the host machine
+		c.AddRule(&nftables.Rule{
+			Table:    osmanOutputChain.Table,
+			Chain:    osmanOutputChain,
+			UserData: []byte(buildID),
+			Exprs: []expr.Any{
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseNetworkHeader,
+					Offset:       16,
+					Len:          4,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     f.PublicIP,
+				},
+				&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte{proto},
+				},
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseTransportHeader,
+					Offset:       2,
+					Len:          2,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     binaryutil.BigEndian.PutUint16(f.PublicPort),
+				},
+				&expr.Immediate{
+					Register: 1,
+					Data:     ip,
+				},
+				&expr.Immediate{
+					Register: 2,
+					Data:     binaryutil.BigEndian.PutUint16(f.VMPort),
+				},
+				&expr.Counter{},
+				&expr.NAT{
+					Type:        expr.NATTypeDestNAT,
+					Family:      unix.NFPROTO_IPV4,
+					RegAddrMin:  1,
+					RegProtoMin: 2,
+				},
+			},
+		})
+
+		// forwarding traffic coming from the osman network (loop)
+		c.AddRule(&nftables.Rule{
+			Table:    osmanPostroutingChain.Table,
+			Chain:    osmanPostroutingChain,
+			UserData: []byte(buildID),
+			Exprs: []expr.Any{
+				&expr.Meta{Key: expr.MetaKeyOIFNAME, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte(n.Name + "\x00"),
+				},
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseNetworkHeader,
+					Offset:       12,
+					Len:          4,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpGte,
+					Register: 1,
+					Data:     startIP,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpLte,
+					Register: 1,
+					Data:     endIP,
+				},
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseNetworkHeader,
+					Offset:       16,
+					Len:          4,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     ip,
+				},
+				&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     []byte{proto},
+				},
+				&expr.Payload{
+					DestRegister: 1,
+					Base:         expr.PayloadBaseTransportHeader,
+					Offset:       2,
+					Len:          2,
+				},
+				&expr.Cmp{
+					Op:       expr.CmpOpEq,
+					Register: 1,
+					Data:     binaryutil.BigEndian.PutUint16(f.VMPort),
+				},
+				&expr.Counter{},
+				&expr.Masq{},
 			},
 		})
 	}
@@ -839,7 +1060,7 @@ func deployVM(ctx context.Context, l *libvirt.Libvirt, domainDoc libvirtxml.Doma
 		return errors.WithStack(err)
 	}
 
-	return forwardPorts(meta, ip, info.BuildID)
+	return forwardPorts(meta, ip, info.BuildID, networkNAT)
 }
 
 func libvirtConn(addr string) (*libvirt.Libvirt, error) {
