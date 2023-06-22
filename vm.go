@@ -523,12 +523,6 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) er
 			Chain:    osmanPreroutingChain,
 			UserData: []byte(buildID),
 			Exprs: []expr.Any{
-				//&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
-				//&expr.Cmp{
-				//	Op:       expr.CmpOpNeq,
-				//	Register: 1,
-				//	Data:     []byte(n.Name + "\x00"),
-				//},
 				&expr.Payload{
 					DestRegister: 1,
 					Base:         expr.PayloadBaseNetworkHeader,
