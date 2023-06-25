@@ -142,7 +142,7 @@ func Start(ctx context.Context, storage config.Storage, start config.Start, s st
 		return types.BuildInfo{}, err
 	}
 
-	if err := deployVM(ctx, l, domain, info, start.MountKey); err != nil {
+	if err := deployVM(ctx, l, domain, info, start); err != nil {
 		return types.BuildInfo{}, err
 	}
 	return info, nil
