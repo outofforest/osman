@@ -43,6 +43,7 @@ func NewStartCommand(cmdF *CmdFactory) *cobra.Command {
 	formatF = cmdF.AddFormatFlags(cmd)
 	cmd.Flags().StringVar(&startF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock", "Address libvirt listens on")
 	cmd.Flags().StringVar(&startF.XMLDir, "xml-dir", must.String(os.UserHomeDir())+"/osman", "Directory where VM definition is taken from if vm-file argument is not provided")
+	cmd.Flags().StringVar(&startF.VolumeDir, "volume-dir", "/tank/vms", "Directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM")
 	cmd.Flags().StringVar(&startF.VMFile, "vm", "", "Defines VM for mounted image in Libvirt using provided file. If flag is provided without value or value is `auto` then file is derived as <xml-dir>/<image-name>.xml")
 	cmd.Flags().Lookup("vm").NoOptDefVal = "auto"
 	return cmd

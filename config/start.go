@@ -12,6 +12,9 @@ type StartFactory struct {
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
 
+	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM
+	VolumeDir string
+
 	// VMFile is the file containing VM definition
 	VMFile string
 
@@ -23,6 +26,7 @@ type StartFactory struct {
 func (f *StartFactory) Config(args Args) Start {
 	config := Start{
 		XMLDir:      f.XMLDir,
+		VolumeDir:   f.VolumeDir,
 		LibvirtAddr: f.LibvirtAddr,
 	}
 	if f.VMFile != "auto" {
@@ -65,6 +69,9 @@ type Start struct {
 
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
+
+	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM
+	VolumeDir string
 
 	// VMFile is the file containing VM definition
 	VMFile string

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,6 +25,7 @@ import (
 	"golang.org/x/sys/unix"
 	"libvirt.org/go/libvirtxml"
 
+	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
 )
 
@@ -894,8 +897,101 @@ func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvir
 	return domainDoc.Metadata, meta, nil
 }
 
-func deployVM(ctx context.Context, l *libvirt.Libvirt, domainDoc libvirtxml.Domain, info types.BuildInfo, buildKey types.BuildKey) error {
-	domainDoc.Name = buildKey.String()
+func prepareFilesystems(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, dir string) ([]libvirtxml.DomainFilesystem, error) {
+	items, err := os.ReadDir(dir)
+	switch {
+	case err == nil:
+	case errors.Is(err, os.ErrNotExist):
+		return nil, nil
+	default:
+		return nil, errors.WithStack(err)
+	}
+
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	dirs := make(map[string]string, len(items))
+	for _, i := range items {
+		if !i.IsDir() {
+			continue
+		}
+		dirs[filepath.Join(dir, i.Name())] = i.Name()
+	}
+
+	if len(dirs) == 0 {
+		return nil, nil
+	}
+
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	domainDocs := make([]libvirtxml.Domain, 0, len(domains))
+	domainDocs = append(domainDocs, domainDoc)
+
+	for _, d := range domains {
+		xml, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(xml); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		if domainDoc.Devices == nil || len(domainDoc.Devices.Filesystems) == 0 {
+			continue
+		}
+
+		domainDocs = append(domainDocs, domainDoc)
+	}
+
+	for _, domainDoc := range domainDocs {
+		for _, fs := range domainDoc.Devices.Filesystems {
+			if fs.Source == nil || fs.Source.Mount == nil {
+				continue
+			}
+			if _, exists := dirs[fs.Source.Mount.Dir]; exists {
+				return nil, errors.Errorf("directory %s is already mounted in VM %s", fs.Source.Mount.Dir, domainDoc.Name)
+			}
+		}
+	}
+
+	filesystems := make([]libvirtxml.DomainFilesystem, 0, len(dirs))
+	for dir, name := range dirs {
+		filesystems = append(filesystems, libvirtxml.DomainFilesystem{
+			Driver: &libvirtxml.DomainFilesystemDriver{
+				Type: "virtiofs",
+			},
+			Binary: &libvirtxml.DomainFilesystemBinary{
+				Path: "/usr/libexec/virtiofsd",
+				ThreadPool: &libvirtxml.DomainFilesystemBinaryThreadPool{
+					Size: 1,
+				},
+			},
+			Source: &libvirtxml.DomainFilesystemSource{
+				Mount: &libvirtxml.DomainFilesystemSourceMount{
+					Dir: dir,
+				},
+			},
+			Target: &libvirtxml.DomainFilesystemTarget{
+				Dir: name,
+			},
+		})
+	}
+
+	return filesystems, nil
+}
+
+func deployVM(
+	ctx context.Context,
+	l *libvirt.Libvirt,
+	domainDoc libvirtxml.Domain,
+	info types.BuildInfo,
+	start config.Start,
+) error {
+	domainDoc.Name = start.MountKey.String()
 
 	uuid, err := uuid.NewUUID()
 	if err != nil {
@@ -965,6 +1061,13 @@ func deployVM(ctx context.Context, l *libvirt.Libvirt, domainDoc libvirtxml.Doma
 			Dir: "root",
 		},
 	})
+
+	filesystems, err := prepareFilesystems(l, domainDoc, filepath.Join(start.VolumeDir, start.MountKey.Name))
+	if err != nil {
+		return err
+	}
+
+	domainDoc.Devices.Filesystems = append(domainDoc.Devices.Filesystems, filesystems...)
 
 	if domainDoc.OS == nil {
 		domainDoc.OS = &libvirtxml.DomainOS{}
