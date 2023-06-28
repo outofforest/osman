@@ -39,7 +39,7 @@ func iocBuilder(c *ioc.Container) {
 }
 
 func main() {
-	run.Tool("osman", iocBuilder, func(rootCmd *cobra.Command) error {
+	run.Run("osman", iocBuilder, func(rootCmd *cobra.Command) error {
 		return rootCmd.Execute()
 	})
 }

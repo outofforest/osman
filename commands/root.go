@@ -12,7 +12,7 @@ func NewRootCommand(c *ioc.Container) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
-	logger.AddFlags(logger.ToolDefaultConfig, rootCmd.PersistentFlags())
+	logger.AddFlags(logger.DefaultConfig, rootCmd.PersistentFlags())
 	c.ForEachNamed(func(cmd *cobra.Command) {
 		rootCmd.AddCommand(cmd)
 	})
