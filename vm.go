@@ -947,13 +947,13 @@ func prepareFilesystems(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, dir str
 		domainDocs = append(domainDocs, domainDoc)
 	}
 
-	for _, domainDoc := range domainDocs {
-		for _, fs := range domainDoc.Devices.Filesystems {
+	for _, dd := range domainDocs {
+		for _, fs := range dd.Devices.Filesystems {
 			if fs.Source == nil || fs.Source.Mount == nil {
 				continue
 			}
 			if _, exists := dirs[fs.Source.Mount.Dir]; exists {
-				return nil, errors.Errorf("directory %s is already mounted in VM %s", fs.Source.Mount.Dir, domainDoc.Name)
+				return nil, errors.Errorf("directory %s requested by VM %s is already mounted in VM %s", fs.Source.Mount.Dir, domainDoc.Name, dd.Name)
 			}
 		}
 	}
@@ -1013,7 +1013,7 @@ func deployVM(
 
 		for _, f := range meta.Forwards {
 			if name, exists := forwardedEndpoints[f.Key()]; exists {
-				return errors.Errorf("forwarding rule %q colides with the one existing in %s", f, name)
+				return errors.Errorf("forwarding rule %q requested by VM %s colides with the one existing in VM %s", f, domainDoc.Name, name)
 			}
 		}
 	}

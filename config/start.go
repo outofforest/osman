@@ -17,9 +17,6 @@ type StartFactory struct {
 	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM
 	VolumeDir string
 
-	// VMFile is the file containing VM definition
-	VMFile string
-
 	// LibvirtAddr is the address libvirt listens on
 	LibvirtAddr string
 }
@@ -37,9 +34,6 @@ func (f *StartFactory) Config(args Args) Start {
 			panic(errors.Errorf("tag %s is invalid", config.Tag))
 		}
 	}
-	if f.VMFile != "auto" {
-		config.VMFile = f.VMFile
-	}
 	return config
 }
 
@@ -53,9 +47,6 @@ type Start struct {
 
 	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM
 	VolumeDir string
-
-	// VMFile is the file containing VM definition
-	VMFile string
 
 	// LibvirtAddr is the address libvirt listens on
 	LibvirtAddr string
