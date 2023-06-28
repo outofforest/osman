@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/digitalocean/go-libvirt"
+	"github.com/outofforest/logger"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 	"libvirt.org/go/libvirtxml"
@@ -95,11 +96,7 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 
 	vms := make([]types.BuildInfo, 0, len(builds))
 	for _, image := range builds {
-		if start.VMFile == "" {
-			start.VMFile = filepath.Join(start.XMLDir, image.Name+".xml")
-		}
-
-		domainRaw, err := os.ReadFile(start.VMFile)
+		domainRaw, err := os.ReadFile(filepath.Join(start.XMLDir, image.Name+".xml"))
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -222,7 +219,8 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 	}
 
 	if len(toDelete) == 0 {
-		return nil, errors.New("no builds were selected to delete")
+		logger.Get(ctx).Info("No builds were selected to delete")
+		return nil, nil
 	}
 
 	enqueued := map[types.BuildID]bool{}
