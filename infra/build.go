@@ -308,7 +308,7 @@ func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
 			if err != nil {
 				return err
 			}
-			if _, err := stream.Write([]byte(m.Text)); err != nil {
+			if _, err := stream.WriteString(m.Text); err != nil {
 				return err
 			}
 		case wire.Result:
