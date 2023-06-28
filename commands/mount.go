@@ -15,6 +15,7 @@ import (
 // NewMountCommand creates new mount command
 func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
+	var filterF *config.FilterFactory
 	var formatF *config.FormatFactory
 	mountF := &config.MountFactory{}
 
@@ -24,21 +25,24 @@ func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 		Use:   "mount [flags] image [name][:tag]",
 		RunE: cmdF.Cmd(func(c *ioc.Container) {
 			c.Singleton(storageF.Config)
+			c.Singleton(filterF.Config)
 			c.Singleton(formatF.Config)
 			c.Singleton(mountF.Config)
 		}, func(c *ioc.Container, formatter format.Formatter) error {
-			var build types.BuildInfo
+			var builds []types.BuildInfo
 			var err error
-			c.Call(osman.Mount, &build, &err)
+			c.Call(osman.Mount, &builds, &err)
 			if err != nil {
 				return err
 			}
-			fmt.Println(formatter.Format(build, defaultFields...))
+			fmt.Println(formatter.Format(builds, defaultFields...))
 			return nil
 		}),
 	}
 	storageF = cmdF.AddStorageFlags(cmd)
+	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
 	formatF = cmdF.AddFormatFlags(cmd)
+	cmd.Flags().StringSliceVar(&mountF.Tags, "tag", []string{}, "Tags to be applied on mounts")
 	cmd.Flags().BoolVar(&mountF.Boot, "boot", false, "Create mount used to boot host machine")
 	return cmd
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
+	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/storage"
 	"github.com/outofforest/osman/infra/types"
 )
@@ -35,117 +36,111 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 }
 
 // Mount mounts image
-func Mount(ctx context.Context, storage config.Storage, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
+func Mount(ctx context.Context, storage config.Storage, filtering config.Filter, mount config.Mount, s storage.Driver) (retInfo []types.BuildInfo, retErr error) {
+	for i, key := range filtering.BuildKeys {
+		if key.Tag == "" {
+			filtering.BuildKeys[i] = types.NewBuildKey(key.Name, description.DefaultTag)
+		}
+	}
+
+	builds, err := List(ctx, filtering, s)
+	if err != nil {
+		return nil, err
+	}
 	properties := mount.Type.Properties()
 	if !properties.Mountable {
-		return types.BuildInfo{}, errors.Errorf("non-mountable image type received: %s", mount.Type)
+		return nil, errors.Errorf("non-mountable image type received: %s", mount.Type)
 	}
 
-	if !mount.ImageBuildID.IsValid() {
-		var err error
-		mount.ImageBuildID, err = s.BuildID(ctx, mount.ImageBuildKey)
+	mounts := make([]types.BuildInfo, 0, len(builds))
+	for _, image := range builds {
+		if !image.BuildID.Type().Properties().Cloneable {
+			return nil, errors.Errorf("build %s is not cloneable", image.BuildID)
+		}
+
+		if mount.Type == types.BuildTypeBoot && len(image.Boots) == 0 {
+			return nil, errors.Errorf("image %s can't be mounted for booting because it was built without specifying BOOT option(s)", image.BuildID)
+		}
+
+		info, err := cloneForMount(ctx, image, storage, mount, s)
 		if err != nil {
-			return types.BuildInfo{}, err
+			return nil, err
 		}
-	}
-	if !mount.ImageBuildID.Type().Properties().Cloneable {
-		return types.BuildInfo{}, errors.Errorf("build %s is not cloneable", mount.ImageBuildID)
+		mounts = append(mounts, info)
 	}
 
-	image, err := s.Info(ctx, mount.ImageBuildID)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-
-	if mount.Type == types.BuildTypeBoot && len(image.Boots) == 0 {
-		return types.BuildInfo{}, errors.New("image can't be mounted for booting because it was built without specifying BOOT option(s)")
-	}
-
-	if mount.MountKey.Name == "" {
-		mount.MountKey.Name = image.Name
-	}
-
-	if mount.MountKey.Tag == "" {
-		mount.MountKey.Tag = types.Tag(types.RandomString(5))
-	}
-
-	if !mount.MountKey.IsValid() {
-		return types.BuildInfo{}, errors.Errorf("mount key %s is invalid", mount.MountKey)
-	}
-
-	info, err := cloneForMount(ctx, image, storage, mount, s)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	defer func() {
-		if retErr != nil {
-			_ = s.Drop(ctx, info.BuildID)
-		}
-	}()
-
-	return info, nil
+	return mounts, nil
 }
 
 // Start starts VM
-func Start(ctx context.Context, storage config.Storage, start config.Start, s storage.Driver) (types.BuildInfo, error) {
-	var nameFromBuild bool
-	if start.MountKey.Name == "" {
-		nameFromBuild = true
-		start.MountKey.Name = start.ImageBuildKey.Name
-	}
-	if start.MountKey.Tag == "" {
-		start.MountKey.Tag = types.Tag(types.RandomString(5))
-	}
-	if start.VMFile == "" {
-		start.VMFile = filepath.Join(start.XMLDir, start.MountKey.Name+".xml")
-	}
-
-	domainRaw, err := os.ReadFile(start.VMFile)
-	if err != nil {
-		return types.BuildInfo{}, errors.WithStack(err)
-	}
-
-	var domain libvirtxml.Domain
-	if err := domain.Unmarshal(string(domainRaw)); err != nil {
-		return types.BuildInfo{}, errors.WithStack(err)
-	}
-
-	if nameFromBuild {
-		if domain.Name != "" {
-			start.MountKey.Name = domain.Name
+func Start(ctx context.Context, storage config.Storage, filtering config.Filter, start config.Start, s storage.Driver) ([]types.BuildInfo, error) {
+	for i, key := range filtering.BuildKeys {
+		if key.Tag == "" {
+			filtering.BuildKeys[i] = types.NewBuildKey(key.Name, description.DefaultTag)
 		}
+	}
+
+	builds, err := List(ctx, filtering, s)
+	if err != nil {
+		return nil, err
 	}
 
 	l, err := libvirtConn(start.LibvirtAddr)
 	if err != nil {
-		return types.BuildInfo{}, err
+		return nil, err
 	}
 	defer func() {
 		_ = l.Disconnect()
 	}()
 
-	exists, err := vmExists(l, start.MountKey)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-	if exists {
-		return types.BuildInfo{}, errors.Errorf("vm %s has been already defined", start.MountKey)
+	vms := make([]types.BuildInfo, 0, len(builds))
+	for _, image := range builds {
+		if start.VMFile == "" {
+			start.VMFile = filepath.Join(start.XMLDir, image.Name+".xml")
+		}
+
+		domainRaw, err := os.ReadFile(start.VMFile)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		var domain libvirtxml.Domain
+		if err := domain.Unmarshal(string(domainRaw)); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		tag := start.Tag
+		if tag == "" {
+			tag = types.Tag(types.RandomString(5))
+		}
+		vmKey := types.NewBuildKey(image.Name, tag)
+		exists, err := vmExists(l, vmKey)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, errors.Errorf("vm %s has been already defined", vmKey)
+		}
+
+		mounts, err := Mount(ctx, storage, config.Filter{
+			Types:    filtering.Types,
+			BuildIDs: []types.BuildID{image.BuildID},
+		}, config.Mount{
+			Tags: types.Tags{tag},
+			Type: types.BuildTypeVM,
+		}, s)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := deployVM(ctx, l, domain, mounts[0], start, vmKey); err != nil {
+			return nil, err
+		}
+
+		vms = append(vms, mounts[0])
 	}
 
-	info, err := Mount(ctx, storage, config.Mount{
-		ImageBuildID:  start.ImageBuildID,
-		ImageBuildKey: start.ImageBuildKey,
-		MountKey:      start.MountKey,
-		Type:          types.BuildTypeVM,
-	}, s)
-	if err != nil {
-		return types.BuildInfo{}, err
-	}
-
-	if err := deployVM(ctx, l, domain, info, start); err != nil {
-		return types.BuildInfo{}, err
-	}
-	return info, nil
+	return vms, nil
 }
 
 // List lists builds
@@ -353,7 +348,7 @@ func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildI
 
 func cloneForMount(ctx context.Context, image types.BuildInfo, storage config.Storage, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
 	buildID := types.NewBuildID(mount.Type)
-	finalizeFn, buildMountpoint, err := s.Clone(ctx, image.BuildID, mount.MountKey.Name, buildID)
+	finalizeFn, buildMountpoint, err := s.Clone(ctx, image.BuildID, image.Name, buildID)
 	if err != nil {
 		return types.BuildInfo{}, err
 	}
@@ -376,8 +371,14 @@ func cloneForMount(ctx context.Context, image types.BuildInfo, storage config.St
 		return types.BuildInfo{}, err
 	}
 
-	if err := s.Tag(ctx, buildID, mount.MountKey.Tag); err != nil {
-		return types.BuildInfo{}, err
+	tags := mount.Tags
+	if len(tags) == 0 {
+		tags = types.Tags{types.Tag(types.RandomString(5))}
+	}
+	for _, tag := range tags {
+		if err := s.Tag(ctx, buildID, tag); err != nil {
+			return types.BuildInfo{}, err
+		}
 	}
 
 	if mount.Type == types.BuildTypeBoot {
