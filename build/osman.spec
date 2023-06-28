@@ -18,8 +18,10 @@ Tool to manage OS images
 %install
 mkdir -p %{buildroot}/usr/bin
 cp ./bin/osman-app %{buildroot}/usr/bin/osman
+cp ./build/osman-autostart.service %{buildroot}/usr/local/lib/systemd/system/osman-autostart.service
 
 %files
 /usr/bin/osman
+/usr/local/lib/systemd/system/osman-autostart.service
 
 %post
