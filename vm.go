@@ -990,8 +990,9 @@ func deployVM(
 	domainDoc libvirtxml.Domain,
 	info types.BuildInfo,
 	start config.Start,
+	vmKey types.BuildKey,
 ) error {
-	domainDoc.Name = start.MountKey.String()
+	domainDoc.Name = vmKey.String()
 
 	uuid, err := uuid.NewUUID()
 	if err != nil {
@@ -1062,7 +1063,7 @@ func deployVM(
 		},
 	})
 
-	filesystems, err := prepareFilesystems(l, domainDoc, filepath.Join(start.VolumeDir, start.MountKey.Name))
+	filesystems, err := prepareFilesystems(l, domainDoc, filepath.Join(start.VolumeDir, vmKey.Name))
 	if err != nil {
 		return err
 	}

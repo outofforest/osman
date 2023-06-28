@@ -3,12 +3,14 @@ package config
 import (
 	"github.com/pkg/errors"
 
-	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/types"
 )
 
 // StartFactory collects data for start config
 type StartFactory struct {
+	// Tag is the tag applied to started VMs
+	Tag string
+
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
 
@@ -29,43 +31,22 @@ func (f *StartFactory) Config(args Args) Start {
 		VolumeDir:   f.VolumeDir,
 		LibvirtAddr: f.LibvirtAddr,
 	}
+	if f.Tag != "" {
+		config.Tag = types.Tag(f.Tag)
+		if !config.Tag.IsValid() {
+			panic(errors.Errorf("tag %s is invalid", config.Tag))
+		}
+	}
 	if f.VMFile != "auto" {
 		config.VMFile = f.VMFile
 	}
-	if len(args) >= 2 {
-		var err error
-		config.MountKey, err = types.ParseBuildKey(args[1])
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	buildID, err := types.ParseBuildID(args[0])
-	if err == nil {
-		config.ImageBuildID = buildID
-		return config
-	}
-	buildKey, err := types.ParseBuildKey(args[0])
-	if err != nil {
-		panic(errors.Errorf("argument '%s' is neither valid build ID nor build key", args[0]))
-	}
-	if buildKey.Tag == "" {
-		buildKey.Tag = description.DefaultTag
-	}
-	config.ImageBuildKey = buildKey
 	return config
 }
 
 // Start stores configuration for start command
 type Start struct {
-	// ImageBuildID is the build ID of image to mount
-	ImageBuildID types.BuildID
-
-	// ImageBuildKey is the build key of image to mount
-	ImageBuildKey types.BuildKey
-
-	// MountKey is the build key of mounted image
-	MountKey types.BuildKey
+	// Tag is the tag applied to started VMs
+	Tag types.Tag
 
 	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
 	XMLDir string
