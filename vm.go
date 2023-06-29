@@ -25,7 +25,6 @@ import (
 	"golang.org/x/sys/unix"
 	"libvirt.org/go/libvirtxml"
 
-	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
 )
 
@@ -205,73 +204,6 @@ func ensureNetwork(ctx context.Context, l *libvirt.Libvirt, n network) error {
 	}
 
 	return addNetworkToFirewall(n)
-}
-
-func findAvailableIPAndMAC(l *libvirt.Libvirt, n network) (net.IP, string, error) {
-	network, err := l.NetworkLookupByName(n.Name)
-	if isError(err, libvirt.ErrNoNetwork) {
-		_, netIP, err := net.ParseCIDR(n.Network)
-		if err != nil {
-			return nil, "", errors.WithStack(err)
-		}
-		ip := uint32ToIP4(ip4ToUint32(netIP.IP) + 2)
-		return ip, ipToMAC(ip), nil
-	}
-	if err != nil {
-		return nil, "", errors.WithStack(err)
-	}
-
-	usedMACs := map[string]struct{}{}
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
-	if err != nil {
-		return nil, "", errors.WithStack(err)
-	}
-	for _, d := range domains {
-		xml, err := l.DomainGetXMLDesc(d, 0)
-		if err != nil {
-			return nil, "", errors.WithStack(err)
-		}
-
-		var domainDoc libvirtxml.Domain
-		if err := domainDoc.Unmarshal(xml); err != nil {
-			return nil, "", errors.WithStack(err)
-		}
-
-		if domainDoc.Devices == nil {
-			continue
-		}
-
-		for _, iface := range domainDoc.Devices.Interfaces {
-			if iface.Source == nil || iface.Source.Network == nil || iface.Source.Network.Network != n.Name ||
-				iface.MAC == nil || iface.MAC.Address == "" {
-				continue
-			}
-			usedMACs[iface.MAC.Address] = struct{}{}
-		}
-	}
-
-	networkXML, err := l.NetworkGetXMLDesc(network, 0)
-	if err != nil {
-		return nil, "", errors.WithStack(err)
-	}
-
-	var networkDoc libvirtxml.Network
-	if err := networkDoc.Unmarshal(networkXML); err != nil {
-		return nil, "", err
-	}
-
-	for _, ip := range networkDoc.IPs {
-		if ip.DHCP == nil {
-			continue
-		}
-		for _, h := range ip.DHCP.Hosts {
-			if _, exists := usedMACs[h.MAC]; !exists {
-				return net.ParseIP(h.IP).To4(), h.MAC, nil
-			}
-		}
-	}
-
-	return nil, "", errors.Errorf("no free IPs in the network %q", n.Name)
 }
 
 func removeNetworkFromFirewall() error {
@@ -795,14 +727,14 @@ func parseMetadata(domainDoc libvirtxml.Domain) (metadata, error) {
 	}
 
 	root := osmanDoc.Root()
-
-	buildIDEl := root.FindElement("osman:buildID")
-	if buildIDEl == nil || buildIDEl.Text() == "" {
-		return metadata{}, errors.New("no build ID found in metadata")
+	if root.Tag != "osman" {
+		return metadata{}, nil
 	}
 
-	meta := metadata{
-		BuildID: types.BuildID(buildIDEl.Text()),
+	meta := metadata{}
+
+	if buildIDEl := root.FindElement("osman:buildID"); buildIDEl != nil && buildIDEl.Text() != "" {
+		meta.BuildID = types.BuildID(buildIDEl.Text())
 	}
 
 	forwarded := map[string]struct{}{}
@@ -872,7 +804,7 @@ func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvir
 		}
 	}
 	root := osmanDoc.Root()
-	if osmanDoc.Root().Tag != "osman" {
+	if root.Tag != "osman" {
 		return nil, metadata{}, errors.Errorf("osman:osman tag expected in metadata but %s found instead", root.Tag)
 	}
 
@@ -897,8 +829,8 @@ func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvir
 	return domainDoc.Metadata, meta, nil
 }
 
-func prepareFilesystems(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, dir string) ([]libvirtxml.DomainFilesystem, error) {
-	items, err := os.ReadDir(dir)
+func prepareFilesystems(baseDir string) ([]libvirtxml.DomainFilesystem, error) {
+	items, err := os.ReadDir(baseDir)
 	switch {
 	case err == nil:
 	case errors.Is(err, os.ErrNotExist):
@@ -911,55 +843,11 @@ func prepareFilesystems(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, dir str
 		return nil, nil
 	}
 
-	dirs := make(map[string]string, len(items))
+	filesystems := make([]libvirtxml.DomainFilesystem, 0, len(items))
 	for _, i := range items {
 		if !i.IsDir() {
 			continue
 		}
-		dirs[filepath.Join(dir, i.Name())] = i.Name()
-	}
-
-	if len(dirs) == 0 {
-		return nil, nil
-	}
-
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	domainDocs := make([]libvirtxml.Domain, 0, len(domains))
-	domainDocs = append(domainDocs, domainDoc)
-
-	for _, d := range domains {
-		xml, err := l.DomainGetXMLDesc(d, 0)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		var domainDoc libvirtxml.Domain
-		if err := domainDoc.Unmarshal(xml); err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-		if domainDoc.Devices == nil || len(domainDoc.Devices.Filesystems) == 0 {
-			continue
-		}
-
-		domainDocs = append(domainDocs, domainDoc)
-	}
-
-	for _, dd := range domainDocs {
-		for _, fs := range dd.Devices.Filesystems {
-			if fs.Source == nil || fs.Source.Mount == nil {
-				continue
-			}
-			if _, exists := dirs[fs.Source.Mount.Dir]; exists {
-				return nil, errors.Errorf("directory %s requested by VM %s is already mounted in VM %s", fs.Source.Mount.Dir, domainDoc.Name, dd.Name)
-			}
-		}
-	}
-
-	filesystems := make([]libvirtxml.DomainFilesystem, 0, len(dirs))
-	for dir, name := range dirs {
 		filesystems = append(filesystems, libvirtxml.DomainFilesystem{
 			Driver: &libvirtxml.DomainFilesystemDriver{
 				Type: "virtiofs",
@@ -972,11 +860,11 @@ func prepareFilesystems(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, dir str
 			},
 			Source: &libvirtxml.DomainFilesystemSource{
 				Mount: &libvirtxml.DomainFilesystemSourceMount{
-					Dir: dir,
+					Dir: filepath.Join(baseDir, i.Name()),
 				},
 			},
 			Target: &libvirtxml.DomainFilesystemTarget{
-				Dir: name,
+				Dir: i.Name(),
 			},
 		})
 	}
@@ -984,46 +872,20 @@ func prepareFilesystems(l *libvirt.Libvirt, domainDoc libvirtxml.Domain, dir str
 	return filesystems, nil
 }
 
-func deployVM(
-	ctx context.Context,
-	l *libvirt.Libvirt,
+func prepareDomainDoc(
 	domainDoc libvirtxml.Domain,
-	info types.BuildInfo,
-	start config.Start,
-	vmKey types.BuildKey,
-) error {
-	domainDoc.Name = vmKey.String()
-
+	capabilitiesDoc libvirtxml.Caps,
+	availableVCPUs [][]uint,
+	volumeBaseDir string,
+	image types.BuildInfo,
+	mac string,
+) (libvirtxml.Domain, error) {
 	uuid, err := uuid.NewUUID()
 	if err != nil {
 		panic(err)
 	}
 	domainDoc.UUID = uuid.String()
 
-	metaLibvirt, meta, err := prepareMetadata(domainDoc, info)
-	if err != nil {
-		return err
-	}
-
-	if len(meta.Forwards) > 0 {
-		forwardedEndpoints, err := findForwardedEndpoints(l)
-		if err != nil {
-			return err
-		}
-
-		for _, f := range meta.Forwards {
-			if name, exists := forwardedEndpoints[f.Key()]; exists {
-				return errors.Errorf("forwarding rule %q requested by VM %s colides with the one existing in VM %s", f, domainDoc.Name, name)
-			}
-		}
-	}
-
-	ip, mac, err := findAvailableIPAndMAC(l, networkNAT)
-	if err != nil {
-		return err
-	}
-
-	domainDoc.Metadata = metaLibvirt
 	if domainDoc.Devices == nil {
 		domainDoc.Devices = &libvirtxml.DomainDeviceList{}
 	}
@@ -1043,59 +905,22 @@ func deployVM(
 		},
 	)
 
-	domainDoc.Devices.Filesystems = append(domainDoc.Devices.Filesystems, libvirtxml.DomainFilesystem{
-		Driver: &libvirtxml.DomainFilesystemDriver{
-			Type: "virtiofs",
-		},
-		Binary: &libvirtxml.DomainFilesystemBinary{
-			Path: "/usr/libexec/virtiofsd",
-			ThreadPool: &libvirtxml.DomainFilesystemBinaryThreadPool{
-				Size: 1,
-			},
-		},
-		Source: &libvirtxml.DomainFilesystemSource{
-			Mount: &libvirtxml.DomainFilesystemSourceMount{
-				Dir: info.Mounted,
-			},
-		},
-		Target: &libvirtxml.DomainFilesystemTarget{
-			Dir: "root",
-		},
-	})
-
-	filesystems, err := prepareFilesystems(l, domainDoc, filepath.Join(start.VolumeDir, vmKey.Name))
+	filesystems, err := prepareFilesystems(filepath.Join(volumeBaseDir, image.Name))
 	if err != nil {
-		return err
+		return libvirtxml.Domain{}, err
 	}
 
 	domainDoc.Devices.Filesystems = append(domainDoc.Devices.Filesystems, filesystems...)
 
-	if domainDoc.OS == nil {
-		domainDoc.OS = &libvirtxml.DomainOS{}
-	}
-	domainDoc.OS.Kernel = info.Mounted + "/boot/vmlinuz"
-	domainDoc.OS.Initrd = info.Mounted + "/boot/initramfs.img"
-	domainDoc.OS.Cmdline = strings.Join(append([]string{"root=virtiofs:root"}, info.Params...), " ")
-
 	if domainDoc.CPU == nil || domainDoc.CPU.Topology == nil {
-		return errors.New("cpu topology must be specified")
-	}
-
-	capabilitiesRaw, err := l.ConnectGetCapabilities()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	var capabilitiesDoc libvirtxml.Caps
-	if err := capabilitiesDoc.Unmarshal(capabilitiesRaw); err != nil {
-		return errors.WithStack(err)
+		return libvirtxml.Domain{}, errors.New("cpu topology must be specified")
 	}
 
 	if domainDoc.VCPU == nil || domainDoc.VCPU.Value == 0 {
-		return errors.New("number of vcpus is not provided")
+		return libvirtxml.Domain{}, errors.New("number of vcpus is not provided")
 	}
 	if domainDoc.CPU == nil {
-		return errors.New("cpu settings are not provided")
+		return libvirtxml.Domain{}, errors.New("cpu settings are not provided")
 	}
 	domainDoc.VCPU.Value += domainDoc.VCPU.Value % uint(capabilitiesDoc.Host.CPU.Topology.Threads)
 	cores := int(domainDoc.VCPU.Value) / capabilitiesDoc.Host.CPU.Topology.Threads
@@ -1110,12 +935,8 @@ func deployVM(
 		domainDoc.IOThreads = 1
 	}
 
-	availableVCPUs, err := computeVCPUAvailability(l)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 	if len(availableVCPUs) < cores {
-		return errors.New("vm requires more cores than available on host")
+		return libvirtxml.Domain{}, errors.Errorf("vm requires more cores (%d) than available on host (%d)", cores, len(availableVCPUs))
 	}
 
 	domainDoc.CPUTune = &libvirtxml.DomainCPUTune{}
@@ -1147,6 +968,48 @@ func deployVM(
 		CPUSet: joinUInts(availableVCPUs[i]),
 	}
 
+	return domainDoc, nil
+}
+
+func deployVM(
+	ctx context.Context,
+	l *libvirt.Libvirt,
+	domainDoc libvirtxml.Domain,
+	ip net.IP,
+	mount types.BuildInfo,
+) error {
+	metaLibvirt, meta, err := prepareMetadata(domainDoc, mount)
+	if err != nil {
+		return err
+	}
+	domainDoc.Metadata = metaLibvirt
+	domainDoc.Devices.Filesystems = append(domainDoc.Devices.Filesystems, libvirtxml.DomainFilesystem{
+		Driver: &libvirtxml.DomainFilesystemDriver{
+			Type: "virtiofs",
+		},
+		Binary: &libvirtxml.DomainFilesystemBinary{
+			Path: "/usr/libexec/virtiofsd",
+			ThreadPool: &libvirtxml.DomainFilesystemBinaryThreadPool{
+				Size: 1,
+			},
+		},
+		Source: &libvirtxml.DomainFilesystemSource{
+			Mount: &libvirtxml.DomainFilesystemSourceMount{
+				Dir: mount.Mounted,
+			},
+		},
+		Target: &libvirtxml.DomainFilesystemTarget{
+			Dir: "root",
+		},
+	})
+
+	if domainDoc.OS == nil {
+		domainDoc.OS = &libvirtxml.DomainOS{}
+	}
+	domainDoc.OS.Kernel = mount.Mounted + "/boot/vmlinuz"
+	domainDoc.OS.Initrd = mount.Mounted + "/boot/initramfs.img"
+	domainDoc.OS.Cmdline = strings.Join(append([]string{"root=virtiofs:root"}, mount.Params...), " ")
+
 	domainXML, err := domainDoc.Marshal()
 	if err != nil {
 		return errors.WithStack(err)
@@ -1164,7 +1027,134 @@ func deployVM(
 		return errors.WithStack(err)
 	}
 
-	return forwardPorts(meta, ip, info.BuildID, networkNAT)
+	return forwardPorts(meta, ip, mount.BuildID, networkNAT)
+}
+
+type vmToDeploy struct {
+	Image     types.BuildInfo
+	DomainDoc libvirtxml.Domain
+	IP        net.IP
+}
+
+func preprocessDomainDocs(l *libvirt.Libvirt, newVMs []vmToDeploy, volumeBaseDir string) ([]vmToDeploy, error) {
+	_, netIP, err := net.ParseCIDR(networkNAT.Network)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	netStart := ip4ToUint32(netIP.IP) + 2
+	netEnd := netStart + netSize(netIP) - 4
+
+	capabilitiesRaw, err := l.ConnectGetCapabilities()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var capabilitiesDoc libvirtxml.Caps
+	if err := capabilitiesDoc.Unmarshal(capabilitiesRaw); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	names := map[string]struct{}{}
+	macs := map[string]struct{}{}
+	mounts := map[string]string{}
+	forwardingRules := map[string]string{}
+
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	domainDocs := make([]libvirtxml.Domain, 0, len(domains)+len(newVMs))
+	for _, d := range domains {
+		xml, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(xml); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		if domainDoc.Devices != nil {
+			for _, iface := range domainDoc.Devices.Interfaces {
+				if iface.Source == nil || iface.Source.Network == nil || iface.Source.Network.Network != networkNAT.Name ||
+					iface.MAC == nil || iface.MAC.Address == "" {
+					continue
+				}
+				macs[iface.MAC.Address] = struct{}{}
+			}
+		}
+
+		domainDocs = append(domainDocs, domainDoc)
+	}
+
+	result := make([]vmToDeploy, 0, len(newVMs))
+	for _, vmToDeploy := range newVMs {
+		availableVCPUs, err := computeVCPUAvailability(capabilitiesDoc, domainDocs)
+		if err != nil {
+			return nil, err
+		}
+
+		var mac string
+		var ip net.IP
+		for i := netStart; i <= netEnd; i++ {
+			ip = uint32ToIP4(i)
+			m := ipToMAC(ip)
+			if _, exists := macs[m]; !exists {
+				mac = m
+				break
+			}
+		}
+		if mac == "" {
+			return nil, errors.Errorf("no free IP addresses available on network %q", networkNAT.Name)
+		}
+		macs[mac] = struct{}{}
+
+		domainDoc, err := prepareDomainDoc(vmToDeploy.DomainDoc, capabilitiesDoc, availableVCPUs, volumeBaseDir, vmToDeploy.Image, mac)
+		if err != nil {
+			return nil, err
+		}
+
+		domainDocs = append(domainDocs, domainDoc)
+		vmToDeploy.DomainDoc = domainDoc
+		vmToDeploy.IP = ip
+		result = append(result, vmToDeploy)
+	}
+	for _, domainDoc := range domainDocs {
+		meta, err := parseMetadata(domainDoc)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, exists := names[domainDoc.Name]; exists {
+			return nil, errors.Errorf("name %s has been already taken", domainDoc.Name)
+		}
+		names[domainDoc.Name] = struct{}{}
+
+		if domainDoc.Devices != nil {
+			for _, fs := range domainDoc.Devices.Filesystems {
+				if fs.Source == nil || fs.Source.Mount == nil || fs.Source.Mount.Dir == "" {
+					continue
+				}
+
+				if vmName, exists := mounts[fs.Source.Mount.Dir]; exists {
+					return nil, errors.Errorf("mount %s requested by %s has been already taken by %s", fs.Source.Mount.Dir, domainDoc.Name, vmName)
+				}
+				mounts[fs.Source.Mount.Dir] = domainDoc.Name
+			}
+		}
+
+		for _, f := range meta.Forwards {
+			key := f.Key()
+			if vmName, exists := forwardingRules[key]; exists {
+				return nil, errors.Errorf("forwarding rule %s requested by %s has been already taken by %s", key, domainDoc.Name, vmName)
+			}
+			forwardingRules[key] = domainDoc.Name
+		}
+	}
+
+	return result, nil
 }
 
 func libvirtConn(addr string) (*libvirt.Libvirt, error) {
@@ -1183,17 +1173,6 @@ func libvirtConn(addr string) (*libvirt.Libvirt, error) {
 		return nil, errors.WithStack(err)
 	}
 	return l, nil
-}
-
-func vmExists(l *libvirt.Libvirt, buildKey types.BuildKey) (bool, error) {
-	_, err := l.DomainLookupByName(buildKey.String())
-	if libvirt.IsNotFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
@@ -1290,47 +1269,7 @@ type socket struct {
 	SiblingsToSort []*sibling
 }
 
-func findForwardedEndpoints(l *libvirt.Libvirt) (map[string]string, error) {
-	res := map[string]string{}
-
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	for _, d := range domains {
-		xml, err := l.DomainGetXMLDesc(d, 0)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		var domainDoc libvirtxml.Domain
-		if err := domainDoc.Unmarshal(xml); err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-		meta, err := parseMetadata(domainDoc)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, f := range meta.Forwards {
-			res[f.Key()] = domainDoc.Name
-		}
-	}
-
-	return res, nil
-}
-
-func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
-	capabilitiesRaw, err := l.ConnectGetCapabilities()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	var capabilitiesDoc libvirtxml.Caps
-	if err := capabilitiesDoc.Unmarshal(capabilitiesRaw); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
+func computeVCPUAvailability(capabilitiesDoc libvirtxml.Caps, domainDocs []libvirtxml.Domain) ([][]uint, error) {
 	sockets := map[uint]*socket{}
 	socketsToSort := []*socket{}
 	cpuToSockets := map[uint]*socket{}
@@ -1359,20 +1298,7 @@ func computeVCPUAvailability(l *libvirt.Libvirt) ([][]uint, error) {
 		}
 	}
 
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	for _, d := range domains {
-		xml, err := l.DomainGetXMLDesc(d, 0)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		var domainDoc libvirtxml.Domain
-		if err := domainDoc.Unmarshal(xml); err != nil {
-			return nil, errors.WithStack(err)
-		}
-
+	for _, domainDoc := range domainDocs {
 		if domainDoc.CPUTune == nil {
 			continue
 		}
