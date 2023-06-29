@@ -86,23 +86,15 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 		return nil, err
 	}
 
-	l, err := libvirtConn(start.LibvirtAddr)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = l.Disconnect()
-	}()
-
-	vms := make([]types.BuildInfo, 0, len(builds))
+	vmsToDeploy := make([]vmToDeploy, 0, len(builds))
 	for _, image := range builds {
 		domainRaw, err := os.ReadFile(filepath.Join(start.XMLDir, image.Name+".xml"))
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
 
-		var domain libvirtxml.Domain
-		if err := domain.Unmarshal(string(domainRaw)); err != nil {
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(string(domainRaw)); err != nil {
 			return nil, errors.WithStack(err)
 		}
 
@@ -111,17 +103,37 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 			tag = types.Tag(types.RandomString(5))
 		}
 		vmKey := types.NewBuildKey(image.Name, tag)
-		exists, err := vmExists(l, vmKey)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			return nil, errors.Errorf("vm %s has been already defined", vmKey)
+		domainDoc.Name = vmKey.String()
+
+		vmsToDeploy = append(vmsToDeploy, vmToDeploy{
+			Image:     image,
+			DomainDoc: domainDoc,
+		})
+	}
+
+	l, err := libvirtConn(start.LibvirtAddr)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = l.Disconnect()
+	}()
+
+	vmsToDeploy, err = preprocessDomainDocs(l, vmsToDeploy, start.VolumeDir)
+	if err != nil {
+		return nil, err
+	}
+
+	vms := make([]types.BuildInfo, 0, len(builds))
+	for _, vmToDeploy := range vmsToDeploy {
+		tag := start.Tag
+		if tag == "" {
+			tag = types.Tag(types.RandomString(5))
 		}
 
 		mounts, err := Mount(ctx, storage, config.Filter{
 			Types:    filtering.Types,
-			BuildIDs: []types.BuildID{image.BuildID},
+			BuildIDs: []types.BuildID{vmToDeploy.Image.BuildID},
 		}, config.Mount{
 			Tags: types.Tags{tag},
 			Type: types.BuildTypeVM,
@@ -130,7 +142,7 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 			return nil, err
 		}
 
-		if err := deployVM(ctx, l, domain, mounts[0], start, vmKey); err != nil {
+		if err := deployVM(ctx, l, vmToDeploy.DomainDoc, vmToDeploy.IP, mounts[0]); err != nil {
 			return nil, err
 		}
 
