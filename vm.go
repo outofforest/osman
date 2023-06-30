@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/google/nftables/binaryutil"
 	"github.com/google/nftables/expr"
 	"github.com/google/uuid"
+	"github.com/outofforest/parallel"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 	"github.com/vishvananda/netlink"
@@ -44,7 +46,79 @@ var networkNAT = network{
 	Bridge:  "osman",
 }
 
-func addNetworkToFirewall(n network) error {
+func ensureNetwork(ctx context.Context, l *libvirt.Libvirt) error {
+	_, err := l.NetworkLookupByName(networkNAT.Name)
+	if err == nil {
+		return nil
+	}
+	if !isError(err, libvirt.ErrNoNetwork) {
+		return errors.WithStack(err)
+	}
+
+	_, netIP, err := net.ParseCIDR(networkNAT.Network)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	start := ip4ToUint32(netIP.IP) + 2
+	end := start + netSize(netIP) - 4
+	hosts := make([]libvirtxml.NetworkDHCPHost, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		ip := uint32ToIP4(i)
+		hosts = append(hosts, libvirtxml.NetworkDHCPHost{
+			IP:  ip.String(),
+			MAC: ipToMAC(ip),
+		})
+	}
+
+	networkDoc := &libvirtxml.Network{
+		Name: networkNAT.Name,
+		Forward: &libvirtxml.NetworkForward{
+			Mode: networkNAT.Type,
+		},
+		Bridge: &libvirtxml.NetworkBridge{
+			Name:  networkNAT.Bridge,
+			STP:   "on",
+			Delay: "0",
+		},
+		IPs: []libvirtxml.NetworkIP{
+			{
+				Address: uint32ToIP4(ip4ToUint32(netIP.IP) + 1).To4().String(),
+				Netmask: fmt.Sprintf("%d.%d.%d.%d", netIP.Mask[0], netIP.Mask[1], netIP.Mask[2], netIP.Mask[3]),
+				DHCP: &libvirtxml.NetworkDHCP{
+					Hosts: hosts,
+				},
+			},
+		},
+	}
+	network, err := l.NetworkDefineXML(must.String(networkDoc.Marshal()))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if err := l.NetworkCreate(network); err != nil {
+		return errors.WithStack(err)
+	}
+
+	for {
+		active, err := l.NetworkIsActive(network)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if active == 1 {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+
+	return addNetworkToFirewall()
+}
+
+func addNetworkToFirewall() error {
 	defaultIfaceName, err := defaultIface()
 	if err != nil {
 		return err
@@ -118,7 +192,7 @@ func addNetworkToFirewall(n network) error {
 			&expr.Cmp{
 				Op:       expr.CmpOpEq,
 				Register: 1,
-				Data:     []byte(n.Bridge + "\x00"),
+				Data:     []byte(networkNAT.Bridge + "\x00"),
 			},
 			&expr.Meta{Key: expr.MetaKeyOIFNAME, Register: 1},
 			&expr.Cmp{
@@ -132,78 +206,6 @@ func addNetworkToFirewall(n network) error {
 	})
 
 	return errors.WithStack(c.Flush())
-}
-
-func ensureNetwork(ctx context.Context, l *libvirt.Libvirt, n network) error {
-	_, err := l.NetworkLookupByName(n.Name)
-	if err == nil {
-		return nil
-	}
-	if !isError(err, libvirt.ErrNoNetwork) {
-		return errors.WithStack(err)
-	}
-
-	_, netIP, err := net.ParseCIDR(n.Network)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	start := ip4ToUint32(netIP.IP) + 2
-	end := start + netSize(netIP) - 4
-	hosts := make([]libvirtxml.NetworkDHCPHost, 0, end-start+1)
-	for i := start; i <= end; i++ {
-		ip := uint32ToIP4(i)
-		hosts = append(hosts, libvirtxml.NetworkDHCPHost{
-			IP:  ip.String(),
-			MAC: ipToMAC(ip),
-		})
-	}
-
-	networkDoc := &libvirtxml.Network{
-		Name: n.Name,
-		Forward: &libvirtxml.NetworkForward{
-			Mode: n.Type,
-		},
-		Bridge: &libvirtxml.NetworkBridge{
-			Name:  n.Bridge,
-			STP:   "on",
-			Delay: "0",
-		},
-		IPs: []libvirtxml.NetworkIP{
-			{
-				Address: uint32ToIP4(ip4ToUint32(netIP.IP) + 1).To4().String(),
-				Netmask: fmt.Sprintf("%d.%d.%d.%d", netIP.Mask[0], netIP.Mask[1], netIP.Mask[2], netIP.Mask[3]),
-				DHCP: &libvirtxml.NetworkDHCP{
-					Hosts: hosts,
-				},
-			},
-		},
-	}
-	network, err := l.NetworkDefineXML(must.String(networkDoc.Marshal()))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	if err := l.NetworkCreate(network); err != nil {
-		return errors.WithStack(err)
-	}
-
-	for {
-		active, err := l.NetworkIsActive(network)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		if active == 1 {
-			break
-		}
-
-		select {
-		case <-ctx.Done():
-			return errors.WithStack(ctx.Err())
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-
-	return addNetworkToFirewall(n)
 }
 
 func removeNetworkFromFirewall() error {
@@ -252,12 +254,12 @@ func deleteNetwork(l *libvirt.Libvirt, n libvirt.Network) error {
 	return removeNetworkFromFirewall()
 }
 
-func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) error {
+func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 	if len(meta.Forwards) == 0 {
 		return nil
 	}
 
-	_, netIP, err := net.ParseCIDR(n.Network)
+	_, netIP, err := net.ParseCIDR(networkNAT.Network)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -566,7 +568,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) er
 				&expr.Cmp{
 					Op:       expr.CmpOpEq,
 					Register: 1,
-					Data:     []byte(n.Name + "\x00"),
+					Data:     []byte(networkNAT.Name + "\x00"),
 				},
 				&expr.Payload{
 					DestRegister: 1,
@@ -621,7 +623,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID, n network) er
 	return errors.WithStack(c.Flush())
 }
 
-func removeVMFirewallRules(buildID types.BuildID) error {
+func removeVMFirewallRules(deletedVMs map[types.BuildID]libvirtxml.Domain) error {
 	c := &nftables.Conn{}
 	chains, err := c.ListChains()
 	if err != nil {
@@ -638,7 +640,7 @@ func removeVMFirewallRules(buildID types.BuildID) error {
 			return errors.WithStack(err)
 		}
 		for _, r := range rules {
-			if types.BuildID(r.UserData) != buildID {
+			if _, exists := deletedVMs[types.BuildID(r.UserData)]; !exists {
 				continue
 			}
 			if err := c.DelRule(r); err != nil {
@@ -650,8 +652,8 @@ func removeVMFirewallRules(buildID types.BuildID) error {
 	return errors.WithStack(c.Flush())
 }
 
-func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string, buildID types.BuildID) error {
-	network, err := l.NetworkLookupByName(n.Name)
+func removeVMsFromNetwork(l *libvirt.Libvirt, leftVMs map[libvirt.UUID]libvirtxml.Domain, deletedVMs map[types.BuildID]libvirtxml.Domain) error {
+	network, err := l.NetworkLookupByName(networkNAT.Name)
 	if isError(err, libvirt.ErrNoNetwork) {
 		return nil
 	}
@@ -659,30 +661,14 @@ func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string, buildID type
 		return errors.WithStack(err)
 	}
 
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	var networkNeeded bool
-	for _, d := range domains {
-		xml, err := l.DomainGetXMLDesc(d, 0)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		var domainDoc libvirtxml.Domain
-		if err := domainDoc.Unmarshal(xml); err != nil {
-			return errors.WithStack(err)
-		}
-
+	for _, domainDoc := range leftVMs {
 		if domainDoc.Devices == nil {
 			continue
 		}
 
 		for _, iface := range domainDoc.Devices.Interfaces {
-			if iface.Source == nil || iface.Source.Network == nil || iface.Source.Network.Network != n.Name ||
-				iface.MAC == nil || iface.MAC.Address == "" || iface.MAC.Address == mac {
+			if iface.Source == nil || iface.Source.Network == nil || iface.Source.Network.Network != networkNAT.Name {
 				continue
 			}
 			networkNeeded = true
@@ -691,7 +677,7 @@ func removeVMFromNetwork(l *libvirt.Libvirt, n network, mac string, buildID type
 	}
 
 	if networkNeeded {
-		return removeVMFirewallRules(buildID)
+		return removeVMFirewallRules(deletedVMs)
 	}
 	return deleteNetwork(l, network)
 }
@@ -972,7 +958,6 @@ func prepareDomainDoc(
 }
 
 func deployVM(
-	ctx context.Context,
 	l *libvirt.Libvirt,
 	domainDoc libvirtxml.Domain,
 	ip net.IP,
@@ -1019,19 +1004,111 @@ func deployVM(
 		return errors.WithStack(err)
 	}
 
-	if err := ensureNetwork(ctx, l, networkNAT); err != nil {
-		return err
-	}
-
 	if err := l.DomainCreate(domain); err != nil {
 		return errors.WithStack(err)
 	}
 
-	return forwardPorts(meta, ip, mount.BuildID, networkNAT)
+	return forwardPorts(meta, ip, mount.BuildID)
+}
+
+func deployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDeploy []vmToDeploy) error {
+	if err := ensureNetwork(ctx, l); err != nil {
+		return err
+	}
+
+	return parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
+		for _, vmToDeploy := range vmsToDeploy {
+			vmToDeploy := vmToDeploy
+			spawn(vmToDeploy.DomainDoc.Name, parallel.Continue, func(ctx context.Context) error {
+				return deployVM(l, vmToDeploy.DomainDoc, vmToDeploy.IP, vmToDeploy.Mount)
+			})
+		}
+		return nil
+	})
+}
+
+func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.BuildID]struct{}) (map[types.BuildID]error, error) {
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	domainDocsByUUID := map[libvirt.UUID]libvirtxml.Domain{}
+	domainsByBuildID := map[types.BuildID]libvirt.Domain{}
+	for _, d := range domains {
+		domainXML, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(domainXML); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		meta, err := parseMetadata(domainDoc)
+		if err != nil {
+			return nil, err
+		}
+
+		domainDocsByUUID[d.UUID] = domainDoc
+		if meta.BuildID != "" {
+			domainsByBuildID[meta.BuildID] = d
+		}
+	}
+
+	mu := sync.Mutex{}
+	results := map[types.BuildID]error{}
+	deletedVMs := map[types.BuildID]libvirtxml.Domain{}
+	errParallel := parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
+		for buildID := range vmsToDelete {
+			buildID := buildID
+			d, exists := domainsByBuildID[buildID]
+			if !exists {
+				continue
+			}
+			spawn(string(buildID), parallel.Continue, func(ctx context.Context) error {
+				active, err := l.DomainIsActive(d)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+
+				if active == 1 {
+					err = errors.Errorf("vm %q cannot be deleted because it is running", d.Name)
+				} else {
+					err = l.DomainUndefineFlags(d, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata)
+				}
+
+				mu.Lock()
+				defer mu.Unlock()
+
+				if err == nil || libvirt.IsNotFound(err) {
+					deletedVMs[buildID] = domainDocsByUUID[d.UUID]
+					delete(domainDocsByUUID, d.UUID)
+				} else {
+					results[buildID] = err
+				}
+
+				return nil
+			})
+		}
+		return nil
+	})
+
+	if err := removeVMsFromNetwork(l, domainDocsByUUID, deletedVMs); err != nil {
+		return nil, err
+	}
+
+	if errParallel != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 type vmToDeploy struct {
 	Image     types.BuildInfo
+	Mount     types.BuildInfo
 	DomainDoc libvirtxml.Domain
 	IP        net.IP
 }
@@ -1173,64 +1250,6 @@ func libvirtConn(addr string) (*libvirt.Libvirt, error) {
 		return nil, errors.WithStack(err)
 	}
 	return l, nil
-}
-
-func undeployVM(l *libvirt.Libvirt, buildID types.BuildID) error {
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	for _, d := range domains {
-		xml, err := l.DomainGetXMLDesc(d, 0)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		doc := etree.NewDocument()
-		if err := doc.ReadFromString(xml); err != nil {
-			return errors.WithStack(err)
-		}
-		buildIDTag := doc.FindElement("//metadata/osman:osman/osman:buildID")
-		if buildIDTag == nil {
-			continue
-		}
-		if buildID == types.BuildID(buildIDTag.Text()) {
-			active, err := l.DomainIsActive(d)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if active == 1 {
-				return errors.Errorf("vm %q cannot be deleted because it is running", d.Name)
-			}
-
-			var domainDoc libvirtxml.Domain
-			if err := domainDoc.Unmarshal(xml); err != nil {
-				return errors.WithStack(err)
-			}
-
-			var macNAT string
-			if domainDoc.Devices != nil {
-				for _, i := range domainDoc.Devices.Interfaces {
-					if i.Source == nil || i.Source.Network == nil {
-						continue
-					}
-					if i.Source.Network.Network == networkNAT.Name && i.MAC != nil {
-						macNAT = i.MAC.Address
-					}
-				}
-			}
-
-			if err := l.DomainUndefineFlags(d, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata); err != nil && !libvirt.IsNotFound(err) {
-				return errors.WithStack(err)
-			}
-
-			if macNAT != "" {
-				return removeVMFromNetwork(l, networkNAT, macNAT, buildID)
-			}
-
-			return nil
-		}
-	}
-	return nil
 }
 
 func ip4ToUint32(ip net.IP) uint32 {

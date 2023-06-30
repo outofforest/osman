@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/digitalocean/go-libvirt"
 	"github.com/outofforest/logger"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
@@ -125,7 +124,7 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 	}
 
 	vms := make([]types.BuildInfo, 0, len(builds))
-	for _, vmToDeploy := range vmsToDeploy {
+	for i, vmToDeploy := range vmsToDeploy {
 		tag := start.Tag
 		if tag == "" {
 			tag = types.Tag(types.RandomString(5))
@@ -142,11 +141,13 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 			return nil, err
 		}
 
-		if err := deployVM(ctx, l, vmToDeploy.DomainDoc, vmToDeploy.IP, mounts[0]); err != nil {
-			return nil, err
-		}
-
+		vmToDeploy.Mount = mounts[0]
+		vmsToDeploy[i] = vmToDeploy
 		vms = append(vms, mounts[0])
+	}
+
+	if err := deployVMs(ctx, l, vmsToDeploy); err != nil {
+		return nil, err
 	}
 
 	return vms, nil
@@ -210,10 +211,14 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 		return nil, err
 	}
 
-	toDelete := map[types.BuildID]bool{}
+	toDelete := map[types.BuildID]struct{}{}
+	vmsToDelete := map[types.BuildID]struct{}{}
 	tree := map[types.BuildID]types.BuildID{}
 	for _, build := range builds {
-		toDelete[build.BuildID] = true
+		toDelete[build.BuildID] = struct{}{}
+		if build.BuildID.Type().Properties().VM {
+			vmsToDelete[build.BuildID] = struct{}{}
+		}
 		for {
 			if _, exists := tree[build.BuildID]; exists {
 				break
@@ -235,18 +240,18 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 		return nil, nil
 	}
 
-	enqueued := map[types.BuildID]bool{}
+	enqueued := map[types.BuildID]struct{}{}
 	deleteSequence := make([]types.BuildID, 0, len(builds))
 	var sort func(buildID types.BuildID)
 	sort = func(buildID types.BuildID) {
-		if enqueued[buildID] {
+		if _, exists := enqueued[buildID]; exists {
 			return
 		}
 		if baseBuildID := tree[buildID]; baseBuildID != "" {
 			sort(baseBuildID)
 		}
-		if toDelete[buildID] {
-			enqueued[buildID] = true
+		if _, exists := toDelete[buildID]; exists {
+			enqueued[buildID] = struct{}{}
 			deleteSequence = append(deleteSequence, buildID)
 		}
 	}
@@ -254,12 +259,19 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 		sort(build.BuildID)
 	}
 
-	var l *libvirt.Libvirt
-	defer func() {
-		if l != nil {
-			_ = l.Disconnect()
+	var deletedVMs map[types.BuildID]error
+	if len(vmsToDelete) > 0 {
+		l, err := libvirtConn(drop.LibvirtAddr)
+		if err != nil {
+			return nil, err
 		}
-	}()
+		defer l.Disconnect() //nolint:errcheck // I don't care about the error here
+
+		deletedVMs, err = undeployVMs(ctx, l, vmsToDelete)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	results := make([]Result, 0, len(deleteSequence))
 	var genGRUB bool
@@ -267,14 +279,7 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 		buildID := deleteSequence[i]
 		res := Result{BuildID: buildID}
 		if buildID.Type().Properties().VM {
-			if l == nil {
-				var err error
-				l, err = libvirtConn(drop.LibvirtAddr)
-				if err != nil {
-					return nil, err
-				}
-			}
-			res.Result = undeployVM(l, buildID)
+			res.Result = deletedVMs[buildID]
 		}
 		if res.Result == nil {
 			res.Result = s.Drop(ctx, buildID)
