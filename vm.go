@@ -1070,6 +1070,9 @@ func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.
 			spawn(string(buildID), parallel.Continue, func(ctx context.Context) error {
 				active, err := l.DomainIsActive(d)
 				if err != nil {
+					if libvirt.IsNotFound(err) {
+						return nil
+					}
 					return errors.WithStack(err)
 				}
 
@@ -1082,11 +1085,10 @@ func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.
 				mu.Lock()
 				defer mu.Unlock()
 
+				results[buildID] = err
 				if err == nil || libvirt.IsNotFound(err) {
 					deletedVMs[buildID] = domainDocsByUUID[d.UUID]
 					delete(domainDocsByUUID, d.UUID)
-				} else {
-					results[buildID] = err
 				}
 
 				return nil
@@ -1100,6 +1102,97 @@ func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.
 	}
 
 	if errParallel != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func stopVMs(ctx context.Context, l *libvirt.Libvirt, vmsToStop []types.BuildInfo) ([]Result, error) {
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	domainsByBuildID := map[types.BuildID]libvirt.Domain{}
+	for _, d := range domains {
+		domainXML, err := l.DomainGetXMLDesc(d, 0)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		var domainDoc libvirtxml.Domain
+		if err := domainDoc.Unmarshal(domainXML); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		meta, err := parseMetadata(domainDoc)
+		if err != nil {
+			return nil, err
+		}
+
+		if meta.BuildID != "" {
+			domainsByBuildID[meta.BuildID] = d
+		}
+	}
+
+	mu := sync.Mutex{}
+	results := make([]Result, 0, len(vmsToStop))
+	err = parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
+		for _, build := range vmsToStop {
+			domain, exists := domainsByBuildID[build.BuildID]
+			if !exists {
+				continue
+			}
+
+			buildID := build.BuildID
+			spawn(string(buildID), parallel.Continue, func(ctx context.Context) error {
+				active, err := l.DomainIsActive(domain)
+				if err != nil {
+					if libvirt.IsNotFound(err) {
+						return nil
+					}
+					return errors.WithStack(err)
+				}
+				if active == 0 {
+					return nil
+				}
+
+				err = l.DomainShutdown(domain)
+
+				mu.Lock()
+				defer mu.Unlock()
+
+				results = append(results, Result{
+					BuildID: buildID,
+					Result:  err,
+				})
+
+				for {
+					select {
+					case <-ctx.Done():
+						return errors.WithStack(ctx.Err())
+					case <-time.After(time.Second):
+					}
+
+					active, err := l.DomainIsActive(domain)
+					if err != nil {
+						if libvirt.IsNotFound(err) {
+							return nil
+						}
+						return errors.WithStack(err)
+					}
+					if active == 0 {
+						return nil
+					}
+				}
+			})
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
 	}
 

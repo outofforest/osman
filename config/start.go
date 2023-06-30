@@ -22,7 +22,7 @@ type StartFactory struct {
 }
 
 // Config returns new start config
-func (f *StartFactory) Config(args Args) Start {
+func (f *StartFactory) Config() Start {
 	config := Start{
 		XMLDir:      f.XMLDir,
 		VolumeDir:   f.VolumeDir,

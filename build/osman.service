@@ -1,5 +1,5 @@
 [Unit]
-Description=Osman starts VM tagged with auto
+Description=Osman starts and stops VMs
 Requires=virtqemud.service virtnetworkd.service virtqemud-admin.socket
 After=virtqemud.service virtnetworkd.service virtqemud-admin.socket
 
@@ -7,6 +7,7 @@ After=virtqemud.service virtnetworkd.service virtqemud-admin.socket
 Type=oneshot
 Environment="HOME=/root"
 ExecStart=/bin/sh -c "/usr/bin/osman drop --type=vm --all && /usr/bin/osman start :auto"
+ExecStop=/bin/sh -c "/usr/bin/osman stop --all && /usr/bin/osman drop --type=vm --all"
 RemainAfterExit=true
 
 [Install]
