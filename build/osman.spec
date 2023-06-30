@@ -5,7 +5,7 @@ Summary: Tool to manage OS images
 URL:     https://github.com/outofforest/osman
 License: MIT
 
-Requires: zfs
+Requires: zfs libvirt
 
 %description
 Tool to manage OS images
