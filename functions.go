@@ -72,7 +72,7 @@ func Mount(ctx context.Context, storage config.Storage, filtering config.Filter,
 	return mounts, nil
 }
 
-// Start starts VM
+// Start starts VMs
 func Start(ctx context.Context, storage config.Storage, filtering config.Filter, start config.Start, s storage.Driver) ([]types.BuildInfo, error) {
 	for i, key := range filtering.BuildKeys {
 		if key.Tag == "" {
@@ -153,6 +153,28 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 	return vms, nil
 }
 
+// Stop stops VMs
+func Stop(ctx context.Context, filtering config.Filter, stop config.Stop, s storage.Driver) ([]Result, error) {
+	if !stop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
+		return nil, errors.New("neither filters are provided nor --all is set")
+	}
+
+	builds, err := List(ctx, filtering, s)
+	if err != nil {
+		return nil, err
+	}
+
+	l, err := libvirtConn(stop.LibvirtAddr)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = l.Disconnect()
+	}()
+
+	return stopVMs(ctx, l, builds)
+}
+
 // List lists builds
 func List(ctx context.Context, filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 	buildTypes := map[types.BuildType]bool{}
@@ -203,7 +225,7 @@ type Result struct {
 // Drop drops builds
 func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
 	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
-		return nil, errors.New("neither filters are provided nor All is set")
+		return nil, errors.New("neither filters are provided nor --all is set")
 	}
 
 	builds, err := List(ctx, filtering, s)

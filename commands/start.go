@@ -22,9 +22,9 @@ func NewStartCommand(cmdF *CmdFactory) *cobra.Command {
 	startF := &config.StartFactory{}
 
 	cmd := &cobra.Command{
-		Short: "Starts VM",
-		Args:  cobra.RangeArgs(1, 2),
-		Use:   "start [flags] image [name][:tag]",
+		Short: "Starts VMs",
+		Args:  cobra.MinimumNArgs(1),
+		Use:   "start [flags] [name][:tag]",
 		RunE: cmdF.Cmd(func(c *ioc.Container) {
 			c.Singleton(storageF.Config)
 			c.Singleton(filterF.Config)

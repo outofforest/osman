@@ -5,7 +5,7 @@ Summary: Tool to manage OS images
 URL:     https://github.com/outofforest/osman
 License: MIT
 
-Requires: zfs
+Requires: zfs libvirt
 
 %description
 Tool to manage OS images
@@ -20,10 +20,10 @@ mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/local/lib/systemd/system
 
 cp ./bin/osman-app %{buildroot}/usr/bin/osman
-cp ./build/osman-autostart.service %{buildroot}/usr/local/lib/systemd/system/osman-autostart.service
+cp ./build/osman.service %{buildroot}/usr/local/lib/systemd/system/osman.service
 
 %files
 /usr/bin/osman
-/usr/local/lib/systemd/system/osman-autostart.service
+/usr/local/lib/systemd/system/osman.service
 
 %post

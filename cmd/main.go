@@ -33,6 +33,7 @@ func iocBuilder(c *ioc.Container) {
 	c.SingletonNamed("build", commands.NewBuildCommand)
 	c.SingletonNamed("mount", commands.NewMountCommand)
 	c.SingletonNamed("start", commands.NewStartCommand)
+	c.SingletonNamed("stop", commands.NewStopCommand)
 	c.SingletonNamed("list", commands.NewListCommand)
 	c.SingletonNamed("drop", commands.NewDropCommand)
 	c.SingletonNamed("tag", commands.NewTagCommand)
