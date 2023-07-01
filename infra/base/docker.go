@@ -1,8 +1,11 @@
 package base
 
 import (
+	"context"
+
 	"github.com/outofforest/isolator"
-	"github.com/outofforest/isolator/client/wire"
+	"github.com/outofforest/isolator/wire"
+	"github.com/outofforest/parallel"
 	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/infra/types"
@@ -17,33 +20,46 @@ type dockerInitializer struct {
 }
 
 // Initialize fetches image from docker registry and integrates it inside directory
-func (f *dockerInitializer) Init(dir string, buildKey types.BuildKey) (retErr error) {
-	isolator, clean, err := isolator.Start(isolator.Config{Dir: dir, Executor: wire.Config{Chroot: true}})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := clean(); retErr == nil {
-			retErr = err
-		}
-	}()
+func (f *dockerInitializer) Init(ctx context.Context, dir string, buildKey types.BuildKey) error {
+	return parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
+		incoming := make(chan interface{})
+		outgoing := make(chan interface{})
 
-	if err := isolator.Send(wire.InitFromDocker{
-		Image: buildKey.Name,
-		Tag:   string(buildKey.Tag),
-	}); err != nil {
-		return err
-	}
-	msg, err := isolator.Receive()
-	if err != nil {
-		return err
-	}
-	result, ok := msg.(wire.Result)
-	if !ok {
-		return errors.Errorf("expected Result, got: %T", msg)
-	}
-	if result.Error != "" {
-		return errors.New(result.Error)
-	}
-	return nil
+		spawn("isolator", parallel.Fail, func(ctx context.Context) error {
+			return isolator.Run(ctx, isolator.Config{
+				Dir: dir,
+				Types: []interface{}{
+					wire.Result{},
+				},
+				Executor: wire.Config{Chroot: true},
+				Incoming: incoming,
+				Outgoing: outgoing,
+			})
+		})
+		spawn("init", parallel.Exit, func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return errors.WithStack(ctx.Err())
+			case outgoing <- wire.InitFromDocker{
+				Image: buildKey.Name,
+				Tag:   string(buildKey.Tag),
+			}:
+			}
+
+			select {
+			case <-ctx.Done():
+				return errors.WithStack(ctx.Err())
+			case content := <-incoming:
+				result, ok := content.(wire.Result)
+				if !ok {
+					return errors.Errorf("expected Result, got: %T", content)
+				}
+				if result.Error != "" {
+					return errors.New(result.Error)
+				}
+				return nil
+			}
+		})
+		return nil
+	})
 }

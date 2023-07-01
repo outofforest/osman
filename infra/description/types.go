@@ -1,6 +1,8 @@
 package description
 
 import (
+	"context"
+
 	"github.com/outofforest/osman/infra/types"
 )
 
@@ -10,7 +12,7 @@ const DefaultTag types.Tag = "latest"
 // Command is implemented by commands available in SpecFile
 type Command interface {
 	// Execute executes build command
-	Execute(build ImageBuild) error
+	Execute(ctx context.Context, build ImageBuild) error
 }
 
 // ImageBuild represents build in progress
@@ -22,7 +24,7 @@ type ImageBuild interface {
 	Params(cmd *ParamsCommand) error
 
 	// Run executes RUN command
-	Run(cmd *RunCommand) error
+	Run(ctx context.Context, cmd *RunCommand) error
 
 	// Boot executes BOOT command
 	Boot(cmd *BootCommand) error
