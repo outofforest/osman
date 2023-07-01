@@ -1,7 +1,16 @@
 package description
 
 import (
+	"context"
+
 	"github.com/outofforest/osman/infra/types"
+)
+
+var (
+	_ Command = &FromCommand{}
+	_ Command = &ParamsCommand{}
+	_ Command = &RunCommand{}
+	_ Command = &BootCommand{}
 )
 
 // From returns handler for FROM command
@@ -42,7 +51,7 @@ type FromCommand struct {
 }
 
 // Execute executes build command
-func (cmd *FromCommand) Execute(build ImageBuild) error {
+func (cmd *FromCommand) Execute(ctx context.Context, build ImageBuild) error {
 	return build.From(cmd)
 }
 
@@ -52,7 +61,7 @@ type ParamsCommand struct {
 }
 
 // Execute executes build command
-func (cmd *ParamsCommand) Execute(build ImageBuild) error {
+func (cmd *ParamsCommand) Execute(ctx context.Context, build ImageBuild) error {
 	return build.Params(cmd)
 }
 
@@ -62,8 +71,8 @@ type RunCommand struct {
 }
 
 // Execute executes build command
-func (cmd *RunCommand) Execute(build ImageBuild) error {
-	return build.Run(cmd)
+func (cmd *RunCommand) Execute(ctx context.Context, build ImageBuild) error {
+	return build.Run(ctx, cmd)
 }
 
 // BootCommand executes BOOT command
@@ -73,6 +82,6 @@ type BootCommand struct {
 }
 
 // Execute executes build command
-func (cmd *BootCommand) Execute(build ImageBuild) error {
+func (cmd *BootCommand) Execute(ctx context.Context, build ImageBuild) error {
 	return build.Boot(cmd)
 }

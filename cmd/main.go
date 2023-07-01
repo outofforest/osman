@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/outofforest/ioc/v2"
+	"github.com/outofforest/isolator/executor"
+	"github.com/outofforest/isolator/wire"
 	"github.com/outofforest/run"
 	"github.com/spf13/cobra"
 
@@ -40,7 +42,16 @@ func iocBuilder(c *ioc.Container) {
 }
 
 func main() {
-	run.Run("osman", iocBuilder, func(rootCmd *cobra.Command) error {
-		return rootCmd.Execute()
+	router := executor.NewRouter()
+	router.RegisterHandler(wire.Execute{}, executor.ExecuteHandler).
+		RegisterHandler(wire.InitFromDocker{}, executor.NewInitFromDockerHandler())
+	executor.Catch(executor.Config{
+		Router: executor.NewRouter().
+			RegisterHandler(wire.Execute{}, executor.ExecuteHandler).
+			RegisterHandler(wire.InitFromDocker{}, executor.NewInitFromDockerHandler()),
+	}, func() {
+		run.Run("osman", iocBuilder, func(rootCmd *cobra.Command) error {
+			return rootCmd.Execute()
+		})
 	})
 }

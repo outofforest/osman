@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/outofforest/isolator"
-	"github.com/outofforest/isolator/client"
-	"github.com/outofforest/isolator/client/wire"
+	"github.com/outofforest/isolator/wire"
+	"github.com/outofforest/parallel"
 	"github.com/pkg/errors"
 
 	"github.com/outofforest/osman/config"
@@ -61,12 +61,12 @@ func (b *Builder) buildFromFile(ctx context.Context, stack map[types.BuildKey]bo
 	return b.build(ctx, stack, description.Describe(name, tags, commands...))
 }
 
-func (b *Builder) initialize(buildKey types.BuildKey, path string) (retErr error) {
+func (b *Builder) initialize(ctx context.Context, buildKey types.BuildKey, path string) (retErr error) {
 	if buildKey.Name == "scratch" {
 		return nil
 	}
 	// permissions on path dir has to be set to 755 to allow read access for everyone so linux boots correctly
-	return b.initializer.Init(path, buildKey)
+	return b.initializer.Init(ctx, path, buildKey)
 }
 
 func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img *description.Descriptor) (retBuildID types.BuildID, retErr error) {
@@ -94,13 +94,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 
 	var imgFinalize storage.FinalizeFn
 	var path string
-	var terminateIsolator func() error
 	defer func() {
-		if terminateIsolator != nil {
-			if err := terminateIsolator(); retErr == nil {
-				retErr = err
-			}
-		}
 		if path != "" {
 			if err := os.Remove(filepath.Join(path, ".specdir")); err != nil && !os.IsNotExist(err) {
 				if retErr == nil {
@@ -136,102 +130,129 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 			return "", err
 		}
 
-		if err := b.initialize(types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
+		if err := b.initialize(ctx, types.NewBuildKey(img.Name(), tags[0]), path); err != nil {
 			return "", err
 		}
 	} else {
-		var build *imageBuild
-		build = newImageBuild(func(srcBuildKey types.BuildKey) (types.BuildInfo, error) {
-			if !types.IsNameValid(srcBuildKey.Name) {
-				return types.BuildInfo{}, errors.Errorf("name %s is invalid", srcBuildKey.Name)
-			}
-			if !srcBuildKey.Tag.IsValid() {
-				return types.BuildInfo{}, errors.Errorf("tag %s is invalid", srcBuildKey.Tag)
-			}
-
-			// Try to clone existing image
-			err := types.ErrImageDoesNotExist
-			var srcBuildID types.BuildID
-			if !b.rebuild || b.readyBuilds[srcBuildKey] {
-				srcBuildID, err = b.storage.BuildID(ctx, srcBuildKey)
-			}
-
-			switch {
-			case err == nil:
-			case errors.Is(err, types.ErrImageDoesNotExist):
-				// If image does not exist try to build it from file in the current directory but only if tag is a default one
-				if srcBuildKey.Tag == description.DefaultTag {
-					_, err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
+		incoming := make(chan interface{})
+		outgoing := make(chan interface{})
+		clonedCh := make(chan struct{})
+		build := newImageBuild(incoming, outgoing,
+			func(srcBuildKey types.BuildKey) (types.BuildInfo, error) {
+				if !types.IsNameValid(srcBuildKey.Name) {
+					return types.BuildInfo{}, errors.Errorf("name %s is invalid", srcBuildKey.Name)
 				}
-			default:
-				return types.BuildInfo{}, err
-			}
-
-			switch {
-			case err == nil:
-			case errors.Is(err, types.ErrImageDoesNotExist):
-				if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
-					// If spec file does not exist, try building from repository
-					_, err = b.build(ctx, stack, baseImage)
-				} else {
-					_, err = b.build(ctx, stack, description.Describe(srcBuildKey.Name, types.Tags{srcBuildKey.Tag}))
+				if !srcBuildKey.Tag.IsValid() {
+					return types.BuildInfo{}, errors.Errorf("tag %s is invalid", srcBuildKey.Tag)
 				}
-			default:
-				return types.BuildInfo{}, err
-			}
 
-			if err != nil {
-				return types.BuildInfo{}, err
-			}
+				// Try to clone existing image
+				err := types.ErrImageDoesNotExist
+				var srcBuildID types.BuildID
+				if !b.rebuild || b.readyBuilds[srcBuildKey] {
+					srcBuildID, err = b.storage.BuildID(ctx, srcBuildKey)
+				}
 
-			if !srcBuildID.IsValid() {
-				srcBuildID, err = b.storage.BuildID(ctx, srcBuildKey)
+				switch {
+				case err == nil:
+				case errors.Is(err, types.ErrImageDoesNotExist):
+					// If image does not exist try to build it from file in the current directory but only if tag is a default one
+					if srcBuildKey.Tag == description.DefaultTag {
+						_, err = b.buildFromFile(ctx, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
+					}
+				default:
+					return types.BuildInfo{}, err
+				}
+
+				switch {
+				case err == nil:
+				case errors.Is(err, types.ErrImageDoesNotExist):
+					if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
+						// If spec file does not exist, try building from repository
+						_, err = b.build(ctx, stack, baseImage)
+					} else {
+						_, err = b.build(ctx, stack, description.Describe(srcBuildKey.Name, types.Tags{srcBuildKey.Tag}))
+					}
+				default:
+					return types.BuildInfo{}, err
+				}
+
 				if err != nil {
 					return types.BuildInfo{}, err
 				}
-			}
-			if !srcBuildID.Type().Properties().Cloneable {
-				return types.BuildInfo{}, errors.Errorf("build %s is not cloneable", srcBuildKey)
-			}
 
-			imgFinalize, path, err = b.storage.Clone(ctx, srcBuildID, img.Name(), buildID)
-			if err != nil {
-				return types.BuildInfo{}, err
-			}
+				if !srcBuildID.IsValid() {
+					srcBuildID, err = b.storage.BuildID(ctx, srcBuildKey)
+					if err != nil {
+						return types.BuildInfo{}, err
+					}
+				}
+				if !srcBuildID.Type().Properties().Cloneable {
+					return types.BuildInfo{}, errors.Errorf("build %s is not cloneable", srcBuildKey)
+				}
 
-			buildInfo, err := b.storage.Info(ctx, srcBuildID)
-			if err != nil {
-				return types.BuildInfo{}, err
-			}
+				imgFinalize, path, err = b.storage.Clone(ctx, srcBuildID, img.Name(), buildID)
+				if err != nil {
+					return types.BuildInfo{}, err
+				}
 
-			build.isolator, terminateIsolator, err = isolator.Start(isolator.Config{
-				Dir: filepath.Dir(path),
-				Executor: wire.Config{
-					Mounts: []wire.Mount{
-						{
-							Host:      ".",
-							Container: "/.specdir",
-							Writable:  true,
+				buildInfo, err := b.storage.Info(ctx, srcBuildID)
+				if err != nil {
+					return types.BuildInfo{}, err
+				}
+
+				if err != nil {
+					return types.BuildInfo{}, err
+				}
+
+				close(clonedCh)
+				return buildInfo, nil
+			})
+		err := parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
+			spawn("isolator", parallel.Fail, func(ctx context.Context) error {
+				select {
+				case <-ctx.Done():
+					return errors.WithStack(ctx.Err())
+				case <-clonedCh:
+				}
+
+				return isolator.Run(ctx, isolator.Config{
+					Dir: filepath.Dir(path),
+					Types: []interface{}{
+						wire.Result{},
+						wire.Log{},
+					},
+					Executor: wire.Config{
+						Mounts: []wire.Mount{
+							{
+								Host:      ".",
+								Container: "/.specdir",
+								Writable:  true,
+							},
 						},
 					},
-				},
+					Incoming: incoming,
+					Outgoing: outgoing,
+				})
 			})
-			if err != nil {
-				return types.BuildInfo{}, err
-			}
-			return buildInfo, nil
+			spawn("commands", parallel.Exit, func(ctx context.Context) error {
+				for _, cmd := range img.Commands() {
+					select {
+					case <-ctx.Done():
+						return errors.WithStack(ctx.Err())
+					default:
+					}
+
+					if err := cmd.Execute(ctx, build); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			return nil
 		})
-
-		for _, cmd := range img.Commands() {
-			select {
-			case <-ctx.Done():
-				return "", ctx.Err()
-			default:
-			}
-
-			if err := cmd.Execute(build); err != nil {
-				return "", err
-			}
+		if err != nil {
+			return "", err
 		}
 
 		build.manifest.BuildID = buildID
@@ -251,18 +272,23 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	return buildID, nil
 }
 
-func newImageBuild(cloneFn cloneFromFn) *imageBuild {
+var _ description.ImageBuild = &imageBuild{}
+
+func newImageBuild(incoming <-chan interface{}, outgoing chan<- interface{}, cloneFn cloneFromFn) *imageBuild {
 	return &imageBuild{
-		cloneFn: cloneFn,
+		incoming: incoming,
+		outgoing: outgoing,
+		cloneFn:  cloneFn,
 	}
 }
 
 type imageBuild struct {
-	cloneFn cloneFromFn
+	incoming <-chan interface{}
+	outgoing chan<- interface{}
+	cloneFn  cloneFromFn
 
 	fromDone bool
 	manifest types.ImageManifest
-	isolator *client.Client
 }
 
 // From is a handler for FROM
@@ -290,19 +316,31 @@ func (b *imageBuild) Params(cmd *description.ParamsCommand) error {
 }
 
 // Run is a handler for RUN
-func (b *imageBuild) Run(cmd *description.RunCommand) (retErr error) {
+func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) error {
 	if !b.fromDone {
 		return errors.New("description has to start with FROM directive")
 	}
-	if err := b.isolator.Send(wire.Execute{Command: cmd.Command}); err != nil {
-		return err
+
+	select {
+	case <-ctx.Done():
+		return errors.WithStack(ctx.Err())
+	case b.outgoing <- wire.Execute{Command: cmd.Command}:
 	}
+
 	for {
-		msg, err := b.isolator.Receive()
-		if err != nil {
-			return err
+		var content interface{}
+		var ok bool
+
+		select {
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
+		case content, ok = <-b.incoming:
 		}
-		switch m := msg.(type) {
+		if !ok {
+			return errors.WithStack(ctx.Err())
+		}
+
+		switch m := content.(type) {
 		case wire.Log:
 			stream, err := toStream(m.Stream)
 			if err != nil {
