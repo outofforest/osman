@@ -22,16 +22,16 @@ import (
 )
 
 func copyKernel(buildMountPoint string, storage config.Storage, buildID types.BuildID) error {
-	buildBinDir := filepath.Join(buildMountPoint, "root", "boot")
+	buildBootDir := filepath.Join(buildMountPoint, "root", "boot")
 	return forEachBootMaster(bootPrefix(storage.Root), func(diskMountpoint string) error {
 		kernelDir := filepath.Join(diskMountpoint, "zfs", string(buildID))
 		if err := os.MkdirAll(kernelDir, 0o755); err != nil {
 			return errors.WithStack(err)
 		}
-		if err := copyFile(filepath.Join(kernelDir, "vmlinuz"), filepath.Join(buildBinDir, "vmlinuz"), 0o755); err != nil {
+		if err := copyFile(filepath.Join(kernelDir, "vmlinuz"), filepath.Join(buildBootDir, "vmlinuz"), 0o755); err != nil {
 			return errors.WithStack(err)
 		}
-		return errors.WithStack(copyFile(filepath.Join(kernelDir, "initramfs.img"), filepath.Join(buildBinDir, "initramfs.img"), 0o600))
+		return errors.WithStack(copyFile(filepath.Join(kernelDir, "initramfs.img"), filepath.Join(buildBootDir, "initramfs.img"), 0o600))
 	})
 }
 

@@ -968,6 +968,8 @@ func deployVM(
 		return err
 	}
 	domainDoc.Metadata = metaLibvirt
+
+	rootDir := filepath.Join(mount.Mounted, "root")
 	domainDoc.Devices.Filesystems = append(domainDoc.Devices.Filesystems, libvirtxml.DomainFilesystem{
 		Driver: &libvirtxml.DomainFilesystemDriver{
 			Type: "virtiofs",
@@ -980,7 +982,7 @@ func deployVM(
 		},
 		Source: &libvirtxml.DomainFilesystemSource{
 			Mount: &libvirtxml.DomainFilesystemSourceMount{
-				Dir: mount.Mounted,
+				Dir: rootDir,
 			},
 		},
 		Target: &libvirtxml.DomainFilesystemTarget{
@@ -991,8 +993,9 @@ func deployVM(
 	if domainDoc.OS == nil {
 		domainDoc.OS = &libvirtxml.DomainOS{}
 	}
-	domainDoc.OS.Kernel = mount.Mounted + "/boot/vmlinuz"
-	domainDoc.OS.Initrd = mount.Mounted + "/boot/initramfs.img"
+	bootDir := filepath.Join(rootDir, "boot")
+	domainDoc.OS.Kernel = filepath.Join(bootDir, "vmlinuz")
+	domainDoc.OS.Initrd = filepath.Join(bootDir, "initramfs.img")
 	domainDoc.OS.Cmdline = strings.Join(append([]string{"root=virtiofs:root"}, mount.Params...), " ")
 
 	domainXML, err := domainDoc.Marshal()
