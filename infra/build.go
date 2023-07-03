@@ -96,7 +96,7 @@ func (b *Builder) build(ctx context.Context, stack map[types.BuildKey]bool, img 
 	var path string
 	defer func() {
 		if path != "" {
-			if err := os.Remove(filepath.Join(path, "root", ".specdir")); err != nil && !os.IsNotExist(err) {
+			if err := os.Remove(filepath.Join(path, ".specdir")); err != nil && !os.IsNotExist(err) {
 				if retErr == nil {
 					retErr = err
 				}

@@ -102,8 +102,9 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 // CreateEmpty creates blank build
 func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
 	buildDir := filepath.Join("/", d.config.Root, string(buildID))
+	mountPoint := filepath.Join(buildDir, "root")
 	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), zfs.CreateFilesystemOptions{Properties: map[string]string{
-		"mountpoint": filepath.Join(buildDir, "root"),
+		"mountpoint": mountPoint,
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   buildID,
 			Name:      imageName,
@@ -129,7 +130,7 @@ func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID t
 		}
 		_, err := filesystem.Snapshot(ctx, "image")
 		return err
-	}, buildDir, nil
+	}, mountPoint, nil
 }
 
 // Clone clones source build to destination build
@@ -141,8 +142,9 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 
 	properties := dstBuildID.Type().Properties()
 	buildDir := filepath.Join("/", d.config.Root, string(dstBuildID))
+	mountPoint := filepath.Join(buildDir, "root")
 	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
-		"mountpoint": filepath.Join(buildDir, "root"),
+		"mountpoint": mountPoint,
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,
@@ -177,7 +179,7 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 			}
 		}
 		return nil
-	}, buildDir, nil
+	}, mountPoint, nil
 }
 
 // StoreManifest stores manifest of build
