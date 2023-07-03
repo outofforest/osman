@@ -19,7 +19,7 @@ func NewDockerInitializer() Initializer {
 type dockerInitializer struct {
 }
 
-// Initialize fetches image from docker registry and integrates it inside directory
+// Init fetches image from docker registry and integrates it inside directory
 func (f *dockerInitializer) Init(ctx context.Context, dir string, buildKey types.BuildKey) error {
 	return parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
 		incoming := make(chan interface{})
@@ -31,7 +31,7 @@ func (f *dockerInitializer) Init(ctx context.Context, dir string, buildKey types
 				Types: []interface{}{
 					wire.Result{},
 				},
-				Executor: wire.Config{Chroot: true},
+				Executor: wire.Config{NoStandardMounts: true},
 				Incoming: incoming,
 				Outgoing: outgoing,
 			})
