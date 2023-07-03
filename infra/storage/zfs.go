@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/outofforest/go-zfs/v3"
@@ -100,9 +101,9 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 
 // CreateEmpty creates blank build
 func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
-	buildDir := "/" + d.config.Root + "/" + string(buildID)
+	buildDir := filepath.Join("/", d.config.Root, string(buildID))
 	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), zfs.CreateFilesystemOptions{Properties: map[string]string{
-		"mountpoint": buildDir + "/root",
+		"mountpoint": buildDir,
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   buildID,
 			Name:      imageName,
@@ -128,7 +129,7 @@ func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID t
 		}
 		_, err := filesystem.Snapshot(ctx, "image")
 		return err
-	}, filesystem.Info.Mountpoint, nil
+	}, buildDir, nil
 }
 
 // Clone clones source build to destination build
@@ -139,9 +140,9 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}
 
 	properties := dstBuildID.Type().Properties()
-	buildDir := "/" + d.config.Root + "/" + string(dstBuildID)
+	buildDir := filepath.Join("/", d.config.Root, string(dstBuildID))
 	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
-		"mountpoint": buildDir + "/root",
+		"mountpoint": buildDir,
 		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
 			BuildID:   dstBuildID,
 			BasedOn:   srcBuildID,
@@ -152,6 +153,7 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	if err != nil {
 		return nil, "", err
 	}
+
 	return func() error {
 		if !properties.Mountable || !properties.AutoMount {
 			if err := filesystem.Unmount(ctx); err != nil {
@@ -175,7 +177,7 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 			}
 		}
 		return nil
-	}, filesystem.Info.Mountpoint, nil
+	}, buildDir, nil
 }
 
 // StoreManifest stores manifest of build
