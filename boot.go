@@ -22,7 +22,7 @@ import (
 )
 
 func copyKernel(buildMountPoint string, storage config.Storage, buildID types.BuildID) error {
-	buildBootDir := filepath.Join(buildMountPoint, "root", "boot")
+	buildBootDir := filepath.Join(buildMountPoint, "boot")
 	return forEachBootMaster(bootPrefix(storage.Root), func(diskMountpoint string) error {
 		kernelDir := filepath.Join(diskMountpoint, "zfs", string(buildID))
 		if err := os.MkdirAll(kernelDir, 0o755); err != nil {

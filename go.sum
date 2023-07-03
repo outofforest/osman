@@ -29,8 +29,8 @@ github.com/outofforest/go-zfs/v3 v3.1.14 h1:F0MosonFuGwiIotlMVKoMsvAmISnOWOAncev
 github.com/outofforest/go-zfs/v3 v3.1.14/go.mod h1:H8SgVKbvhso4bQGQMn6P21mFEd3oDOIaBH2w0Bcsu3c=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
 github.com/outofforest/ioc/v2 v2.5.2/go.mod h1:yI+FHuHchC/t6nVo3WJ96qEgCXdHQKFI/4wW2/75YcU=
-github.com/outofforest/isolator v0.7.0 h1:xlHhWuUI2G/zIWXyynmQQOdreHCcC29o0fGNra8/7k4=
-github.com/outofforest/isolator v0.7.0/go.mod h1:02EyC+kX65/xHY0TWHec52JmYLJ8mb+04Cd+Sn2lN5s=
+github.com/outofforest/isolator v0.7.1 h1:S8Gk8H0UB8QpiHhrS+qqVWjCVi2icgiffeYDPymz/k0=
+github.com/outofforest/isolator v0.7.1/go.mod h1:02EyC+kX65/xHY0TWHec52JmYLJ8mb+04Cd+Sn2lN5s=
 github.com/outofforest/libexec v0.3.9 h1:KvVLuKDHqpydwNoKm+j36hi9DVPU61X4oHonlZ5cw88=
 github.com/outofforest/libexec v0.3.9/go.mod h1:J2rUB/m0ER8UNOHd3/UQM55bvh1cbMwhb8gibeF/zyo=
 github.com/outofforest/logger v0.3.3/go.mod h1:+M5sO17Va9V33t28Qs9VqRQ8bFV501Uhq2PtQY+R3Ms=
