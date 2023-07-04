@@ -22,7 +22,7 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 	builds := make([]types.BuildInfo, 0, len(build.SpecFiles))
 	for i, specFile := range build.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
-		buildID, err := builder.BuildFromFile(ctx, specFile, build.Names[i], build.Tags...)
+		buildID, err := builder.BuildFromFile(ctx, build.CacheDir, specFile, build.Names[i], build.Tags...)
 		if err != nil {
 			return nil, err
 		}

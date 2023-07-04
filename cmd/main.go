@@ -49,7 +49,7 @@ func main() {
 		WithFlavour(executor.NewFlavour(executor.Config{
 			Router: executor.NewRouter().
 				RegisterHandler(wire.Execute{}, executor.ExecuteHandler).
-				RegisterHandler(wire.InitFromDocker{}, executor.NewInitFromDockerHandler()),
+				RegisterHandler(wire.InflateDockerImage{}, executor.NewInflateDockerImageHandler()),
 		})).
 		Run("osman", func(ctx context.Context, rootCmd *cobra.Command) error {
 			return rootCmd.Execute()

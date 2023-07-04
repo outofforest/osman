@@ -2,6 +2,8 @@ package base
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 
 	"github.com/outofforest/isolator"
 	"github.com/outofforest/isolator/wire"
@@ -20,10 +22,15 @@ type dockerInitializer struct {
 }
 
 // Init fetches image from docker registry and integrates it inside directory
-func (f *dockerInitializer) Init(ctx context.Context, dir string, buildKey types.BuildKey) error {
+func (f *dockerInitializer) Init(ctx context.Context, cacheDir, dir string, buildKey types.BuildKey) error {
 	return parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
 		incoming := make(chan interface{})
 		outgoing := make(chan interface{})
+
+		cacheDir := filepath.Join(cacheDir, "docker-images")
+		if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+			return errors.WithStack(err)
+		}
 
 		spawn("isolator", parallel.Fail, func(ctx context.Context) error {
 			return isolator.Run(ctx, isolator.Config{
@@ -31,7 +38,16 @@ func (f *dockerInitializer) Init(ctx context.Context, dir string, buildKey types
 				Types: []interface{}{
 					wire.Result{},
 				},
-				Executor: wire.Config{NoStandardMounts: true},
+				Executor: wire.Config{
+					NoStandardMounts: true,
+					Mounts: []wire.Mount{
+						{
+							Host:      cacheDir,
+							Container: "/.docker-cache",
+							Writable:  true,
+						},
+					},
+				},
 				Incoming: incoming,
 				Outgoing: outgoing,
 			})
@@ -40,9 +56,10 @@ func (f *dockerInitializer) Init(ctx context.Context, dir string, buildKey types
 			select {
 			case <-ctx.Done():
 				return errors.WithStack(ctx.Err())
-			case outgoing <- wire.InitFromDocker{
-				Image: buildKey.Name,
-				Tag:   string(buildKey.Tag),
+			case outgoing <- wire.InflateDockerImage{
+				CacheDir: "/.docker-cache",
+				Image:    buildKey.Name,
+				Tag:      string(buildKey.Tag),
 			}:
 			}
 
