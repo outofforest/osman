@@ -1,31 +1,40 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ridge/must"
 
 	"github.com/outofforest/osman/infra/types"
 )
 
-// BuildFactory collects data for build config
+// BuildFactory collects data for build config.
 type BuildFactory struct {
-	// Names is the list of names for corresponding specfiles
+	// Names is the list of names for corresponding specfiles.
 	Names []string
 
-	// Tags are used to tag the build
+	// Tags are used to tag the build.
 	Tags []string
 
-	// Rebuild forces rebuild of all parent images even if they exist
+	// Rebuild forces rebuild of all parent images even if they exist.
 	Rebuild bool
+
+	// CacheDir is the directory where cached files are stored.
+	CacheDir string
 }
 
 // Config creates build config
 func (f BuildFactory) Config(args Args) Build {
+	must.OK(os.MkdirAll(f.CacheDir, 0o700))
+
 	config := Build{
 		SpecFiles: args,
 		Names:     f.Names,
 		Tags:      make(types.Tags, 0, len(f.Tags)),
 		Rebuild:   f.Rebuild,
+		CacheDir:  must.String(filepath.Abs(must.String(filepath.EvalSymlinks(f.CacheDir)))),
 	}
 
 	for i, specFile := range config.SpecFiles {
@@ -52,4 +61,7 @@ type Build struct {
 
 	// Rebuild forces rebuild of all parent images even if they exist
 	Rebuild bool
+
+	// CacheDir is the directory where cached files are stored.
+	CacheDir string
 }
