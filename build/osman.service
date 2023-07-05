@@ -6,7 +6,7 @@ After=virtqemud.service virtnetworkd.service virtqemud-admin.socket
 [Service]
 Type=oneshot
 Environment="HOME=/root"
-ExecStart=/bin/sh -c "/usr/bin/osman drop --type=vm --all && /usr/bin/osman start :auto"
+ExecStart=/bin/sh -c "/usr/bin/osman drop --type=vm --all && /usr/bin/osman start @auto"
 ExecStop=/bin/sh -c "/usr/bin/osman stop --all && /usr/bin/osman drop --type=vm --all"
 RemainAfterExit=true
 
