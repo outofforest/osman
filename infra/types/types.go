@@ -161,7 +161,7 @@ func (bid BuildID) IsValidType(buildType BuildType) bool {
 	return bid.Type() == buildType
 }
 
-var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_.]*$`)
+var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_.:]*$`)
 
 // Tag is the tag of build
 type Tag string
@@ -203,7 +203,7 @@ func ParseBuildKey(strBuildKey string) (BuildKey, error) {
 	if strBuildKey == "" {
 		return BuildKey{}, errors.New("empty build key received")
 	}
-	parts := strings.SplitN(strBuildKey, ":", 2)
+	parts := strings.SplitN(strBuildKey, "@", 2)
 	name := parts[0]
 	if name != "" && !IsNameValid(name) {
 		return BuildKey{}, errors.Errorf("name '%s' is invalid", name)
@@ -231,7 +231,7 @@ type BuildKey struct {
 
 // String returns string representation of build key
 func (bk BuildKey) String() string {
-	return fmt.Sprintf("%s:%s", bk.Name, bk.Tag)
+	return fmt.Sprintf("%s@%s", bk.Name, bk.Tag)
 }
 
 // IsValid returns true if build key is valid
