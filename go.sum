@@ -29,8 +29,8 @@ github.com/outofforest/go-zfs/v3 v3.1.14 h1:F0MosonFuGwiIotlMVKoMsvAmISnOWOAncev
 github.com/outofforest/go-zfs/v3 v3.1.14/go.mod h1:H8SgVKbvhso4bQGQMn6P21mFEd3oDOIaBH2w0Bcsu3c=
 github.com/outofforest/ioc/v2 v2.5.2 h1:4mNzLuzoZTXL/cO0qf1TrSYvejMgbZz5OUhdLzAUbek=
 github.com/outofforest/ioc/v2 v2.5.2/go.mod h1:yI+FHuHchC/t6nVo3WJ96qEgCXdHQKFI/4wW2/75YcU=
-github.com/outofforest/isolator v0.8.0 h1:fBiM2pX2hlinEVpKWOt6+mdbXUooUHyUtyscnzpiQtU=
-github.com/outofforest/isolator v0.8.0/go.mod h1:oybGTl8quQf7ra2cq0FwjX6LbgBwZybOErS5oeh2DJc=
+github.com/outofforest/isolator v0.8.2 h1:QbNe1kD+ktdgN2Haps6Mx3r1vB0aJFHDLSm8C/WDZI0=
+github.com/outofforest/isolator v0.8.2/go.mod h1:CWQkLwr3qXyXxouqvS1QDC1nfUQ2FCdcUJSMrZVikJc=
 github.com/outofforest/libexec v0.3.9 h1:KvVLuKDHqpydwNoKm+j36hi9DVPU61X4oHonlZ5cw88=
 github.com/outofforest/libexec v0.3.9/go.mod h1:J2rUB/m0ER8UNOHd3/UQM55bvh1cbMwhb8gibeF/zyo=
 github.com/outofforest/logger v0.3.3/go.mod h1:+M5sO17Va9V33t28Qs9VqRQ8bFV501Uhq2PtQY+R3Ms=
@@ -111,8 +111,8 @@ golang.org/x/sys v0.0.0-20210510120138-977fb7262007/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.9.0 h1:KS/R3tvhPqvJvwcKfnBHJwwthS11LRhmM5D59eEXa0s=
-golang.org/x/sys v0.9.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.10.0 h1:SqMFp9UcQJZa+pmYuAKjd9xq1f0j5rLcDIk0mj4qAsA=
+golang.org/x/sys v0.10.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
