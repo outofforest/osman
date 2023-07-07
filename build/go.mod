@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/outofforest/build v1.12.1
-	github.com/outofforest/buildgo v0.7.1
+	github.com/outofforest/buildgo v0.7.2
 	github.com/outofforest/libexec v0.3.9
 )
 
