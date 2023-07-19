@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/outofforest/go-zfs/v3 v3.1.14
 	github.com/outofforest/ioc/v2 v2.5.2
-	github.com/outofforest/isolator v0.8.2
+	github.com/outofforest/isolator v0.11.0
 	github.com/outofforest/logger v0.4.0
 	github.com/outofforest/parallel v0.2.3
 	github.com/outofforest/run v0.6.0
@@ -40,6 +40,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 )
