@@ -17,15 +17,12 @@ type Command interface {
 
 // ImageBuild represents build in progress
 type ImageBuild interface {
-	// From executes FROM command
-	From(cmd *FromCommand) error
-
 	// Params executes PARAMS command
-	Params(cmd *ParamsCommand) error
+	Params(cmd *ParamsCommand)
 
 	// Run executes RUN command
 	Run(ctx context.Context, cmd *RunCommand) error
 
 	// Boot executes BOOT command
-	Boot(cmd *BootCommand) error
+	Boot(cmd *BootCommand)
 }
