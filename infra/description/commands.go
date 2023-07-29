@@ -3,6 +3,8 @@ package description
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/outofforest/osman/infra/types"
 )
 
@@ -52,7 +54,7 @@ type FromCommand struct {
 
 // Execute executes build command
 func (cmd *FromCommand) Execute(ctx context.Context, build ImageBuild) error {
-	return build.From(cmd)
+	return errors.New("this should not be called")
 }
 
 // ParamsCommand executes PARAMS command
@@ -62,7 +64,8 @@ type ParamsCommand struct {
 
 // Execute executes build command
 func (cmd *ParamsCommand) Execute(ctx context.Context, build ImageBuild) error {
-	return build.Params(cmd)
+	build.Params(cmd)
+	return nil
 }
 
 // RunCommand executes RUN command
@@ -83,5 +86,6 @@ type BootCommand struct {
 
 // Execute executes build command
 func (cmd *BootCommand) Execute(ctx context.Context, build ImageBuild) error {
-	return build.Boot(cmd)
+	build.Boot(cmd)
+	return nil
 }
