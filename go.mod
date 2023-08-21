@@ -13,7 +13,7 @@ require (
 	github.com/beevik/etree v1.2.0
 	github.com/digitalocean/go-libvirt v0.0.0-20221205150000-2939327a8519
 	github.com/google/nftables v0.1.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/outofforest/go-zfs/v3 v3.1.14
 	github.com/outofforest/ioc/v2 v2.5.2
 	github.com/outofforest/isolator v0.12.0
