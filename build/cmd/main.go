@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	build.Main("go-env-v1", nil, me.Commands)
+	build.Main("go-env-v1", me.Commands)
 }
