@@ -20,7 +20,7 @@ mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/local/lib/systemd/system
 
 cp ./bin/osman-app %{buildroot}/usr/bin/osman
-cp ./build/osman.service %{buildroot}/usr/local/lib/systemd/system/osman.service
+cp ./build/osman.service %{buildroot}/usr/lib/systemd/system/osman.service
 
 %files
 /usr/bin/osman
