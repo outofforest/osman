@@ -17,7 +17,7 @@ Tool to manage OS images
 
 %install
 mkdir -p %{buildroot}/usr/bin
-mkdir -p %{buildroot}/usr/local/lib/systemd/system
+mkdir -p %{buildroot}/usr/lib/systemd/system
 
 cp ./bin/osman-app %{buildroot}/usr/bin/osman
 cp ./build/osman.service %{buildroot}/usr/lib/systemd/system/osman.service
