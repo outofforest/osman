@@ -1,7 +1,7 @@
 [Unit]
 Description=Osman starts and stops VMs
-Requires=virtqemud.service virtnetworkd.service virtqemud-admin.socket
-After=virtqemud.service virtnetworkd.service virtqemud-admin.socket
+Requires=virtqemud.service virtnetworkd.service
+After=virtqemud.service virtnetworkd.service
 
 [Service]
 Type=oneshot
