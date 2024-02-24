@@ -13,7 +13,7 @@ require (
 	github.com/beevik/etree v1.2.0
 	github.com/digitalocean/go-libvirt v0.0.0-20221205150000-2939327a8519
 	github.com/google/nftables v0.1.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.4.0
 	github.com/outofforest/go-zfs/v3 v3.1.14
 	github.com/outofforest/ioc/v2 v2.5.2
 	github.com/outofforest/isolator v0.12.0
@@ -22,9 +22,9 @@ require (
 	github.com/outofforest/run v0.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/ridge/must v0.6.0
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/sys v0.11.0
+	golang.org/x/sys v0.14.0
 	libvirt.org/go/libvirtxml v1.9007.0
 )
 
