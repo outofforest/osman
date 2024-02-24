@@ -24,6 +24,6 @@ cp ./build/osman.service %{buildroot}/usr/local/lib/systemd/system/osman.service
 
 %files
 /usr/bin/osman
-/usr/local/lib/systemd/system/osman.service
+/usr/lib/systemd/system/osman.service
 
 %post
