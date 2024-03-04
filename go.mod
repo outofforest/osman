@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sys v0.14.0
-	libvirt.org/go/libvirtxml v1.9007.0
+	libvirt.org/go/libvirtxml v1.10001.0
 )
 
 require (
