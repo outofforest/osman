@@ -1,6 +1,6 @@
 module github.com/outofforest/osman
 
-go 1.20
+go 1.21
 
 // rsc.io is unreliable, take it from github
 replace (
