@@ -731,7 +731,7 @@ func parseMetadata(domainDoc libvirtxml.Domain) (metadata, error) {
 			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
 		}
 		parts2 := strings.SplitN(parts1[2], "/", 2)
-		if len(parts1) != 3 {
+		if len(parts2) != 2 {
 			return metadata{}, errors.Errorf("invalid forward rule %q", rule)
 		}
 

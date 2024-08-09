@@ -13,7 +13,7 @@ require (
 	github.com/beevik/etree v1.4.0
 	github.com/digitalocean/go-libvirt v0.0.0-20221205150000-2939327a8519
 	github.com/google/nftables v0.1.0
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/outofforest/go-zfs/v3 v3.1.14
 	github.com/outofforest/ioc/v2 v2.5.2
 	github.com/outofforest/isolator v0.12.0
@@ -24,8 +24,8 @@ require (
 	github.com/ridge/must v0.6.0
 	github.com/spf13/cobra v1.8.0
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/sys v0.14.0
-	libvirt.org/go/libvirtxml v1.9007.0
+	golang.org/x/sys v0.24.0
+	libvirt.org/go/libvirtxml v1.10006.0
 )
 
 require (
@@ -40,6 +40,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 )
