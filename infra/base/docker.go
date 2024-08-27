@@ -5,14 +5,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/outofforest/isolator"
-	"github.com/outofforest/isolator/wire"
 	"github.com/pkg/errors"
 
+	"github.com/outofforest/isolator"
+	"github.com/outofforest/isolator/wire"
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewDockerInitializer creates new initializer getting base images from docker registry
+// NewDockerInitializer creates new initializer getting base images from docker registry.
 func NewDockerInitializer() Initializer {
 	return &dockerInitializer{}
 }
@@ -20,7 +20,7 @@ func NewDockerInitializer() Initializer {
 type dockerInitializer struct {
 }
 
-// Init fetches image from docker registry and integrates it inside directory
+// Init fetches image from docker registry and integrates it inside directory.
 func (f *dockerInitializer) Init(ctx context.Context, cacheDir, dir string, buildKey types.BuildKey) (retErr error) {
 	cacheDir = filepath.Join(cacheDir, "docker-images")
 	if err := os.MkdirAll(cacheDir, 0o700); err != nil {

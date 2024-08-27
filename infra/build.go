@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/outofforest/isolator"
-	"github.com/outofforest/isolator/wire"
 	"github.com/pkg/errors"
 
+	"github.com/outofforest/isolator"
+	"github.com/outofforest/isolator/wire"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/base"
 	"github.com/outofforest/osman/infra/description"
@@ -17,8 +17,14 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewBuilder creates new image builder
-func NewBuilder(config config.Build, initializer base.Initializer, repo *Repository, storage storage.Driver, parser parser.Parser) *Builder {
+// NewBuilder creates new image builder.
+func NewBuilder(
+	config config.Build,
+	initializer base.Initializer,
+	repo *Repository,
+	storage storage.Driver,
+	parser parser.Parser,
+) *Builder {
 	return &Builder{
 		rebuild:     config.Rebuild,
 		readyBuilds: map[types.BuildKey]bool{},
@@ -29,7 +35,7 @@ func NewBuilder(config config.Build, initializer base.Initializer, repo *Reposit
 	}
 }
 
-// Builder builds images
+// Builder builds images.
 type Builder struct {
 	rebuild     bool
 	readyBuilds map[types.BuildKey]bool
@@ -40,17 +46,29 @@ type Builder struct {
 	parser      parser.Parser
 }
 
-// BuildFromFile builds image from spec file
-func (b *Builder) BuildFromFile(ctx context.Context, cacheDir string, specFile, name string, tags ...types.Tag) (types.BuildID, error) {
+// BuildFromFile builds image from spec file.
+func (b *Builder) BuildFromFile(
+	ctx context.Context,
+	cacheDir string,
+	specFile,
+	name string,
+	tags ...types.Tag,
+) (types.BuildID, error) {
 	return b.buildFromFile(ctx, cacheDir, map[types.BuildKey]bool{}, specFile, name, tags...)
 }
 
-// Build builds images
+// Build builds images.
 func (b *Builder) Build(ctx context.Context, cacheDir string, img *description.Descriptor) (types.BuildID, error) {
 	return b.build(ctx, cacheDir, map[types.BuildKey]bool{}, img)
 }
 
-func (b *Builder) buildFromFile(ctx context.Context, cacheDir string, stack map[types.BuildKey]bool, specFile, name string, tags ...types.Tag) (types.BuildID, error) {
+func (b *Builder) buildFromFile(
+	ctx context.Context,
+	cacheDir string,
+	stack map[types.BuildKey]bool,
+	specFile, name string,
+	tags ...types.Tag,
+) (types.BuildID, error) {
 	commands, err := b.parser.Parse(specFile)
 	if err != nil {
 		return "", err
@@ -58,15 +76,25 @@ func (b *Builder) buildFromFile(ctx context.Context, cacheDir string, stack map[
 	return b.build(ctx, cacheDir, stack, description.Describe(name, tags, commands...))
 }
 
-func (b *Builder) initialize(ctx context.Context, cacheDir string, buildKey types.BuildKey, path string) (retErr error) {
+func (b *Builder) initialize(
+	ctx context.Context,
+	cacheDir string,
+	buildKey types.BuildKey,
+	path string,
+) (retErr error) {
 	if buildKey.Name == "scratch" {
 		return nil
 	}
-	// permissions on path dir has to be set to 755 to allow read access for everyone so linux boots correctly
+	// Permissions on path dir has to be set to 755 to allow read access for everyone so linux boots correctly.
 	return b.initializer.Init(ctx, cacheDir, path, buildKey)
 }
 
-func (b *Builder) build(ctx context.Context, cacheDir string, stack map[types.BuildKey]bool, img *description.Descriptor) (retBuildID types.BuildID, retErr error) {
+func (b *Builder) build(
+	ctx context.Context,
+	cacheDir string,
+	stack map[types.BuildKey]bool,
+	img *description.Descriptor,
+) (retBuildID types.BuildID, retErr error) {
 	if !types.IsNameValid(img.Name()) {
 		return "", errors.Errorf("name %s is invalid", img.Name())
 	}
@@ -116,6 +144,7 @@ func (b *Builder) build(ctx context.Context, cacheDir string, stack map[types.Bu
 		}
 	}()
 
+	//nolint:nestif
 	if commands := img.Commands(); len(commands) == 0 {
 		if len(tags) != 1 {
 			return "", errors.New("for base image exactly one tag is required")
@@ -215,7 +244,7 @@ func (b *Builder) clone(
 		return nil, "", types.BuildInfo{}, errors.Errorf("tag %s is invalid", srcBuildKey.Tag)
 	}
 
-	// Try to clone existing image
+	// Try to clone existing image.
 	err := types.ErrImageDoesNotExist
 	var srcBuildID types.BuildID
 	if !b.rebuild || b.readyBuilds[srcBuildKey] {
@@ -225,7 +254,7 @@ func (b *Builder) clone(
 	switch {
 	case err == nil:
 	case errors.Is(err, types.ErrImageDoesNotExist):
-		// If image does not exist try to build it from file in the current directory but only if tag is a default one
+		// If image does not exist try to build it from file in the current directory but only if tag is a default one.
 		if srcBuildKey.Tag == description.DefaultTag {
 			_, err = b.buildFromFile(ctx, cacheDir, stack, srcBuildKey.Name, srcBuildKey.Name, description.DefaultTag)
 		}
@@ -237,7 +266,7 @@ func (b *Builder) clone(
 	case err == nil:
 	case errors.Is(err, types.ErrImageDoesNotExist):
 		if baseImage := b.repo.Retrieve(srcBuildKey); baseImage != nil {
-			// If spec file does not exist, try building from repository
+			// If spec file does not exist, try building from repository.
 			_, err = b.build(ctx, cacheDir, stack, baseImage)
 		} else {
 			_, err = b.build(ctx, cacheDir, stack, description.Describe(srcBuildKey.Name, types.Tags{srcBuildKey.Tag}))
@@ -296,12 +325,12 @@ type imageBuild struct {
 	manifest types.ImageManifest
 }
 
-// Params sets kernel params for image
+// Params sets kernel params for image.
 func (b *imageBuild) Params(cmd *description.ParamsCommand) {
 	b.manifest.Params = append(b.manifest.Params, cmd.Params...)
 }
 
-// Run is a handler for RUN
+// Run is a handler for RUN.
 func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) error {
 	select {
 	case <-ctx.Done():
@@ -331,7 +360,7 @@ func (b *imageBuild) Run(ctx context.Context, cmd *description.RunCommand) error
 	return errors.WithStack(ctx.Err())
 }
 
-// Boot sets boot option for an image
+// Boot sets boot option for an image.
 func (b *imageBuild) Boot(cmd *description.BootCommand) {
 	b.manifest.Boots = append(b.manifest.Boots, types.Boot{Title: cmd.Title, Params: cmd.Params})
 }

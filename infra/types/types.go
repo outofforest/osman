@@ -14,7 +14,7 @@ import (
 	"github.com/ridge/must"
 )
 
-// ErrImageDoesNotExist is returned if source image does not exist
+// ErrImageDoesNotExist is returned if source image does not exist.
 var ErrImageDoesNotExist = errors.New("image does not exist")
 
 const alphabet = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -41,7 +41,7 @@ func checksum(data string) string {
 	return string(buf)
 }
 
-// RandomString generates random string of fixed length
+// RandomString generates random string of fixed length.
 func RandomString(length int) string {
 	buf := make([]byte, length)
 	must.Any(rand.Read(buf))
@@ -49,7 +49,7 @@ func RandomString(length int) string {
 	return string(buf)
 }
 
-// NewBuildID returns new random build ID
+// NewBuildID returns new random build ID.
 func NewBuildID(buildType BuildType) BuildID {
 	if !buildType.IsValid() {
 		panic(errors.Errorf("invalid build type: %s", buildType))
@@ -58,7 +58,7 @@ func NewBuildID(buildType BuildType) BuildID {
 	return BuildID(buildIDCore + checksum(buildIDCore))
 }
 
-// ParseBuildID parses string into build ID and returns error if string is not a valid one
+// ParseBuildID parses string into build ID and returns error if string is not a valid one.
 func ParseBuildID(strBuildID string) (BuildID, error) {
 	buildID := BuildID(strBuildID)
 	if !buildID.IsValid() {
@@ -67,49 +67,49 @@ func ParseBuildID(strBuildID string) (BuildID, error) {
 	return buildID, nil
 }
 
-// BuildType is the type of build
+// BuildType is the type of build.
 type BuildType string
 
-// IsValid verifies if build type is valid
+// IsValid verifies if build type is valid.
 func (bt BuildType) IsValid() bool {
 	_, exists := buildTypes[bt]
 	return exists
 }
 
-// Properties returns properties of build type
+// Properties returns properties of build type.
 func (bt BuildType) Properties() BuildTypeProperties {
 	return buildTypes[bt]
 }
 
-// BuildTypeProperties contains properties of build type
+// BuildTypeProperties contains properties of build type.
 type BuildTypeProperties struct {
-	// Cloneable means image may be cloned
+	// Cloneable means image may be cloned.
 	Cloneable bool
 
-	// Revertable means image might be reverted to original state
+	// Revertable means image might be reverted to original state.
 	Revertable bool
 
-	// Mountable means image can't be mounted
+	// Mountable means image can't be mounted.
 	Mountable bool
 
-	// AutoMount means image is automatically mounted
+	// AutoMount means image is automatically mounted.
 	AutoMount bool
 
-	// VM means vm in libvirt is defined for this image
+	// VM means vm in libvirt is defined for this image.
 	VM bool
 }
 
 const (
-	// BuildTypeImage is the image build type
+	// BuildTypeImage is the image build type.
 	BuildTypeImage BuildType = "iid"
 
-	// BuildTypeMount is the mount build type
+	// BuildTypeMount is the mount build type.
 	BuildTypeMount BuildType = "mid"
 
-	// BuildTypeBoot is the boot build type
+	// BuildTypeBoot is the boot build type.
 	BuildTypeBoot BuildType = "bid"
 
-	// BuildTypeVM is the vm build type
+	// BuildTypeVM is the vm build type.
 	BuildTypeVM BuildType = "vid"
 )
 
@@ -133,15 +133,15 @@ var buildTypes = map[BuildType]BuildTypeProperties{
 	},
 }
 
-// BuildID is unique ID of build
+// BuildID is unique ID of build.
 type BuildID string
 
-// Type returns type of build encoded inside build ID
+// Type returns type of build encoded inside build ID.
 func (bid BuildID) Type() BuildType {
 	return BuildType(bid[:buildIDPrefixLength])
 }
 
-// IsValid verifies if format of build ID is valid
+// IsValid verifies if format of build ID is valid.
 func (bid BuildID) IsValid() bool {
 	dataLen := buildIDPrefixLength + buildIDLength
 	if len(bid) != dataLen+checksumLength {
@@ -153,7 +153,7 @@ func (bid BuildID) IsValid() bool {
 	return checksum(string(bid[:dataLen])) == string(bid[dataLen:])
 }
 
-// IsValidType verifies if format of build ID is valid and type matches
+// IsValidType verifies if format of build ID is valid and type matches.
 func (bid BuildID) IsValidType(buildType BuildType) bool {
 	if !bid.IsValid() {
 		return false
@@ -163,15 +163,15 @@ func (bid BuildID) IsValidType(buildType BuildType) bool {
 
 var validRegExp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_.:]*$`)
 
-// Tag is the tag of build
+// Tag is the tag of build.
 type Tag string
 
-// IsValid returns true if tag is valid
+// IsValid returns true if tag is valid.
 func (t Tag) IsValid() bool {
 	return validRegExp.MatchString(string(t))
 }
 
-// Tags is a sortable representation of slice of tags
+// Tags is a sortable representation of slice of tags.
 type Tags []Tag
 
 func (t Tags) String() string {
@@ -183,7 +183,7 @@ func (t Tags) String() string {
 	return strings.Join(values, ", ")
 }
 
-// IsNameValid returns true if name is valid
+// IsNameValid returns true if name is valid.
 func IsNameValid(name string) bool {
 	for t := range buildTypes {
 		if strings.HasPrefix(name, string(t)) {
@@ -193,12 +193,12 @@ func IsNameValid(name string) bool {
 	return validRegExp.MatchString(name)
 }
 
-// NewBuildKey returns new build key
+// NewBuildKey returns new build key.
 func NewBuildKey(name string, tag Tag) BuildKey {
 	return BuildKey{Name: name, Tag: tag}
 }
 
-// ParseBuildKey parses string into build key and returns error if string is not a valid one
+// ParseBuildKey parses string into build key and returns error if string is not a valid one.
 func ParseBuildKey(strBuildKey string) (BuildKey, error) {
 	if strBuildKey == "" {
 		return BuildKey{}, errors.New("empty build key received")
@@ -223,26 +223,26 @@ func ParseBuildKey(strBuildKey string) (BuildKey, error) {
 	return BuildKey{Name: name, Tag: tag}, nil
 }
 
-// BuildKey represents Name-Tag pair
+// BuildKey represents Name-Tag pair.
 type BuildKey struct {
 	Name string
 	Tag  Tag
 }
 
-// String returns string representation of build key
+// String returns string representation of build key.
 func (bk BuildKey) String() string {
 	return fmt.Sprintf("%s@%s", bk.Name, bk.Tag)
 }
 
-// IsValid returns true if build key is valid
+// IsValid returns true if build key is valid.
 func (bk BuildKey) IsValid() bool {
 	return IsNameValid(bk.Name) && bk.Tag.IsValid()
 }
 
-// Params is a list of params configured on image
+// Params is a list of params configured on image.
 type Params []string
 
-// Boot represents a boot option for an image
+// Boot represents a boot option for an image.
 type Boot struct {
 	Title  string
 	Params []string
@@ -256,7 +256,7 @@ func (p Params) String() string {
 	return strings.Join(values, ", ")
 }
 
-// ImageManifest contains info about built image
+// ImageManifest contains info about built image.
 type ImageManifest struct {
 	BuildID BuildID
 	BasedOn BuildID
@@ -264,7 +264,7 @@ type ImageManifest struct {
 	Boots   []Boot
 }
 
-// BuildInfo stores all the information about build
+// BuildInfo stores all the information about build.
 type BuildInfo struct {
 	BuildID   BuildID
 	BasedOn   BuildID

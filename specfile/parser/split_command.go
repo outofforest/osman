@@ -63,6 +63,8 @@ func extractBuilderFlags(line string) (string, []string) {
 			}
 			break
 		}
+
+		//nolint:nestif
 		if phase == inWord {
 			if unicode.IsSpace(ch) {
 				phase = inSpaces

@@ -15,7 +15,7 @@ var (
 	_ Command = &BootCommand{}
 )
 
-// From returns handler for FROM command
+// From returns handler for FROM command.
 func From(buildKey types.BuildKey) Command {
 	if buildKey.Tag == "" {
 		buildKey.Tag = DefaultTag
@@ -25,21 +25,21 @@ func From(buildKey types.BuildKey) Command {
 	}
 }
 
-// Params returns handler for PARAMS command
+// Params returns handler for PARAMS command.
 func Params(params ...string) Command {
 	return &ParamsCommand{
 		Params: params,
 	}
 }
 
-// Run returns handler for RUN command
+// Run returns handler for RUN command.
 func Run(command string) Command {
 	return &RunCommand{
 		Command: command,
 	}
 }
 
-// Boot returns handler for BOOT command
+// Boot returns handler for BOOT command.
 func Boot(title string, params []string) Command {
 	return &BootCommand{
 		Title:  title,
@@ -47,44 +47,44 @@ func Boot(title string, params []string) Command {
 	}
 }
 
-// FromCommand executes FROM command
+// FromCommand executes FROM command.
 type FromCommand struct {
 	BuildKey types.BuildKey
 }
 
-// Execute executes build command
+// Execute executes build command.
 func (cmd *FromCommand) Execute(ctx context.Context, build ImageBuild) error {
 	return errors.New("this should not be called")
 }
 
-// ParamsCommand executes PARAMS command
+// ParamsCommand executes PARAMS command.
 type ParamsCommand struct {
 	Params []string
 }
 
-// Execute executes build command
+// Execute executes build command.
 func (cmd *ParamsCommand) Execute(ctx context.Context, build ImageBuild) error {
 	build.Params(cmd)
 	return nil
 }
 
-// RunCommand executes RUN command
+// RunCommand executes RUN command.
 type RunCommand struct {
 	Command string
 }
 
-// Execute executes build command
+// Execute executes build command.
 func (cmd *RunCommand) Execute(ctx context.Context, build ImageBuild) error {
 	return build.Run(ctx, cmd)
 }
 
-// BootCommand executes BOOT command
+// BootCommand executes BOOT command.
 type BootCommand struct {
 	Title  string
 	Params []string
 }
 
-// Execute executes build command
+// Execute executes build command.
 func (cmd *BootCommand) Execute(ctx context.Context, build ImageBuild) error {
 	build.Boot(cmd)
 	return nil

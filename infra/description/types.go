@@ -6,23 +6,23 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// DefaultTag is used if user specified empty tag list
+// DefaultTag is used if user specified empty tag list.
 const DefaultTag types.Tag = "latest"
 
-// Command is implemented by commands available in SpecFile
+// Command is implemented by commands available in SpecFile.
 type Command interface {
-	// Execute executes build command
+	// Execute executes build command.
 	Execute(ctx context.Context, build ImageBuild) error
 }
 
-// ImageBuild represents build in progress
+// ImageBuild represents build in progress.
 type ImageBuild interface {
-	// Params executes PARAMS command
+	// Params executes PARAMS command.
 	Params(cmd *ParamsCommand)
 
-	// Run executes RUN command
+	// Run executes RUN command.
 	Run(ctx context.Context, cmd *RunCommand) error
 
-	// Boot executes BOOT command
+	// Boot executes BOOT command.
 	Boot(cmd *BootCommand)
 }

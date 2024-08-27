@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewTagCommand returns new tag command
+// NewTagCommand returns new tag command.
 func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
@@ -47,6 +47,7 @@ func NewTagCommand(cmdF *CmdFactory) *cobra.Command {
 	formatF = cmdF.AddFormatFlags(cmd)
 	cmd.Flags().StringSliceVar(&tagF.Remove, "remove", []string{}, "Tag to be removed")
 	cmd.Flags().StringSliceVar(&tagF.Add, "add", []string{}, "Tag to be added")
-	cmd.Flags().BoolVar(&tagF.All, "all", false, "It is required to set this flag to tag builds if no filters are provided")
+	cmd.Flags().BoolVar(&tagF.All, "all", false,
+		"It is required to set this flag to tag builds if no filters are provided")
 	return cmd
 }

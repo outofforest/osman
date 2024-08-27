@@ -1,8 +1,8 @@
 module github.com/outofforest/osman
 
-go 1.21
+go 1.23
 
-// rsc.io is unreliable, take it from github
+// rsc.io is unreliable, take it from github.
 replace (
 	rsc.io/binaryregexp => github.com/rsc/binaryregexp v0.2.0
 	rsc.io/quote/v3 => github.com/rsc/quote/v3 v3.1.0

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
@@ -15,7 +15,7 @@ import (
 
 var defaultFields = []string{"BuildID", "BasedOn", "CreatedAt", "Name", "Tags", "Mounted"}
 
-// NewListCommand returns new list command
+// NewListCommand returns new list command.
 func NewListCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
@@ -44,7 +44,8 @@ func NewListCommand(cmdF *CmdFactory) *cobra.Command {
 	}
 
 	storageF = cmdF.AddStorageFlags(cmd)
-	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage, config.BuildTypeMount, config.BuildTypeBoot, config.BuildTypeVM})
+	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage, config.BuildTypeMount, config.BuildTypeBoot,
+		config.BuildTypeVM})
 	formatF = cmdF.AddFormatFlags(cmd)
 	return cmd
 }

@@ -22,10 +22,7 @@ jobs:
           result-encoding: string
           script: return context.ref.replace(/refs\/tags\//, '');
       - name: Build OSMan
-        run: |
-          cd ./build
-          go build -o ../bin/.cache/build ./cmd
-          ../bin/.cache/build build
+        run: bin/builder build
       - name: Build RPM
         id: rpm
         uses: outofforest/rpmbuild@main

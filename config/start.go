@@ -6,22 +6,23 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// StartFactory collects data for start config
+// StartFactory collects data for start config.
 type StartFactory struct {
-	// Tag is the tag applied to started VMs
+	// Tag is the tag applied to started VMs.
 	Tag string
 
-	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
+	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly.
 	XMLDir string
 
-	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM
+	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted
+	// as filesystems in the VM.
 	VolumeDir string
 
-	// LibvirtAddr is the address libvirt listens on
+	// LibvirtAddr is the address libvirt listens on.
 	LibvirtAddr string
 }
 
-// Config returns new start config
+// Config returns new start config.
 func (f *StartFactory) Config() Start {
 	config := Start{
 		XMLDir:      f.XMLDir,
@@ -37,15 +38,16 @@ func (f *StartFactory) Config() Start {
 	return config
 }
 
-// Start stores configuration for start command
+// Start stores configuration for start command.
 type Start struct {
-	// Tag is the tag applied to started VMs
+	// Tag is the tag applied to started VMs.
 	Tag types.Tag
 
-	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly
+	// XMLDir is a directory where VM definition is taken from if xml file is not provided explicitly.
 	XMLDir string
 
-	// VolumeDir is a directory where vm-specific folder exists containing subfolders to be mounted as filesystems in the VM
+	// VolumeDir is a directory where vm-specific folder exists containing subfolders
+	// to be mounted as filesystems in the VM
 	VolumeDir string
 
 	// LibvirtAddr is the address libvirt listens on

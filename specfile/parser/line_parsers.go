@@ -58,7 +58,7 @@ func parseMaybeJSONToList(rest string, d *directives) (*Node, map[string]bool, e
 	if err == nil {
 		return node, attrs, nil
 	}
-	if err == errDockerfileNotStringArray {
+	if errors.Is(err, errDockerfileNotStringArray) {
 		return nil, nil, err
 	}
 
@@ -109,7 +109,7 @@ func parseMaybeJSON(rest string, d *directives) (*Node, map[string]bool, error) 
 	if err == nil {
 		return node, attrs, nil
 	}
-	if err == errDockerfileNotStringArray {
+	if errors.Is(err, errDockerfileNotStringArray) {
 		return nil, nil, err
 	}
 

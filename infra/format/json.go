@@ -6,7 +6,7 @@ import (
 	"github.com/ridge/must"
 )
 
-// NewJSONFormatter returns formatter converting slice into json string
+// NewJSONFormatter returns formatter converting slice into json string.
 func NewJSONFormatter() Formatter {
 	return &jsonFormatter{}
 }
@@ -14,7 +14,7 @@ func NewJSONFormatter() Formatter {
 type jsonFormatter struct {
 }
 
-// Format formats slice into json string
+// Format formats slice into json string.
 func (f *jsonFormatter) Format(slice interface{}, fieldsToPrint ...string) string {
 	marshaled := must.Bytes(json.MarshalIndent(slice, "", "  "))
 	if fieldsToPrint == nil {

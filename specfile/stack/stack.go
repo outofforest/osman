@@ -4,7 +4,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Enable adds stack to error
+// Enable adds stack to error.
 func Enable(err error) error {
 	if err == nil {
 		return nil

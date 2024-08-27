@@ -1,15 +1,15 @@
 package config
 
-// StopFactory collects data for stop config
+// StopFactory collects data for stop config.
 type StopFactory struct {
-	// If no filter is provided it is required to set this flag to stop builds
+	// If no filter is provided it is required to set this flag to stop builds.
 	All bool
 
-	// LibvirtAddr is the address libvirt listens on
+	// LibvirtAddr is the address libvirt listens on.
 	LibvirtAddr string
 }
 
-// Config returns new stop config
+// Config returns new stop config.
 func (f *StopFactory) Config() Stop {
 	config := Stop{
 		All:         f.All,
@@ -18,11 +18,11 @@ func (f *StopFactory) Config() Stop {
 	return config
 }
 
-// Stop stores configuration for stop command
+// Stop stores configuration for stop command.
 type Stop struct {
-	// If no filter is provided it is required to set this flag to stop builds
+	// If no filter is provided it is required to set this flag to stop builds.
 	All bool
 
-	// LibvirtAddr is the address libvirt listens on
+	// LibvirtAddr is the address libvirt listens on.
 	LibvirtAddr string
 }

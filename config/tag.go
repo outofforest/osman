@@ -6,19 +6,19 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// TagFactory collects data for tag config
+// TagFactory collects data for tag config.
 type TagFactory struct {
-	// If no filter is provided it is required to set this flag to tag builds
+	// If no filter is provided it is required to set this flag to tag builds.
 	All bool
 
-	// Remove is the list of tags to remove
+	// Remove is the list of tags to remove.
 	Remove []string
 
-	// Add is the list of tags to add
+	// Add is the list of tags to add.
 	Add []string
 }
 
-// Config returns new tag config
+// Config returns new tag config.
 func (f *TagFactory) Config() Tag {
 	config := Tag{
 		All:    f.All,
@@ -42,7 +42,7 @@ func (f *TagFactory) Config() Tag {
 	return config
 }
 
-// Tag stores configuration related to tag operation
+// Tag stores configuration related to tag operation.
 type Tag struct {
 	// If no filter is provided it is required to set this flag to tag builds
 	All bool

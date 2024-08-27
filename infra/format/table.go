@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// NewTableFormatter returns formatter converting slice into table string
+// NewTableFormatter returns formatter converting slice into table string.
 func NewTableFormatter() Formatter {
 	return &tableFormatter{}
 }
@@ -14,7 +14,7 @@ func NewTableFormatter() Formatter {
 type tableFormatter struct {
 }
 
-// Format formats slice into table string
+// Format formats slice into table string.
 func (f *tableFormatter) Format(objOrSlice interface{}, fieldsToPrint ...string) string {
 	objOrSliceValue := reflect.ValueOf(objOrSlice)
 	objOrSliceType := objOrSliceValue.Type()
@@ -25,7 +25,7 @@ func (f *tableFormatter) Format(objOrSlice interface{}, fieldsToPrint ...string)
 
 	enabledFields := mapEnabledFields(fieldsToPrint)
 	fields := make([]reflect.StructField, 0, elementType.NumField())
-	for i := 0; i < elementType.NumField(); i++ {
+	for i := range elementType.NumField() {
 		field := elementType.Field(i)
 		if field.Anonymous || (!enabledFields[field.Name] && fieldsToPrint != nil) {
 			continue
@@ -47,7 +47,7 @@ func (f *tableFormatter) Format(objOrSlice interface{}, fieldsToPrint ...string)
 	if objOrSliceType.Kind() == reflect.Slice {
 		objOrSliceLen = objOrSliceValue.Len()
 	}
-	for i := 0; i < objOrSliceLen; i++ {
+	for i := range objOrSliceLen {
 		row := make([]string, 0, len(fields))
 		elem := objOrSliceValue
 		if objOrSliceType.Kind() == reflect.Slice {
@@ -80,6 +80,6 @@ func (f *tableFormatter) Format(objOrSlice interface{}, fieldsToPrint ...string)
 		res += "\n"
 	}
 
-	// remove last new line
+	// Remove last new line.
 	return res[:len(res)-1]
 }

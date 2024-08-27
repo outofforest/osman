@@ -9,16 +9,16 @@ import (
 )
 
 const (
-	// BuildTypeImage represents image build
+	// BuildTypeImage represents image build.
 	BuildTypeImage = "image"
 
-	// BuildTypeMount represents mount build
+	// BuildTypeMount represents mount build.
 	BuildTypeMount = "mount"
 
-	// BuildTypeBoot represents boot build
+	// BuildTypeBoot represents boot build.
 	BuildTypeBoot = "boot"
 
-	// BuildTypeVM represents vm build
+	// BuildTypeVM represents vm build.
 	BuildTypeVM = "vm"
 )
 
@@ -29,7 +29,7 @@ var typeMapping = map[string]types.BuildType{
 	BuildTypeVM:    types.BuildTypeVM,
 }
 
-// BuildTypes returns valid build types
+// BuildTypes returns valid build types.
 func BuildTypes() []string {
 	res := make([]string, 0, len(typeMapping))
 	for t := range typeMapping {
@@ -39,16 +39,16 @@ func BuildTypes() []string {
 	return res
 }
 
-// FilterFactory collects data for filter config
+// FilterFactory collects data for filter config.
 type FilterFactory struct {
-	// Untagged filters untagged builds only
+	// Untagged filters untagged builds only.
 	Untagged bool
 
-	// Types is the list of build types to return
+	// Types is the list of build types to return.
 	Types []string
 }
 
-// Config returns new filter config
+// Config returns new filter config.
 func (f *FilterFactory) Config(args Args) Filter {
 	config := Filter{
 		Untagged:  f.Untagged,
@@ -80,7 +80,7 @@ func (f *FilterFactory) Config(args Args) Filter {
 	return config
 }
 
-// Filter stores configuration of filtering criteria
+// Filter stores configuration of filtering criteria.
 type Filter struct {
 	// Untagged filters untagged builds only
 	Untagged bool

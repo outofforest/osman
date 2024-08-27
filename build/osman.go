@@ -2,19 +2,18 @@ package build
 
 import (
 	"context"
-	"os/exec"
 
-	"github.com/outofforest/build"
-	"github.com/outofforest/buildgo"
-	"github.com/outofforest/libexec"
+	"github.com/outofforest/build/v2/pkg/tools"
+	"github.com/outofforest/build/v2/pkg/types"
+	"github.com/outofforest/tools/pkg/tools/golang"
 )
 
-func buildApp(ctx context.Context, deps build.DepsFunc) error {
-	deps(buildgo.EnsureGo)
-	return buildgo.GoBuildPkg(ctx, "cmd", "bin/osman-app", false)
-}
+func buildApp(ctx context.Context, deps types.DepsFunc) error {
+	deps(golang.EnsureGo)
 
-func runApp(ctx context.Context, deps build.DepsFunc) error {
-	deps(buildApp)
-	return libexec.Exec(ctx, exec.Command("./bin/osman-app"))
+	return golang.Build(ctx, deps, golang.BuildConfig{
+		Platform:      tools.PlatformLocal,
+		PackagePath:   "cmd",
+		BinOutputPath: "bin/osman-app",
+	})
 }

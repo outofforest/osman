@@ -1,15 +1,15 @@
 package config
 
-// DropFactory collects data for drop config
+// DropFactory collects data for drop config.
 type DropFactory struct {
-	// If no filter is provided it is required to set this flag to drop builds
+	// If no filter is provided it is required to set this flag to drop builds.
 	All bool
 
-	// LibvirtAddr is the address libvirt listens on
+	// LibvirtAddr is the address libvirt listens on.
 	LibvirtAddr string
 }
 
-// Config returns new drop config
+// Config returns new drop config.
 func (f *DropFactory) Config() Drop {
 	return Drop{
 		All:         f.All,
@@ -17,11 +17,11 @@ func (f *DropFactory) Config() Drop {
 	}
 }
 
-// Drop stores configuration related to drop operation
+// Drop stores configuration related to drop operation.
 type Drop struct {
-	// If no filter is provided it is required to set this flag to drop builds
+	// If no filter is provided it is required to set this flag to drop builds.
 	All bool
 
-	// LibvirtAddr is the address libvirt listens on
+	// LibvirtAddr is the address libvirt listens on.
 	LibvirtAddr string
 }
