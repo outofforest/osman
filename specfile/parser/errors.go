@@ -6,24 +6,24 @@ import (
 	"github.com/outofforest/osman/specfile/stack"
 )
 
-// ErrorLocation gives a location in source code that caused the error
+// ErrorLocation gives a location in source code that caused the error.
 type ErrorLocation struct {
 	Location []Range
 	error
 }
 
-// Unwrap unwraps to the next error
+// Unwrap unwraps to the next error.
 func (e *ErrorLocation) Unwrap() error {
 	return e.error
 }
 
-// Range is a code section between two positions
+// Range is a code section between two positions.
 type Range struct {
 	Start Position
 	End   Position
 }
 
-// Position is a point in source code
+// Position is a point in source code.
 type Position struct {
 	Line      int
 	Character int
@@ -33,7 +33,7 @@ func withLocation(err error, start, end int) error {
 	return WithLocation(err, toRanges(start, end))
 }
 
-// WithLocation extends an error with a source code location
+// WithLocation extends an error with a source code location.
 func WithLocation(err error, location []Range) error {
 	if err == nil {
 		return nil

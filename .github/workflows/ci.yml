@@ -1,20 +1,24 @@
 name: ci
-
 on:
   pull_request:
     branches: [ main ]
-
   workflow_dispatch:
 
 jobs:
   ci:
+    strategy:
+      matrix:
+        command: [
+          "build",
+          "lint/go",
+          "test/go",
+        ]
+
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: CI
-        run: |
-          cd ./build
-          go build -o ../bin/.cache/build ./cmd
-          ../bin/.cache/build dev/lint dev/test build
+      - name: Run ${{ matrix.command }}
+        run: bin/builder tidy/go ${{ matrix.command }} git/isclean

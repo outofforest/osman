@@ -1,12 +1,13 @@
 package commands
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/logger"
-	"github.com/spf13/cobra"
 )
 
-// NewRootCommand returns new root command
+// NewRootCommand returns new root command.
 func NewRootCommand(c *ioc.Container) *cobra.Command {
 	rootCmd := &cobra.Command{
 		SilenceErrors: true,

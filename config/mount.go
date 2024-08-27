@@ -6,16 +6,16 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// MountFactory collects data for mount config
+// MountFactory collects data for mount config.
 type MountFactory struct {
-	// Tags are the tags applied to mounts
+	// Tags are the tags applied to mounts.
 	Tags []string
 
-	// Boot means that the mount is created for booting host machine
+	// Boot means that the mount is created for booting host machine.
 	Boot bool
 }
 
-// Config returns new mount config
+// Config returns new mount config.
 func (f *MountFactory) Config(args Args) Mount {
 	tags := make(types.Tags, 0, len(f.Tags))
 	for _, tag := range f.Tags {
@@ -36,11 +36,11 @@ func (f *MountFactory) Config(args Args) Mount {
 	return config
 }
 
-// Mount stores configuration for mount command
+// Mount stores configuration for mount command.
 type Mount struct {
-	// Type is the type of mount
+	// Type is the type of mount.
 	Type types.BuildType
 
-	// Tags are the tags applied to mounts
+	// Tags are the tags applied to mounts.
 	Tags types.Tags
 }

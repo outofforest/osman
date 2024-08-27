@@ -8,17 +8,17 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/outofforest/go-zfs/v3"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 
+	"github.com/outofforest/go-zfs/v3"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/types"
 )
 
 const propertyName = "co.exw:info"
 
-// NewZFSDriver returns new storage driver based on zfs datasets
+// NewZFSDriver returns new storage driver based on zfs datasets.
 func NewZFSDriver(config config.Storage) Driver {
 	return &zfsDriver{
 		config: config,
@@ -51,7 +51,7 @@ func (d *zfsDriver) Builds(ctx context.Context) ([]types.BuildID, error) {
 	return builds, nil
 }
 
-// Info returns information about build
+// Info returns information about build.
 func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.BuildInfo, error) {
 	filesystem, err := zfs.GetFilesystem(ctx, d.config.Root+"/"+string(buildID))
 	if err != nil {
@@ -63,7 +63,8 @@ func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 		return types.BuildInfo{}, err
 	}
 	if !exists {
-		return types.BuildInfo{}, errors.Errorf("property %s does not exist on filesystem %s", propertyName, filesystem.Info.Name)
+		return types.BuildInfo{}, errors.Errorf("property %s does not exist on filesystem %s", propertyName,
+			filesystem.Info.Name)
 	}
 
 	var buildInfo types.BuildInfo
@@ -80,7 +81,7 @@ func (d *zfsDriver) Info(ctx context.Context, buildID types.BuildID) (types.Buil
 	return buildInfo, nil
 }
 
-// BuildID returns build ID for build given by name and tag
+// BuildID returns build ID for build given by name and tag.
 func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types.BuildID, error) {
 	builds, err := d.Builds(ctx)
 	if err != nil {
@@ -99,18 +100,23 @@ func (d *zfsDriver) BuildID(ctx context.Context, buildKey types.BuildKey) (types
 	return "", errors.WithStack(fmt.Errorf("image %s does not exist: %w", buildKey, types.ErrImageDoesNotExist))
 }
 
-// CreateEmpty creates blank build
-func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID types.BuildID) (FinalizeFn, string, error) {
+// CreateEmpty creates blank build.
+func (d *zfsDriver) CreateEmpty(
+	ctx context.Context,
+	imageName string,
+	buildID types.BuildID,
+) (FinalizeFn, string, error) {
 	buildDir := filepath.Join("/", d.config.Root, string(buildID))
 	mountPoint := filepath.Join(buildDir, "root")
-	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID), zfs.CreateFilesystemOptions{Properties: map[string]string{
-		"mountpoint": mountPoint,
-		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
-			BuildID:   buildID,
-			Name:      imageName,
-			CreatedAt: time.Now(),
-		}))),
-	}})
+	filesystem, err := zfs.CreateFilesystem(ctx, d.config.Root+"/"+string(buildID),
+		zfs.CreateFilesystemOptions{Properties: map[string]string{
+			"mountpoint": mountPoint,
+			propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
+				BuildID:   buildID,
+				Name:      imageName,
+				CreatedAt: time.Now(),
+			}))),
+		}})
 	if err != nil {
 		return nil, "", err
 	}
@@ -133,8 +139,13 @@ func (d *zfsDriver) CreateEmpty(ctx context.Context, imageName string, buildID t
 	}, mountPoint, nil
 }
 
-// Clone clones source build to destination build
-func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImageName string, dstBuildID types.BuildID) (FinalizeFn, string, error) {
+// Clone clones source build to destination build.
+func (d *zfsDriver) Clone(
+	ctx context.Context,
+	srcBuildID types.BuildID,
+	dstImageName string,
+	dstBuildID types.BuildID,
+) (FinalizeFn, string, error) {
 	snapshot, err := zfs.GetSnapshot(ctx, d.config.Root+"/"+string(srcBuildID)+"@image")
 	if err != nil {
 		return nil, "", err
@@ -143,15 +154,16 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	properties := dstBuildID.Type().Properties()
 	buildDir := filepath.Join("/", d.config.Root, string(dstBuildID))
 	mountPoint := filepath.Join(buildDir, "root")
-	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID), zfs.CloneOptions{Properties: map[string]string{
-		"mountpoint": mountPoint,
-		propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
-			BuildID:   dstBuildID,
-			BasedOn:   srcBuildID,
-			Name:      dstImageName,
-			CreatedAt: time.Now(),
-		}))),
-	}})
+	filesystem, err := snapshot.Clone(ctx, d.config.Root+"/"+string(dstBuildID),
+		zfs.CloneOptions{Properties: map[string]string{
+			"mountpoint": mountPoint,
+			propertyName: string(must.Bytes(json.Marshal(types.BuildInfo{
+				BuildID:   dstBuildID,
+				BasedOn:   srcBuildID,
+				Name:      dstImageName,
+				CreatedAt: time.Now(),
+			}))),
+		}})
 	if err != nil {
 		return nil, "", err
 	}
@@ -182,7 +194,7 @@ func (d *zfsDriver) Clone(ctx context.Context, srcBuildID types.BuildID, dstImag
 	}, mountPoint, nil
 }
 
-// StoreManifest stores manifest of build
+// StoreManifest stores manifest of build.
 func (d *zfsDriver) StoreManifest(ctx context.Context, manifest types.ImageManifest) error {
 	info, err := d.Info(ctx, manifest.BuildID)
 	if err != nil {
@@ -193,7 +205,7 @@ func (d *zfsDriver) StoreManifest(ctx context.Context, manifest types.ImageManif
 	return d.setInfo(ctx, info)
 }
 
-// Tag tags build with tag
+// Tag tags build with tag.
 func (d *zfsDriver) Tag(ctx context.Context, buildID types.BuildID, tag types.Tag) error {
 	info, err := d.Info(ctx, buildID)
 	if err != nil {
@@ -229,7 +241,7 @@ func (d *zfsDriver) Tag(ctx context.Context, buildID types.BuildID, tag types.Ta
 	return d.setInfo(ctx, info)
 }
 
-// Untag removes tag from the build
+// Untag removes tag from the build.
 func (d *zfsDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.Tag) error {
 	info, err := d.Info(ctx, buildID)
 	if err != nil {
@@ -248,7 +260,7 @@ func (d *zfsDriver) Untag(ctx context.Context, buildID types.BuildID, tag types.
 	return d.setInfo(ctx, info)
 }
 
-// Drop drops image
+// Drop drops image.
 func (d *zfsDriver) Drop(ctx context.Context, buildID types.BuildID) error {
 	filesystem, err := zfs.GetFilesystem(ctx, d.config.Root+"/"+string(buildID))
 	if err != nil {

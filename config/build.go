@@ -25,7 +25,7 @@ type BuildFactory struct {
 	CacheDir string
 }
 
-// Config creates build config
+// Config creates build config.
 func (f BuildFactory) Config(args Args) Build {
 	must.OK(os.MkdirAll(f.CacheDir, 0o700))
 
@@ -48,18 +48,18 @@ func (f BuildFactory) Config(args Args) Build {
 	return config
 }
 
-// Build stores configuration for build command
+// Build stores configuration for build command.
 type Build struct {
-	// SpecFiles is the list of specfiles to build
+	// SpecFiles is the list of specfiles to build.
 	SpecFiles []string
 
-	// Names is the list of names for corresponding specfiles
+	// Names is the list of names for corresponding specfiles.
 	Names []string
 
-	// Tags are used to tag the build
+	// Tags are used to tag the build.
 	Tags types.Tags
 
-	// Rebuild forces rebuild of all parent images even if they exist
+	// Rebuild forces rebuild of all parent images even if they exist.
 	Rebuild bool
 
 	// CacheDir is the directory where cached files are stored.

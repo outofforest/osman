@@ -3,16 +3,16 @@ package commands
 import (
 	"fmt"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewMountCommand creates new mount command
+// NewMountCommand creates new mount command.
 func NewMountCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory

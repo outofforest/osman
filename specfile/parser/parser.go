@@ -37,7 +37,7 @@ type Node struct {
 	PrevComment []string
 }
 
-// Location return the location of node in source code
+// Location return the location of node in source code.
 func (node *Node) Location() []Range {
 	return toRanges(node.StartLine, node.EndLine)
 }
@@ -72,7 +72,7 @@ func (node *Node) lines(start, end int) {
 	node.EndLine = end
 }
 
-// AddChild adds a new child node, and updates line information
+// AddChild adds a new child node, and updates line information.
 func (node *Node) AddChild(child *Node, startLine, endLine int) {
 	child.lines(startLine, endLine)
 	if node.StartLine < 0 {
@@ -89,7 +89,7 @@ var (
 	reComment    = regexp.MustCompile(`^#.*$`)
 )
 
-// DefaultEscapeToken is the default escape token
+// DefaultEscapeToken is the default escape token.
 const DefaultEscapeToken = '\\'
 
 var validDirectives = map[string]struct{}{
@@ -100,10 +100,10 @@ var validDirectives = map[string]struct{}{
 // directive is the structure used during a build run to hold the state of
 // parsing directives.
 type directives struct {
-	escapeToken           rune                // Current escape token
-	lineContinuationRegex *regexp.Regexp      // Current line continuation regex
-	done                  bool                // Whether we are done looking for directives
-	seen                  map[string]struct{} // Whether the escape directive has been seen
+	escapeToken           rune                // Current escape token.
+	lineContinuationRegex *regexp.Regexp      // Current line continuation regex.
+	done                  bool                // Whether we are done looking for directives.
+	seen                  map[string]struct{} // Whether the escape directive has been seen.
 }
 
 // setEscapeToken sets the default token for escaping characters and as line-
@@ -160,7 +160,7 @@ func (d *directives) possibleParserDirective(line string) error {
 	return nil
 }
 
-// newDefaultDirectives returns a new directives structure with the default escapeToken token
+// newDefaultDirectives returns a new directives structure with the default escapeToken token.
 func newDefaultDirectives() *directives {
 	d := &directives{
 		seen: map[string]struct{}{},
@@ -211,23 +211,23 @@ func newNodeFromLine(line string, d *directives, comments []string) (*Node, erro
 	}, nil
 }
 
-// Result is the result of parsing a SpecFile
+// Result is the result of parsing a SpecFile.
 type Result struct {
 	AST         *Node
 	EscapeToken rune
 	Warnings    []string
 }
 
-// PrintWarnings to the writer
+// PrintWarnings to the writer.
 func (r *Result) PrintWarnings(out io.Writer) {
 	if len(r.Warnings) == 0 {
 		return
 	}
-	fmt.Fprintf(out, strings.Join(r.Warnings, "\n")+"\n")
+	_, _ = fmt.Fprint(out, strings.Join(r.Warnings, "\n")+"\n")
 }
 
 // Parse reads lines from a Reader, parses the lines into an AST and returns
-// the AST and escape token
+// the AST and escape token.
 func Parse(rwc io.Reader) (*Result, error) {
 	d := newDefaultDirectives()
 	currentLine := 0
@@ -354,7 +354,7 @@ func processLine(d *directives, token []byte, stripLeftWhitespace bool) ([]byte,
 	return trimComments(token), d.possibleParserDirective(string(token))
 }
 
-// Variation of bufio.ScanLines that preserves the line endings
+// Variation of bufio.ScanLines that preserves the line endings.
 func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
@@ -369,10 +369,8 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 }
 
 func handleScannerError(err error) error {
-	switch err {
-	case bufio.ErrTooLong:
+	if errors.Is(err, bufio.ErrTooLong) {
 		return errors.Errorf("dockerfile line greater than max allowed size of %d", bufio.MaxScanTokenSize-1)
-	default:
-		return err
 	}
+	return err
 }

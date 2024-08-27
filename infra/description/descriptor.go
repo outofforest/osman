@@ -4,7 +4,7 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// Describe creates descriptor for image
+// Describe creates descriptor for image.
 func Describe(name string, tags types.Tags, commands ...Command) *Descriptor {
 	return &Descriptor{
 		name:     name,
@@ -13,24 +13,24 @@ func Describe(name string, tags types.Tags, commands ...Command) *Descriptor {
 	}
 }
 
-// Descriptor describes future image
+// Descriptor describes future image.
 type Descriptor struct {
 	name     string
 	tags     types.Tags
 	commands []Command
 }
 
-// Name returns name of the image
+// Name returns name of the image.
 func (d *Descriptor) Name() string {
 	return d.name
 }
 
-// Tags returns tags of the image
+// Tags returns tags of the image.
 func (d *Descriptor) Tags() types.Tags {
 	return d.tags
 }
 
-// Commands returns commands
+// Commands returns commands.
 func (d *Descriptor) Commands() []Command {
 	return d.commands
 }

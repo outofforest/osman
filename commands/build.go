@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/ridge/must"
 	"github.com/spf13/cobra"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/description"
@@ -15,7 +15,7 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewBuildCommand creates new build command
+// NewBuildCommand creates new build command.
 func NewBuildCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
 	var formatF *config.FormatFactory
@@ -42,9 +42,13 @@ func NewBuildCommand(cmdF *CmdFactory) *cobra.Command {
 	}
 	storageF = cmdF.AddStorageFlags(cmd)
 	formatF = cmdF.AddFormatFlags(cmd)
-	cmd.Flags().StringSliceVar(&buildF.Names, "name", []string{}, "Name of built image, if empty name is derived from corresponding specfile")
-	cmd.Flags().StringSliceVar(&buildF.Tags, "tag", []string{string(description.DefaultTag)}, "Tags assigned to created build")
-	cmd.Flags().BoolVar(&buildF.Rebuild, "rebuild", false, "If set, all parent images are rebuilt even if they exist")
-	cmd.Flags().StringVar(&buildF.CacheDir, "cache-dir", must.String(os.UserCacheDir())+"/osman", "Path to a directory where files are cached")
+	cmd.Flags().StringSliceVar(&buildF.Names, "name", []string{},
+		"Name of built image, if empty name is derived from corresponding specfile")
+	cmd.Flags().StringSliceVar(&buildF.Tags, "tag", []string{string(description.DefaultTag)},
+		"Tags assigned to created build")
+	cmd.Flags().BoolVar(&buildF.Rebuild, "rebuild", false,
+		"If set, all parent images are rebuilt even if they exist")
+	cmd.Flags().StringVar(&buildF.CacheDir, "cache-dir", must.String(os.UserCacheDir())+"/osman",
+		"Path to a directory where files are cached")
 	return cmd
 }

@@ -1,18 +1,19 @@
+//nolint:dupl
 package commands
 
 import (
 	"fmt"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 )
 
-// NewStopCommand creates new stop command
+// NewStopCommand creates new stop command.
 func NewStopCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
@@ -48,7 +49,9 @@ func NewStopCommand(cmdF *CmdFactory) *cobra.Command {
 	storageF = cmdF.AddStorageFlags(cmd)
 	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeVM})
 	formatF = cmdF.AddFormatFlags(cmd)
-	cmd.Flags().StringVar(&stopF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock", "Address libvirt listens on")
-	cmd.Flags().BoolVar(&stopF.All, "all", false, "It is required to set this flag to stop builds if no filters are provided")
+	cmd.Flags().StringVar(&stopF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock",
+		"Address libvirt listens on")
+	cmd.Flags().BoolVar(&stopF.All, "all", false,
+		"It is required to set this flag to stop builds if no filters are provided")
 	return cmd
 }

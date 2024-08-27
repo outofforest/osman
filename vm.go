@@ -1,3 +1,4 @@
+//nolint:dupl,gocyclo,nestif
 package osman
 
 import (
@@ -20,7 +21,6 @@ import (
 	"github.com/google/nftables/binaryutil"
 	"github.com/google/nftables/expr"
 	"github.com/google/uuid"
-	"github.com/outofforest/parallel"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 	"github.com/vishvananda/netlink"
@@ -28,6 +28,7 @@ import (
 	"libvirt.org/go/libvirtxml"
 
 	"github.com/outofforest/osman/infra/types"
+	"github.com/outofforest/parallel"
 )
 
 const tableNAT = "nat"
@@ -454,7 +455,7 @@ func forwardPorts(meta metadata, ip net.IP, buildID types.BuildID) error {
 			panic(errors.Errorf("unknown proto %q", f.Proto))
 		}
 
-		// forwarding traffic incoming requests
+		// Forwarding traffic incoming requests.
 		c.AddRule(&nftables.Rule{
 			Table:    osmanPreroutingChain.Table,
 			Chain:    osmanPreroutingChain,
@@ -652,7 +653,11 @@ func removeVMFirewallRules(deletedVMs map[types.BuildID]libvirtxml.Domain) error
 	return errors.WithStack(c.Flush())
 }
 
-func removeVMsFromNetwork(l *libvirt.Libvirt, leftVMs map[libvirt.UUID]libvirtxml.Domain, deletedVMs map[types.BuildID]libvirtxml.Domain) error {
+func removeVMsFromNetwork(
+	l *libvirt.Libvirt,
+	leftVMs map[libvirt.UUID]libvirtxml.Domain,
+	deletedVMs map[types.BuildID]libvirtxml.Domain,
+) error {
 	network, err := l.NetworkLookupByName(networkNAT.Name)
 	if isError(err, libvirt.ErrNoNetwork) {
 		return nil
@@ -791,7 +796,8 @@ func prepareMetadata(domainDoc libvirtxml.Domain, info types.BuildInfo) (*libvir
 	}
 	root := osmanDoc.Root()
 	if root.Tag != "osman" {
-		return nil, metadata{}, errors.Errorf("osman:osman tag expected in metadata but %s found instead", root.Tag)
+		return nil, metadata{}, errors.Errorf("osman:osman tag expected in metadata but %s found instead",
+			root.Tag)
 	}
 
 	if root.FindElement("osman:buildID") != nil {
@@ -922,7 +928,8 @@ func prepareDomainDoc(
 	}
 
 	if len(availableVCPUs) < cores {
-		return libvirtxml.Domain{}, errors.Errorf("vm requires more cores (%d) than available on host (%d)", cores, len(availableVCPUs))
+		return libvirtxml.Domain{}, errors.Errorf("vm requires more cores (%d) than available on host (%d)",
+			cores, len(availableVCPUs))
 	}
 
 	domainDoc.CPUTune = &libvirtxml.DomainCPUTune{}
@@ -932,7 +939,7 @@ func prepareDomainDoc(
 		for _, cpuID := range availableVCPUs[i] {
 			domainDoc.CPUTune.VCPUPin = append(domainDoc.CPUTune.VCPUPin, libvirtxml.DomainCPUTuneVCPUPin{
 				VCPU:   vcpuIndex,
-				CPUSet: fmt.Sprintf("%d", cpuID),
+				CPUSet: strconv.FormatUint(uint64(cpuID), 10),
 			})
 			vcpuIndex++
 		}
@@ -1020,7 +1027,6 @@ func deployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDeploy []vmToDeploy
 
 	return parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
 		for _, vmToDeploy := range vmsToDeploy {
-			vmToDeploy := vmToDeploy
 			spawn(vmToDeploy.DomainDoc.Name, parallel.Continue, func(ctx context.Context) error {
 				return deployVM(l, vmToDeploy.DomainDoc, vmToDeploy.IP, vmToDeploy.Mount)
 			})
@@ -1029,8 +1035,13 @@ func deployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDeploy []vmToDeploy
 	})
 }
 
-func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.BuildID]struct{}) (map[types.BuildID]error, error) {
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+func undeployVMs(
+	ctx context.Context,
+	l *libvirt.Libvirt,
+	vmsToDelete map[types.BuildID]struct{},
+) (map[types.BuildID]error, error) {
+	domains, _, err := l.ConnectListAllDomains(1,
+		libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -1064,7 +1075,6 @@ func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.
 	deletedVMs := map[types.BuildID]libvirtxml.Domain{}
 	errParallel := parallel.Run(ctx, func(ctx context.Context, spawn parallel.SpawnFn) error {
 		for buildID := range vmsToDelete {
-			buildID := buildID
 			d, exists := domainsByBuildID[buildID]
 			if !exists {
 				continue
@@ -1081,7 +1091,9 @@ func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.
 				if active == 1 {
 					err = errors.Errorf("vm %q cannot be deleted because it is running", d.Name)
 				} else {
-					err = l.DomainUndefineFlags(d, libvirt.DomainUndefineManagedSave|libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|libvirt.DomainUndefineCheckpointsMetadata)
+					err = l.DomainUndefineFlags(d, libvirt.DomainUndefineManagedSave|
+						libvirt.DomainUndefineSnapshotsMetadata|libvirt.DomainUndefineNvram|
+						libvirt.DomainUndefineCheckpointsMetadata)
 				}
 
 				mu.Lock()
@@ -1111,7 +1123,8 @@ func undeployVMs(ctx context.Context, l *libvirt.Libvirt, vmsToDelete map[types.
 }
 
 func stopVMs(ctx context.Context, l *libvirt.Libvirt, vmsToStop []types.BuildInfo) ([]Result, error) {
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|
+		libvirt.ConnectListDomainsInactive)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -1232,7 +1245,8 @@ func preprocessDomainDocs(l *libvirt.Libvirt, newVMs []vmToDeploy, volumeBaseDir
 	mounts := map[string]string{}
 	forwardingRules := map[string]string{}
 
-	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|libvirt.ConnectListDomainsInactive)
+	domains, _, err := l.ConnectListAllDomains(1, libvirt.ConnectListDomainsActive|
+		libvirt.ConnectListDomainsInactive)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -1250,7 +1264,8 @@ func preprocessDomainDocs(l *libvirt.Libvirt, newVMs []vmToDeploy, volumeBaseDir
 
 		if domainDoc.Devices != nil {
 			for _, iface := range domainDoc.Devices.Interfaces {
-				if iface.Source == nil || iface.Source.Network == nil || iface.Source.Network.Network != networkNAT.Name ||
+				if iface.Source == nil || iface.Source.Network == nil ||
+					iface.Source.Network.Network != networkNAT.Name ||
 					iface.MAC == nil || iface.MAC.Address == "" {
 					continue
 				}
@@ -1283,7 +1298,8 @@ func preprocessDomainDocs(l *libvirt.Libvirt, newVMs []vmToDeploy, volumeBaseDir
 		}
 		macs[mac] = struct{}{}
 
-		domainDoc, err := prepareDomainDoc(vmToDeploy.DomainDoc, capabilitiesDoc, availableVCPUs, volumeBaseDir, vmToDeploy.Image, mac)
+		domainDoc, err := prepareDomainDoc(vmToDeploy.DomainDoc, capabilitiesDoc, availableVCPUs, volumeBaseDir,
+			vmToDeploy.Image, mac)
 		if err != nil {
 			return nil, err
 		}
@@ -1311,7 +1327,8 @@ func preprocessDomainDocs(l *libvirt.Libvirt, newVMs []vmToDeploy, volumeBaseDir
 				}
 
 				if vmName, exists := mounts[fs.Source.Mount.Dir]; exists {
-					return nil, errors.Errorf("mount %s requested by %s has been already taken by %s", fs.Source.Mount.Dir, domainDoc.Name, vmName)
+					return nil, errors.Errorf("mount %s requested by %s has been already taken by %s",
+						fs.Source.Mount.Dir, domainDoc.Name, vmName)
 				}
 				mounts[fs.Source.Mount.Dir] = domainDoc.Name
 			}
@@ -1320,7 +1337,8 @@ func preprocessDomainDocs(l *libvirt.Libvirt, newVMs []vmToDeploy, volumeBaseDir
 		for _, f := range meta.Forwards {
 			key := f.Key()
 			if vmName, exists := forwardingRules[key]; exists {
-				return nil, errors.Errorf("forwarding rule %s requested by %s has been already taken by %s", key, domainDoc.Name, vmName)
+				return nil, errors.Errorf("forwarding rule %s requested by %s has been already taken by %s",
+					key, domainDoc.Name, vmName)
 			}
 			forwardingRules[key] = domainDoc.Name
 		}
@@ -1363,8 +1381,8 @@ func netSize(ipNet *net.IPNet) uint32 {
 
 func isError(err error, expectedError libvirt.ErrorNumber) bool {
 	for err != nil {
-		e, ok := err.(libvirt.Error)
-		if ok {
+		var e libvirt.Error
+		if ok := errors.As(err, e); ok {
 			return e.Code == uint32(expectedError)
 		}
 		err = errors.Unwrap(err)
@@ -1473,7 +1491,7 @@ func joinUInts(vals []uint) string {
 		if result != "" {
 			result += ","
 		}
-		result += fmt.Sprintf("%d", v)
+		result += strconv.FormatUint(uint64(v), 10)
 	}
 	return result
 }

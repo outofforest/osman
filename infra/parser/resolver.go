@@ -5,14 +5,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/pkg/errors"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman/infra/description"
 	"github.com/outofforest/osman/infra/types"
 )
 
-// NewResolvingParser returns new auto resolving parser
+// NewResolvingParser returns new auto resolving parser.
 func NewResolvingParser(c *ioc.Container) Parser {
 	return &resolvingParser{
 		c: c,
@@ -23,7 +23,7 @@ type resolvingParser struct {
 	c *ioc.Container
 }
 
-// Parse parses file using resolver matching the extension of a file
+// Parse parses file using resolver matching the extension of a file.
 func (p *resolvingParser) Parse(filePath string) ([]description.Command, error) {
 	var ext string
 	if i := strings.LastIndex(filePath, "."); i >= 0 {

@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/outofforest/logger"
 	"github.com/pkg/errors"
 	"github.com/ridge/must"
 	"libvirt.org/go/libvirtxml"
 
+	"github.com/outofforest/logger"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra"
 	"github.com/outofforest/osman/infra/description"
@@ -17,8 +17,13 @@ import (
 	"github.com/outofforest/osman/infra/types"
 )
 
-// Build builds image
-func Build(ctx context.Context, build config.Build, s storage.Driver, builder *infra.Builder) ([]types.BuildInfo, error) {
+// Build builds image.
+func Build(
+	ctx context.Context,
+	build config.Build,
+	s storage.Driver,
+	builder *infra.Builder,
+) ([]types.BuildInfo, error) {
 	builds := make([]types.BuildInfo, 0, len(build.SpecFiles))
 	for i, specFile := range build.SpecFiles {
 		must.OK(os.Chdir(filepath.Dir(specFile)))
@@ -35,8 +40,14 @@ func Build(ctx context.Context, build config.Build, s storage.Driver, builder *i
 	return builds, nil
 }
 
-// Mount mounts image
-func Mount(ctx context.Context, storage config.Storage, filtering config.Filter, mount config.Mount, s storage.Driver) (retInfo []types.BuildInfo, retErr error) {
+// Mount mounts image.
+func Mount(
+	ctx context.Context,
+	storage config.Storage,
+	filtering config.Filter,
+	mount config.Mount,
+	s storage.Driver,
+) (retInfo []types.BuildInfo, retErr error) {
 	for i, key := range filtering.BuildKeys {
 		if key.Tag == "" {
 			filtering.BuildKeys[i] = types.NewBuildKey(key.Name, description.DefaultTag)
@@ -59,7 +70,10 @@ func Mount(ctx context.Context, storage config.Storage, filtering config.Filter,
 		}
 
 		if mount.Type == types.BuildTypeBoot && len(image.Boots) == 0 {
-			return nil, errors.Errorf("image %s can't be mounted for booting because it was built without specifying BOOT option(s)", image.BuildID)
+			return nil, errors.Errorf(
+				"image %s can't be mounted for booting because it was built without specifying BOOT option(s)",
+				image.BuildID,
+			)
 		}
 
 		info, err := cloneForMount(ctx, image, storage, mount, s)
@@ -72,8 +86,14 @@ func Mount(ctx context.Context, storage config.Storage, filtering config.Filter,
 	return mounts, nil
 }
 
-// Start starts VMs
-func Start(ctx context.Context, storage config.Storage, filtering config.Filter, start config.Start, s storage.Driver) ([]types.BuildInfo, error) {
+// Start starts VMs.
+func Start(
+	ctx context.Context,
+	storage config.Storage,
+	filtering config.Filter,
+	start config.Start,
+	s storage.Driver,
+) ([]types.BuildInfo, error) {
 	for i, key := range filtering.BuildKeys {
 		if key.Tag == "" {
 			filtering.BuildKeys[i] = types.NewBuildKey(key.Name, description.DefaultTag)
@@ -153,7 +173,7 @@ func Start(ctx context.Context, storage config.Storage, filtering config.Filter,
 	return vms, nil
 }
 
-// Stop stops VMs
+// Stop stops VMs.
 func Stop(ctx context.Context, filtering config.Filter, stop config.Stop, s storage.Driver) ([]Result, error) {
 	if !stop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
 		return nil, errors.New("neither filters are provided nor --all is set")
@@ -175,7 +195,7 @@ func Stop(ctx context.Context, filtering config.Filter, stop config.Stop, s stor
 	return stopVMs(ctx, l, builds)
 }
 
-// List lists builds
+// List lists builds.
 func List(ctx context.Context, filtering config.Filter, s storage.Driver) ([]types.BuildInfo, error) {
 	buildTypes := map[types.BuildType]bool{}
 	for _, buildType := range filtering.Types {
@@ -216,14 +236,20 @@ func List(ctx context.Context, filtering config.Filter, s storage.Driver) ([]typ
 	return list, nil
 }
 
-// Result contains error realted to build ID
+// Result contains error realted to build ID.
 type Result struct {
 	BuildID types.BuildID
 	Result  error
 }
 
-// Drop drops builds
-func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, drop config.Drop, s storage.Driver) ([]Result, error) {
+// Drop drops builds.
+func Drop(
+	ctx context.Context,
+	storage config.Storage,
+	filtering config.Filter,
+	drop config.Drop,
+	s storage.Driver,
+) ([]Result, error) {
 	if !drop.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
 		return nil, errors.New("neither filters are provided nor --all is set")
 	}
@@ -323,7 +349,7 @@ func Drop(ctx context.Context, storage config.Storage, filtering config.Filter, 
 	return results, nil
 }
 
-// Tag removes and add tags to the build
+// Tag removes and add tags to the build.
 func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage.Driver) ([]types.BuildInfo, error) {
 	if !tag.All && len(filtering.BuildIDs) == 0 && len(filtering.BuildKeys) == 0 {
 		return nil, errors.New("neither filters are provided nor All is set")
@@ -360,7 +386,13 @@ func Tag(ctx context.Context, filtering config.Filter, tag config.Tag, s storage
 	return List(ctx, filtering, s)
 }
 
-func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildIDs map[types.BuildID]bool, buildKeys map[types.BuildKey]bool, untagged bool) bool {
+func listBuild(
+	info types.BuildInfo,
+	buildTypes map[types.BuildType]bool,
+	buildIDs map[types.BuildID]bool,
+	buildKeys map[types.BuildKey]bool,
+	untagged bool,
+) bool {
 	if !buildTypes[info.BuildID.Type()] {
 		return false
 	}
@@ -383,7 +415,13 @@ func listBuild(info types.BuildInfo, buildTypes map[types.BuildType]bool, buildI
 	return buildIDs == nil && buildKeys == nil
 }
 
-func cloneForMount(ctx context.Context, image types.BuildInfo, storage config.Storage, mount config.Mount, s storage.Driver) (retInfo types.BuildInfo, retErr error) {
+func cloneForMount(
+	ctx context.Context,
+	image types.BuildInfo,
+	storage config.Storage,
+	mount config.Mount,
+	s storage.Driver,
+) (retInfo types.BuildInfo, retErr error) {
 	buildID := types.NewBuildID(mount.Type)
 	finalizeFn, buildMountpoint, err := s.Clone(ctx, image.BuildID, image.Name, buildID)
 	if err != nil {

@@ -28,10 +28,12 @@ func copyKernel(buildMountPoint string, storage config.Storage, buildID types.Bu
 		if err := os.MkdirAll(kernelDir, 0o755); err != nil {
 			return errors.WithStack(err)
 		}
-		if err := copyFile(filepath.Join(kernelDir, "vmlinuz"), filepath.Join(buildBootDir, "vmlinuz"), 0o755); err != nil {
+		if err := copyFile(filepath.Join(kernelDir, "vmlinuz"), filepath.Join(buildBootDir, "vmlinuz"),
+			0o755); err != nil {
 			return errors.WithStack(err)
 		}
-		return errors.WithStack(copyFile(filepath.Join(kernelDir, "initramfs.img"), filepath.Join(buildBootDir, "initramfs.img"), 0o600))
+		return errors.WithStack(copyFile(filepath.Join(kernelDir, "initramfs.img"),
+			filepath.Join(buildBootDir, "initramfs.img"), 0o600))
 	})
 }
 
@@ -83,7 +85,8 @@ func generateGRUB(ctx context.Context, storage config.Storage, s storage.Driver)
 		if err := os.WriteFile(filepath.Join(grubDir, "grub.cfg"), grubConfig, 0o644); err != nil {
 			return errors.WithStack(err)
 		}
-		return errors.WithStack(os.WriteFile(filepath.Join(grubDir, fmt.Sprintf("grub-%s.cfg", time.Now().UTC().Format(time.RFC3339))), grubConfig, 0o644))
+		return errors.WithStack(os.WriteFile(filepath.Join(grubDir, fmt.Sprintf("grub-%s.cfg",
+			time.Now().UTC().Format(time.RFC3339))), grubConfig, 0o644))
 	})
 }
 

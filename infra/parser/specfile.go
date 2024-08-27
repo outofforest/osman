@@ -12,16 +12,16 @@ import (
 	"github.com/outofforest/osman/specfile/parser"
 )
 
-// NewSpecFileParser creates new specfile parser
+// NewSpecFileParser creates new specfile parser.
 func NewSpecFileParser() Parser {
 	return &specFileParser{}
 }
 
-// Parser parses image description from file
+// Parser parses image description from file.
 type specFileParser struct {
 }
 
-// Parse parses commands from specfile
+// Parse parses commands from specfile.
 func (p *specFileParser) Parse(filePath string) ([]description.Command, error) {
 	file, err := os.Open(filePath)
 	if err != nil {

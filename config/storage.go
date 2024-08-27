@@ -1,15 +1,15 @@
 package config
 
-// StorageFactory collects data for storage config
+// StorageFactory collects data for storage config.
 type StorageFactory struct {
-	// Root is the root location for images
+	// Root is the root location for images.
 	Root string
 
-	// Driver specifies storage driver to use
+	// Driver specifies storage driver to use.
 	Driver string
 }
 
-// Config returns new storage config
+// Config returns new storage config.
 func (f *StorageFactory) Config() Storage {
 	return Storage{
 		Root:   f.Root,
@@ -17,11 +17,11 @@ func (f *StorageFactory) Config() Storage {
 	}
 }
 
-// Storage stores configuration related to storage drivers
+// Storage stores configuration related to storage drivers.
 type Storage struct {
-	// Root is the root location for images
+	// Root is the root location for images.
 	Root string
 
-	// Driver specifies storage driver to use
+	// Driver specifies storage driver to use.
 	Driver string
 }

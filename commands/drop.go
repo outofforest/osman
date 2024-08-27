@@ -1,18 +1,19 @@
+//nolint:dupl
 package commands
 
 import (
 	"fmt"
 
-	"github.com/outofforest/ioc/v2"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/outofforest/ioc/v2"
 	"github.com/outofforest/osman"
 	"github.com/outofforest/osman/config"
 	"github.com/outofforest/osman/infra/format"
 )
 
-// NewDropCommand returns new drop command
+// NewDropCommand returns new drop command.
 func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
 	var storageF *config.StorageFactory
 	var filterF *config.FilterFactory
@@ -48,7 +49,9 @@ func NewDropCommand(cmdF *CmdFactory) *cobra.Command {
 	storageF = cmdF.AddStorageFlags(cmd)
 	filterF = cmdF.AddFilterFlags(cmd, []string{config.BuildTypeImage})
 	formatF = cmdF.AddFormatFlags(cmd)
-	cmd.Flags().StringVar(&dropF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock", "Address libvirt listens on")
-	cmd.Flags().BoolVar(&dropF.All, "all", false, "It is required to set this flag to drop builds if no filters are provided")
+	cmd.Flags().StringVar(&dropF.LibvirtAddr, "libvirt-addr", "unix:///var/run/libvirt/libvirt-sock",
+		"Address libvirt listens on")
+	cmd.Flags().BoolVar(&dropF.All, "all", false,
+		"It is required to set this flag to drop builds if no filters are provided")
 	return cmd
 }

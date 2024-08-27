@@ -1,17 +1,10 @@
 package build
 
 import (
-	"github.com/outofforest/build"
-	"github.com/outofforest/buildgo"
+	"github.com/outofforest/build/v2/pkg/types"
 )
 
-// Commands is a definition of commands available in build system
-var Commands = map[string]build.Command{
-	"setup": {Fn: setup, Description: "Installs tools required by development environment"},
+// Commands is a definition of commands available in build system.
+var Commands = map[string]types.Command{
 	"build": {Fn: buildApp, Description: "Builds osman binary"},
-	"run":   {Fn: runApp, Description: "Builds and runs osman binary"},
-}
-
-func init() {
-	buildgo.AddCommands(Commands)
 }
