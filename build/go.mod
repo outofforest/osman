@@ -6,7 +6,7 @@ toolchain go1.22.6
 
 require (
 	github.com/outofforest/build/v2 v2.2.0
-	github.com/outofforest/tools v1.0.0
+	github.com/outofforest/tools v1.0.4
 )
 
 require (
