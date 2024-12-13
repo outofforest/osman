@@ -51,7 +51,7 @@ func main() {
 				RegisterHandler(wire.Execute{}, executor.ExecuteHandler).
 				RegisterHandler(wire.InflateDockerImage{}, executor.NewInflateDockerImageHandler()),
 		})).
-		Run("osman", func(ctx context.Context, rootCmd *cobra.Command) error {
+		Run(context.Background(), "osman", func(ctx context.Context, rootCmd *cobra.Command) error {
 			return rootCmd.Execute()
 		})
 }
