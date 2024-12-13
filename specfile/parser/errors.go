@@ -6,14 +6,14 @@ import (
 	"github.com/outofforest/osman/specfile/stack"
 )
 
-// ErrorLocation gives a location in source code that caused the error.
-type ErrorLocation struct {
+// LocationError gives a location in source code that caused the error.
+type LocationError struct {
 	Location []Range
 	error
 }
 
 // Unwrap unwraps to the next error.
-func (e *ErrorLocation) Unwrap() error {
+func (e *LocationError) Unwrap() error {
 	return e.error
 }
 
@@ -38,11 +38,11 @@ func WithLocation(err error, location []Range) error {
 	if err == nil {
 		return nil
 	}
-	var el *ErrorLocation
+	var el *LocationError
 	if errors.As(err, &el) {
 		return err
 	}
-	return stack.Enable(&ErrorLocation{
+	return stack.Enable(&LocationError{
 		error:    err,
 		Location: location,
 	})
