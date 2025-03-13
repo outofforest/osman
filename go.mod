@@ -1,7 +1,6 @@
 module github.com/outofforest/osman
 
 go 1.23
-
 // rsc.io is unreliable, take it from github.
 replace (
 	rsc.io/binaryregexp => github.com/rsc/binaryregexp v0.2.0
@@ -24,7 +23,7 @@ require (
 	github.com/ridge/must v0.6.0
 	github.com/spf13/cobra v1.8.1
 	github.com/vishvananda/netlink v1.3.0
-	golang.org/x/sys v0.28.0
+	golang.org/x/sys v0.30.0
 	libvirt.org/go/libvirtxml v1.10009.0
 )
 
@@ -40,7 +39,7 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 )
